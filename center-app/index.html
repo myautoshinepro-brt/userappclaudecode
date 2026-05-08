@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>SparkWash Center</title>
+
+  <!-- PWA -->
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#0f172a">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="SW Center">
+  <link rel="apple-touch-icon" href="/icon.svg">
+  <meta name="description" content="Manage your SparkWash center — bookings, queue, slots and revenue.">
+
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/screens.css">
+  <style>
+    body { display:flex; flex-direction:column; align-items:center; padding:8px; gap:10px; min-height:100vh; background:#e5e7eb; }
+    .phone { width:375px; height:812px; background:#fff; border-radius:40px; overflow:hidden; display:flex; flex-direction:column; box-shadow:0 8px 40px rgba(0,0,0,.2); border:1.5px solid #d1d5db; position:relative; }
+    @media (max-width:480px) { body { padding:0; } .phone { width:100vw; height:100dvh; border-radius:0; border:none; } }
+    [data-screen] { position:absolute; inset:0; display:flex; flex-direction:column; background:#fff; visibility:hidden; pointer-events:none; }
+    [data-screen].screen-active { visibility:visible; pointer-events:all; z-index:1; }
+  </style>
+</head>
+<body>
+
+<!-- Dev nav pills -->
+<div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:center;max-width:375px">
+  <div class="nav-pill" data-screen="login"          onclick="Router.go('login')"          style="font-size:10px;padding:4px 10px;border-radius:18px;border:.5px solid #d1d5db;cursor:pointer">🔑 Login</div>
+  <div class="nav-pill" data-screen="onboard"        onclick="Router.go('onboard')"        style="font-size:10px;padding:4px 10px;border-radius:18px;border:.5px solid #d1d5db;cursor:pointer">🏪 Apply</div>
+  <div class="nav-pill" data-screen="dashboard"      onclick="Router.go('dashboard')"      style="font-size:10px;padding:4px 10px;border-radius:18px;border:.5px solid #d1d5db;cursor:pointer">📊 Dashboard</div>
+  <div class="nav-pill" data-screen="bookings"       onclick="Router.go('bookings')"       style="font-size:10px;padding:4px 10px;border-radius:18px;border:.5px solid #d1d5db;cursor:pointer">📋 Bookings</div>
+  <div class="nav-pill" data-screen="booking-detail" onclick="Router.go('booking-detail')" style="font-size:10px;padding:4px 10px;border-radius:18px;border:.5px solid #d1d5db;cursor:pointer">🔍 Detail</div>
+  <div class="nav-pill" data-screen="queue"          onclick="Router.go('queue')"          style="font-size:10px;padding:4px 10px;border-radius:18px;border:.5px solid #d1d5db;cursor:pointer">🚗 Queue</div>
+  <div class="nav-pill" data-screen="slots"          onclick="Router.go('slots')"          style="font-size:10px;padding:4px 10px;border-radius:18px;border:.5px solid #d1d5db;cursor:pointer">🕐 Slots</div>
+  <div class="nav-pill" data-screen="profile"        onclick="Router.go('profile')"        style="font-size:10px;padding:4px 10px;border-radius:18px;border:.5px solid #d1d5db;cursor:pointer">⚙️ Profile</div>
+  <div class="nav-pill" data-screen="edit-center"    onclick="Router.go('edit-center')"    style="font-size:10px;padding:4px 10px;border-radius:18px;border:.5px solid #d1d5db;cursor:pointer">✏️ Edit</div>
+  <div class="nav-pill" data-screen="manage-packages" onclick="Router.go('manage-packages')" style="font-size:10px;padding:4px 10px;border-radius:18px;border:.5px solid #d1d5db;cursor:pointer">📦 Packages</div>
+  <div class="nav-pill" data-screen="revenue-report"  onclick="Router.go('revenue-report')"  style="font-size:10px;padding:4px 10px;border-radius:18px;border:.5px solid #d1d5db;cursor:pointer">📊 Revenue</div>
+  <div class="nav-pill" data-screen="reviews"         onclick="Router.go('reviews')"         style="font-size:10px;padding:4px 10px;border-radius:18px;border:.5px solid #d1d5db;cursor:pointer">⭐ Reviews</div>
+</div>
+
+<div class="phone">
+  <!-- Status bar -->
+  <div class="status-bar" style="flex-shrink:0">
+    <span>9:41</span><span>🚿 SparkWash</span><span>▲▲▲ 98%</span>
+  </div>
+
+  <!-- Screens container -->
+  <div style="flex:1;position:relative;overflow:hidden">
+
+    <!-- ══════════════════════════════════════
+         LOGIN SCREEN
+    ══════════════════════════════════════ -->
+    <div data-screen="login" id="sc-login">
+      <div class="login-screen scroll-area">
+        <div class="login-top">
+          <div class="login-logo">🚿</div>
+          <div class="login-brand">SparkWash</div>
+          <div class="login-tagline">Center Management App</div>
+        </div>
+        <div class="login-card">
+          <div class="login-heading">Welcome back 👋</div>
+          <div id="login-form-area">
+            <!-- Filled by Auth.renderLogin() -->
+          </div>
+          <div style="text-align:center;margin-top:16px;padding-top:14px;border-top:1px solid var(--border)">
+            <div style="font-size:11px;color:var(--muted);margin-bottom:8px">New center? Want to join SparkWash?</div>
+            <button class="btn btn-outline btn-sm" onclick="Onboarding.start('');Router.go('onboard')">🏪 Apply to Join SparkWash</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         ONBOARDING SCREEN
+    ══════════════════════════════════════ -->
+    <div data-screen="onboard" id="sc-onboard">
+      <div class="login-screen scroll-area">
+        <div class="login-top" style="background:linear-gradient(135deg,#065f46,#0891b2)">
+          <div class="login-logo">🏪</div>
+          <div class="login-brand">Join SparkWash</div>
+          <div class="login-tagline">Onboard your wash center</div>
+        </div>
+        <div class="login-card">
+          <div class="login-heading">Center Application</div>
+          <div id="onboard-form-area">
+            <!-- Filled by Onboarding.render() -->
+          </div>
+          <div style="text-align:center;margin-top:16px">
+            <button class="btn btn-ghost btn-sm" onclick="Auth.renderLogin();Router.go('login')">Already registered? Login →</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         DASHBOARD SCREEN
+    ══════════════════════════════════════ -->
+    <div data-screen="dashboard" id="sc-dashboard">
+      <!-- Header -->
+      <div class="dash-header" style="flex-shrink:0">
+        <div class="dash-header-row">
+          <div>
+            <div class="dash-greeting" id="dash-greeting">Good morning, </div>
+            <div class="dash-center-name" id="dash-center-name"></div>
+          </div>
+          <div class="dash-avatar" id="dash-avatar" onclick="Router.go('profile')">??</div>
+        </div>
+        <div class="dash-date-row">
+          <span>📅</span>
+          <span id="dash-date-label"></span>
+        </div>
+      </div>
+
+      <div class="scroll-area">
+        <!-- Open/close banner -->
+        <div style="padding:12px 14px 0">
+          <div id="open-banner" class="open-banner open">
+            <span>🟢 Center is Open</span>
+            <label class="toggle">
+              <input type="checkbox" checked onchange="DashboardScreen.toggleOpen(this.checked)">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Stats grid -->
+        <div class="dash-stats-grid" id="dash-stats">
+          <div class="flex-center" style="grid-column:1/-1;padding:24px"><span class="spinner"></span></div>
+        </div>
+
+        <!-- Quick actions -->
+        <div class="dash-section">
+          <div class="dash-section-title">Quick Actions</div>
+          <div class="dash-quick-actions" id="dash-quick-actions"></div>
+        </div>
+
+        <!-- Live queue preview -->
+        <div class="dash-section">
+          <div class="dash-section-title" style="display:flex;align-items:center;justify-content:space-between">
+            <span>Live Queue</span>
+            <span style="font-size:11px;color:var(--navy);cursor:pointer" onclick="Router.go('queue')">View all →</span>
+          </div>
+          <div id="dash-queue-preview"></div>
+        </div>
+
+        <div style="height:16px"></div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         BOOKINGS SCREEN
+    ══════════════════════════════════════ -->
+    <div data-screen="bookings" id="sc-bookings">
+      <div class="bookings-header">
+        <div class="header-title">📋 Bookings</div>
+        <div class="header-subtitle" id="bookings-date-sub"></div>
+      </div>
+
+      <div class="bookings-filter-bar" id="bookings-filter">
+        <!-- Filter tabs rendered by BookingsScreen -->
+      </div>
+
+      <div class="scroll-area">
+        <div class="bookings-list" id="bookings-list">
+          <div class="flex-center" style="padding:32px"><span class="spinner"></span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         BOOKING DETAIL SCREEN
+    ══════════════════════════════════════ -->
+    <div data-screen="booking-detail" id="sc-booking-detail">
+      <div class="header">
+        <button class="header-back" onclick="Router.back()">←</button>
+        <div class="header-info">
+          <div class="header-title" id="booking-detail-title">Booking Detail</div>
+          <div class="header-subtitle" id="booking-detail-sub"></div>
+        </div>
+      </div>
+      <div class="scroll-area">
+        <div id="booking-detail-body"></div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         QUEUE SCREEN
+    ══════════════════════════════════════ -->
+    <div data-screen="queue" id="sc-queue">
+      <div class="queue-header">
+        <div class="header-title">🚗 Live Wash Queue</div>
+        <div class="header-subtitle" id="queue-date-sub"></div>
+      </div>
+
+      <div class="queue-summary" id="queue-summary">
+        <!-- Rendered by QueueScreen -->
+      </div>
+
+      <div class="scroll-area">
+        <div class="queue-list" id="queue-list">
+          <div class="flex-center" style="padding:32px"><span class="spinner"></span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         SLOT MANAGER SCREEN
+    ══════════════════════════════════════ -->
+    <div data-screen="slots" id="sc-slots">
+      <div class="slots-header">
+        <div class="header-title">🕐 Slot Manager</div>
+        <div class="header-subtitle" id="slots-date-sub"></div>
+      </div>
+
+      <div class="scroll-area">
+        <div class="slots-body" id="slots-body">
+          <div class="flex-center" style="padding:32px"><span class="spinner"></span></div>
+        </div>
+      </div>
+
+      <!-- Slot edit bottom sheet -->
+      <div class="slot-edit-overlay" id="slot-edit-overlay" onclick="SlotsScreen._overlayClick(event)">
+        <div class="slot-edit-sheet">
+          <div id="slot-edit-content"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         PROFILE / SETTINGS SCREEN
+    ══════════════════════════════════════ -->
+    <div data-screen="profile" id="sc-profile">
+      <div class="scroll-area">
+        <!-- Profile header -->
+        <div class="profile-header">
+          <div class="profile-avatar" id="profile-avatar">??</div>
+          <div class="profile-name" id="profile-owner-name">Owner Name</div>
+          <div class="profile-center" id="profile-center-name">Center Name</div>
+          <div class="profile-mobile" id="profile-mobile">Mobile</div>
+        </div>
+
+        <!-- Center info section -->
+        <div style="padding:14px">
+          <div class="profile-section">
+            <div class="profile-section-title">Center</div>
+            <div class="menu-row" onclick="Router.go('edit-center');ProfileScreen.renderEditCenter()">
+              <span class="menu-ico">🏪</span>
+              <div class="menu-text">
+                <div class="menu-title">Edit Center Info</div>
+                <div class="menu-sub">Name, address, hours, wash types</div>
+              </div>
+              <span class="menu-arrow">›</span>
+            </div>
+            <div class="menu-row" onclick="Router.go('manage-packages')">
+              <span class="menu-ico">📦</span>
+              <div class="menu-text">
+                <div class="menu-title">Manage Packages</div>
+                <div class="menu-sub">Prices, duration, services</div>
+              </div>
+              <span class="menu-arrow">›</span>
+            </div>
+            <div class="menu-row" onclick="UI.toast('👥 Staff Management — coming soon')">
+              <span class="menu-ico">👥</span>
+              <div class="menu-text">
+                <div class="menu-title">Staff Management</div>
+                <div class="menu-sub">Add/remove staff members</div>
+              </div>
+              <span class="menu-arrow">›</span>
+            </div>
+          </div>
+
+          <div class="profile-section">
+            <div class="profile-section-title">Reports</div>
+            <div class="menu-row" onclick="Router.go('revenue-report')">
+              <span class="menu-ico">📊</span>
+              <div class="menu-text">
+                <div class="menu-title">Revenue Report</div>
+                <div class="menu-sub">Daily, weekly, monthly earnings</div>
+              </div>
+              <span class="menu-arrow">›</span>
+            </div>
+            <div class="menu-row" onclick="Router.go('reviews')">
+              <span class="menu-ico">⭐</span>
+              <div class="menu-text">
+                <div class="menu-title">Customer Reviews</div>
+                <div class="menu-sub">Ratings &amp; feedback</div>
+              </div>
+              <span class="menu-arrow">›</span>
+            </div>
+          </div>
+
+          <div class="profile-section">
+            <div class="profile-section-title">Payments &amp; Settlement</div>
+            <div class="menu-row" onclick="Router.go('bank-details');ProfileScreen.renderBankDetails()">
+              <span class="menu-ico">🏦</span>
+              <div class="menu-text">
+                <div class="menu-title">Bank Account Details</div>
+                <div class="menu-sub" id="profile-bank-sub">Add account for SparkWash settlements</div>
+              </div>
+              <span class="menu-arrow">›</span>
+            </div>
+          </div>
+
+          <div class="profile-section">
+            <div class="profile-section-title">Account</div>
+            <div class="menu-row" onclick="Auth.logout()">
+              <span class="menu-ico">🚪</span>
+              <div class="menu-text">
+                <div class="menu-title" style="color:var(--red)">Logout</div>
+              </div>
+            </div>
+          </div>
+
+          <div style="text-align:center;font-size:11px;color:var(--text-tertiary);padding:16px 0">
+            SparkWash Center App v1.0
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         EDIT CENTER SCREEN
+    ══════════════════════════════════════ -->
+    <div data-screen="edit-center" id="sc-edit-center">
+      <div class="header">
+        <button class="header-back" onclick="Router.back()">←</button>
+        <div class="header-info">
+          <div class="header-title">Edit Center Info</div>
+        </div>
+      </div>
+      <div class="scroll-area">
+        <div class="edit-body" id="edit-center-body">
+          <!-- Rendered by ProfileScreen.renderEditCenter() -->
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         BANK DETAILS SCREEN
+    ══════════════════════════════════════ -->
+    <div data-screen="bank-details" id="sc-bank-details">
+      <div class="header">
+        <button class="header-back" onclick="Router.back()">←</button>
+        <div class="header-info">
+          <div class="header-title">🏦 Bank Account</div>
+          <div class="header-subtitle">Settlement bank details</div>
+        </div>
+      </div>
+      <div class="scroll-area">
+        <div class="edit-body" id="bank-details-body">
+          <!-- Rendered by ProfileScreen.renderBankDetails() -->
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         MANAGE PACKAGES SCREEN
+    ══════════════════════════════════════ -->
+    <div data-screen="manage-packages" id="sc-manage-packages">
+      <div class="header">
+        <button class="header-back" onclick="Router.back()">←</button>
+        <div class="header-info">
+          <div class="header-title">📦 Packages</div>
+          <div class="header-subtitle">Prices, duration & services</div>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="PackagesScreen.openEdit(null)" style="margin-right:10px">+ Add</button>
+      </div>
+      <div class="scroll-area">
+        <div id="packages-list" style="padding:12px 14px 80px">
+          <div class="flex-center" style="padding:32px"><span class="spinner"></span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         REVENUE REPORT SCREEN
+    ══════════════════════════════════════ -->
+    <div data-screen="revenue-report" id="sc-revenue-report">
+      <div class="header">
+        <button class="header-back" onclick="Router.back()">←</button>
+        <div class="header-info">
+          <div class="header-title">📊 Revenue Report</div>
+          <div class="header-subtitle" id="rev-period-label">Last 7 days</div>
+        </div>
+      </div>
+      <div class="scroll-area">
+        <div id="revenue-body" style="padding:0 0 80px">
+          <div class="flex-center" style="padding:40px"><span class="spinner"></span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         EDIT PACKAGE SCREEN
+    ══════════════════════════════════════ -->
+    <div data-screen="edit-package" id="sc-edit-package">
+      <div class="header">
+        <button class="header-back" onclick="Router.go('manage-packages')">←</button>
+        <div class="header-info">
+          <div class="header-title" id="edit-package-title">New Package</div>
+          <div class="header-subtitle" id="edit-package-sub"></div>
+        </div>
+      </div>
+      <div class="scroll-area">
+        <div class="edit-body" id="edit-package-body" style="padding:14px 14px 100px">
+          <!-- Rendered by PackagesScreen.renderEditForm() -->
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         REVIEWS SCREEN
+    ══════════════════════════════════════ -->
+    <div data-screen="reviews" id="sc-reviews">
+      <div class="header">
+        <button class="header-back" onclick="Router.back()">←</button>
+        <div class="header-info">
+          <div class="header-title">⭐ Customer Reviews</div>
+          <div class="header-subtitle" id="reviews-subtitle">Ratings &amp; feedback</div>
+        </div>
+      </div>
+
+      <!-- Filter chips -->
+      <div id="reviews-filter-bar"
+           style="flex-shrink:0;display:flex;gap:6px;padding:10px 14px 8px;overflow-x:auto;border-bottom:.5px solid var(--border-light);background:#fff">
+        <!-- rendered by ReviewsScreen -->
+      </div>
+
+      <div class="scroll-area">
+        <div id="reviews-body" style="padding:0 0 80px">
+          <div class="flex-center" style="padding:40px"><span class="spinner"></span></div>
+        </div>
+      </div>
+
+      <!-- Reply bottom sheet -->
+      <div id="reply-overlay"
+           style="display:none;position:absolute;inset:0;background:rgba(0,0,0,.45);z-index:50;align-items:flex-end"
+           onclick="ReviewsScreen._closeReply(event)">
+        <div id="reply-sheet"
+             style="width:100%;background:#fff;border-radius:20px 20px 0 0;padding:20px 16px 28px;box-shadow:0 -4px 24px rgba(0,0,0,.15)">
+          <div style="width:36px;height:4px;background:#e5e7eb;border-radius:2px;margin:0 auto 16px"></div>
+          <div style="font-size:13px;font-weight:700;margin-bottom:4px">Reply to review</div>
+          <div id="reply-sheet-meta" style="font-size:11px;color:var(--text-secondary);margin-bottom:12px"></div>
+          <textarea id="reply-textarea"
+                    style="width:100%;box-sizing:border-box;height:90px;border:1.5px solid var(--border-medium);border-radius:10px;padding:10px 12px;font-size:13px;font-family:inherit;resize:none;outline:none;line-height:1.5"
+                    placeholder="Write a helpful reply to the customer…"
+                    oninput="ReviewsScreen._replyInput(this)"></textarea>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px">
+            <div id="reply-char-count" style="font-size:11px;color:var(--text-tertiary)">0 / 500</div>
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-ghost btn-sm" onclick="ReviewsScreen._closeReply()">Cancel</button>
+              <button class="btn btn-primary btn-sm" id="reply-send-btn" onclick="ReviewsScreen._submitReply()">Send Reply</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- end screens container -->
+
+  <!-- Bottom Nav -->
+  <nav class="bottom-nav">
+    <button class="nav-btn active" data-tab="dashboard" onclick="Router.go('dashboard')">
+      <span class="nav-icon">📊</span>Dashboard
+    </button>
+    <button class="nav-btn" data-tab="bookings" onclick="Router.go('bookings')">
+      <span class="nav-icon">📋</span>Bookings
+    </button>
+    <button class="nav-btn" data-tab="queue" onclick="Router.go('queue')">
+      <span class="nav-icon">🚗</span>Queue
+    </button>
+    <button class="nav-btn" data-tab="slots" onclick="Router.go('slots')">
+      <span class="nav-icon">🕐</span>Slots
+    </button>
+    <button class="nav-btn" data-tab="profile" onclick="Router.go('profile')">
+      <span class="nav-icon">⚙️</span>Settings
+    </button>
+  </nav>
+
+</div><!-- end .phone -->
+
+<!-- Scripts -->
+<script src="js/data.js"></script>
+<script src="js/state.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/router.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/onboarding.js"></script>
+<script src="js/dashboard.js"></script>
+<script src="js/bookings.js"></script>
+<script src="js/queue.js"></script>
+<script src="js/slots.js"></script>
+<script src="js/profile.js"></script>
+<script src="js/packages.js"></script>
+<script src="js/reports.js"></script>
+<script src="js/reviews.js"></script>
+
+<script>
+  // Boot
+  Router.init();
+
+  // Set date labels
+  const _dateLabel = todayLabel();
+  const _dateEls = ['dash-date-label','bookings-date-sub','queue-date-sub','slots-date-sub'];
+  _dateEls.forEach(id => { const el = document.getElementById(id); if(el) el.textContent = _dateLabel; });
+
+  // Restore session or show login
+  Auth.init().then(() => {
+    if (!AppState.token) Auth.renderLogin();
+  });
+</script>
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js')
+        .then(r => console.log('SW registered', r.scope))
+        .catch(e => console.warn('SW registration failed', e));
+    });
+  }
+</script>
+</body>
+</html>

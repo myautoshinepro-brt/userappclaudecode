@@ -1,0 +1,168 @@
+const nodemailer = require('nodemailer');
+
+// ── Transporter (lazy-initialised so server starts even without SMTP config) ──
+let _transporter = null;
+
+function getTransporter() {
+  if (_transporter) return _transporter;
+
+  const host = process.env.SMTP_HOST;
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
+
+  if (!host || !user || !pass) return null;
+
+  _transporter = nodemailer.createTransport({
+    host,
+    port:   parseInt(process.env.SMTP_PORT  || '587', 10),
+    secure: process.env.SMTP_SECURE === 'true',
+    auth:   { user, pass },
+  });
+
+  return _transporter;
+}
+
+// ── Wash-done order summary email ──────────────────────────────
+async function sendWashDoneEmail(booking, center) {
+  const t = getTransporter();
+  if (!t) {
+    console.log('📧 Email skipped — SMTP not configured (set SMTP_HOST/USER/PASS in .env)');
+    return;
+  }
+
+  const to = booking.customer_email;
+  if (!to) {
+    console.log(`📧 Email skipped for ${booking.booking_ref} — no customer email on file`);
+    return;
+  }
+
+  const collectAmount = Math.max(0,
+    (booking.package_price || 0) - (booking.app_discount || 0) - (booking.center_discount || 0)
+  );
+
+  const washIcon  = { water:'💧', dry:'🧴', steam:'💨', d2d:'🚗' }[booking.wash_type] || '🚿';
+  const washLabel = { water:'Water Wash', dry:'Dry Wash', steam:'Steam Wash', d2d:'Door-to-Door' }[booking.wash_type] || booking.wash_type;
+
+  const discountRows = [
+    booking.app_discount > 0
+      ? `<tr><td style="padding:6px 0;color:#166534">🎁 SparkWash offer</td><td style="text-align:right;color:#166534">-₹${booking.app_discount}</td></tr>`
+      : '',
+    booking.center_discount > 0
+      ? `<tr><td style="padding:6px 0;color:#1d4ed8">🏢 Center offer</td><td style="text-align:right;color:#1d4ed8">-₹${booking.center_discount}</td></tr>`
+      : '',
+  ].join('');
+
+  const ratingSection = booking.rating
+    ? `<div style="text-align:center;margin:24px 0">
+         <div style="font-size:13px;color:#6b7280;margin-bottom:6px">Your rating</div>
+         <div style="font-size:28px;letter-spacing:4px">${'⭐'.repeat(booking.rating)}</div>
+       </div>`
+    : `<div style="text-align:center;margin:24px 0;padding:16px;background:#f9fafb;border-radius:10px">
+         <div style="font-size:13px;color:#6b7280">Enjoyed the wash? Drop us a rating next time! 😊</div>
+       </div>`;
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+  <div style="max-width:480px;margin:0 auto;padding:24px 16px">
+
+    <!-- Header -->
+    <div style="background:linear-gradient(135deg,#0f172a,#1e3a5f);border-radius:16px 16px 0 0;padding:28px 24px;text-align:center">
+      <div style="font-size:40px;margin-bottom:8px">🚿</div>
+      <div style="color:#fff;font-size:22px;font-weight:800;letter-spacing:-0.5px">SparkWash</div>
+      <div style="color:#94a3b8;font-size:12px;margin-top:4px">Your car is sparkling clean!</div>
+    </div>
+
+    <!-- Body -->
+    <div style="background:#fff;padding:24px;border-radius:0 0 16px 16px;box-shadow:0 4px 12px rgba(0,0,0,.08)">
+
+      <!-- Greeting -->
+      <h2 style="margin:0 0 4px;font-size:18px;color:#0f172a">✅ Wash Complete!</h2>
+      <p style="margin:0 0 20px;color:#6b7280;font-size:13px">
+        Hi <strong>${booking.customer_name}</strong>, your car wash at <strong>${center.name}</strong> is done.
+      </p>
+
+      <!-- Booking ref chip -->
+      <div style="background:#f0f9ff;border-radius:8px;padding:10px 14px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:11px;color:#64748b;font-weight:600">BOOKING REF</span>
+        <span style="font-size:14px;font-weight:800;color:#0369a1">${booking.booking_ref}</span>
+      </div>
+
+      <!-- Details card -->
+      <div style="border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;margin-bottom:20px">
+        <div style="background:#f8fafc;padding:10px 16px;font-size:11px;font-weight:700;color:#64748b;letter-spacing:.5px">WASH DETAILS</div>
+        <div style="padding:14px 16px;display:grid;gap:10px">
+          <div style="display:flex;justify-content:space-between;font-size:13px">
+            <span style="color:#6b7280">${washIcon} Wash type</span>
+            <span style="font-weight:600">${washLabel}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:13px">
+            <span style="color:#6b7280">📦 Package</span>
+            <span style="font-weight:600">${booking.package_name}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:13px">
+            <span style="color:#6b7280">🚗 Vehicle</span>
+            <span style="font-weight:600">${booking.vehicle_plate}${booking.vehicle_model ? ' · ' + booking.vehicle_model : ''}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:13px">
+            <span style="color:#6b7280">🕐 Slot</span>
+            <span style="font-weight:600">${booking.slot_time} · ${booking.slot_date}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:13px">
+            <span style="color:#6b7280">📍 Center</span>
+            <span style="font-weight:600">${center.name}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Price breakdown -->
+      <div style="border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;margin-bottom:20px">
+        <div style="background:#f8fafc;padding:10px 16px;font-size:11px;font-weight:700;color:#64748b;letter-spacing:.5px">AMOUNT SUMMARY</div>
+        <div style="padding:14px 16px">
+          <table style="width:100%;border-collapse:collapse;font-size:13px">
+            <tr><td style="padding:6px 0;color:#374151">Package price</td><td style="text-align:right;color:#374151">₹${booking.package_price}</td></tr>
+            ${discountRows}
+            <tr><td colspan="2" style="padding:6px 0"><hr style="border:none;border-top:1px dashed #e5e7eb;margin:4px 0"></td></tr>
+            <tr>
+              <td style="padding:6px 0;font-weight:700;font-size:15px;color:#0369a1">💵 Paid at center</td>
+              <td style="text-align:right;font-weight:800;font-size:17px;color:#0369a1">₹${collectAmount}</td>
+            </tr>
+          </table>
+        </div>
+      </div>
+
+      ${ratingSection}
+
+      <!-- Footer note -->
+      <div style="text-align:center;font-size:11px;color:#9ca3af;line-height:1.6;margin-top:8px">
+        Thank you for using SparkWash! 🚗✨<br>
+        Questions? Contact ${center.name} · ${center.mobile || ''}
+      </div>
+    </div>
+
+    <!-- Bottom -->
+    <div style="text-align:center;padding:16px;font-size:10px;color:#9ca3af">
+      SparkWash · Powered by technology, driven by cleanliness
+    </div>
+  </div>
+</body>
+</html>`;
+
+  const from = process.env.SMTP_FROM || `"SparkWash" <${process.env.SMTP_USER}>`;
+
+  try {
+    const info = await t.sendMail({
+      from,
+      to,
+      subject: `✅ Wash complete — ${booking.booking_ref} | ${booking.package_name}`,
+      html,
+    });
+    console.log(`📧 Order summary email sent to ${to} (${info.messageId})`);
+  } catch (err) {
+    console.error(`📧 Failed to send email to ${to}:`, err.message);
+  }
+}
+
+module.exports = { sendWashDoneEmail };

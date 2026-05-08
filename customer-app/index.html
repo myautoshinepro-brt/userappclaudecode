@@ -1,0 +1,1225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>SparkWash — Car Wash Booking</title>
+
+  <!-- PWA -->
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#1e40af">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="SparkWash">
+  <link rel="apple-touch-icon" href="/icon.svg">
+  <meta name="description" content="Book your car wash in seconds. Choose a center, pick a slot, done.">
+
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/screens.css">
+  <style>
+    /* Phone shell for desktop prototyping */
+    body { display:flex; flex-direction:column; align-items:center; padding:8px; gap:10px; min-height:100vh; background:#e5e7eb; }
+    .phone { width:375px; height:812px; background:#fff; border-radius:40px; overflow:hidden; display:flex; flex-direction:column; box-shadow:0 8px 40px rgba(0,0,0,.2); border:1.5px solid #d1d5db; position:relative; }
+    /* Remove phone shell on actual mobile */
+    @media (max-width:480px) { body { padding:0; } .phone { width:100vw; height:100dvh; border-radius:0; border:none; } }
+    /* Screen visibility */
+    [data-screen] { position:absolute; inset:0; display:flex; flex-direction:column; background:#fff; visibility:hidden; pointer-events:none; }
+    [data-screen].screen-active { visibility:visible; pointer-events:all; z-index:1; }
+  </style>
+</head>
+<body>
+
+<!-- Dev nav pills (remove in production) -->
+<div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:center;max-width:375px">
+  <div class="nav-pill" data-screen="login"     onclick="Router.go('login')"     style="font-size:10px;padding:4px 10px;border-radius:18px;border:.5px solid #d1d5db;cursor:pointer">🔑 Login</div>
+  <div class="nav-pill" data-screen="signup"    onclick="Router.go('signup')"    style="font-size:10px;padding:4px 10px;border-radius:18px;border:.5px solid #d1d5db;cursor:pointer">📝 Signup</div>
+  <div class="nav-pill" data-screen="home"      onclick="Router.go('home')"      style="font-size:10px;padding:4px 10px;border-radius:18px;border:.5px solid #d1d5db;cursor:pointer;background:#1a73e8;color:#fff">🏠 Home</div>
+  <div class="nav-pill" data-screen="detail"    onclick="Router.go('detail')"    style="font-size:10px;padding:4px 10px;border-radius:18px;border:.5px solid #d1d5db;cursor:pointer">🔍 Center</div>
+  <div class="nav-pill" data-screen="summary"   onclick="Router.go('summary')"   style="font-size:10px;padding:4px 10px;border-radius:18px;border:.5px solid #d1d5db;cursor:pointer">📋 Summary</div>
+  <div class="nav-pill" data-screen="confirmed" onclick="Router.go('confirmed')" style="font-size:10px;padding:4px 10px;border-radius:18px;border:.5px solid #d1d5db;cursor:pointer">✅ Confirmed</div>
+  <div class="nav-pill" data-screen="manage"    onclick="Router.go('manage')"    style="font-size:10px;padding:4px 10px;border-radius:18px;border:.5px solid #d1d5db;cursor:pointer">📱 Manage</div>
+  <div class="nav-pill" data-screen="bookings"  onclick="Router.go('bookings')"  style="font-size:10px;padding:4px 10px;border-radius:18px;border:.5px solid #d1d5db;cursor:pointer">📋 Bookings</div>
+  <div class="nav-pill" data-screen="profile"   onclick="Router.go('profile')"   style="font-size:10px;padding:4px 10px;border-radius:18px;border:.5px solid #d1d5db;cursor:pointer">👤 Profile</div>
+</div>
+
+<div class="phone">
+  <!-- Status bar -->
+  <div class="status-bar" style="flex-shrink:0">
+    <span>9:41</span><span>✨ SparkWash</span><span>▲▲▲ 98%</span>
+  </div>
+
+  <!-- Screens container -->
+  <div style="flex:1;position:relative;overflow:hidden">
+
+    <!-- ══════════════════════════════════════
+         HOME SCREEN
+    ══════════════════════════════════════ -->
+    <div data-screen="home" id="sc-home">
+      <!-- AT banner (address selected) -->
+      <div class="at-banner" id="at-banner">📍 Home selected</div>
+
+      <!-- Location modal — Zepto-style bottom sheet -->
+      <div class="loc-overlay" id="location-modal" onclick="LocationModal.handleOverlayClick(event)">
+        <div class="loc-sheet" id="loc-sheet">
+
+          <!-- Handle + header -->
+          <div class="loc-handle-bar"><div class="loc-handle"></div></div>
+          <div class="loc-sheet-header">
+            <span class="loc-sheet-title">Select location</span>
+            <button class="loc-close-btn" onclick="LocationModal.close()">✕</button>
+          </div>
+
+          <!-- Map preview -->
+          <div class="loc-map-preview" id="loc-map-preview">
+            <!-- SVG street-map mockup -->
+            <svg width="100%" height="100%" viewBox="0 0 375 140" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+              <rect width="375" height="140" fill="#e8f0fe"/>
+              <!-- roads -->
+              <rect x="0" y="60" width="375" height="20" fill="#fff" opacity=".7"/>
+              <rect x="80" y="0" width="18" height="140" fill="#fff" opacity=".7"/>
+              <rect x="200" y="0" width="18" height="140" fill="#fff" opacity=".7"/>
+              <rect x="300" y="0" width="16" height="140" fill="#fff" opacity=".65"/>
+              <rect x="0" y="110" width="375" height="16" fill="#fff" opacity=".55"/>
+              <!-- blocks -->
+              <rect x="8"   y="6"  width="65" height="48" rx="4" fill="#c7d9f0"/>
+              <rect x="104" y="6"  width="88" height="48" rx="4" fill="#cbd5e1"/>
+              <rect x="224" y="6"  width="68" height="48" rx="4" fill="#c7d9f0"/>
+              <rect x="8"   y="86" width="65" height="46" rx="4" fill="#c7d9f0"/>
+              <rect x="104" y="86" width="88" height="46" rx="4" fill="#cbd5e1"/>
+              <rect x="224" y="86" width="68" height="46" rx="4" fill="#c7d9f0"/>
+              <rect x="320" y="6"  width="48" height="46" rx="4" fill="#d1d5db"/>
+              <rect x="320" y="86" width="48" height="46" rx="4" fill="#d1d5db"/>
+              <!-- green areas -->
+              <rect x="14"  y="14" width="22" height="14" rx="3" fill="#bbf7d0" opacity=".8"/>
+              <rect x="110" y="14" width="18" height="14" rx="3" fill="#bbf7d0" opacity=".8"/>
+            </svg>
+            <!-- animated pin -->
+            <div class="loc-map-pin" id="loc-map-pin">
+              <div class="loc-pin-icon">📍</div>
+              <div class="loc-pin-pulse"></div>
+            </div>
+            <!-- current area label -->
+            <div class="loc-map-label" id="loc-map-label">Andheri West, Mumbai</div>
+          </div>
+
+          <!-- Scrollable content -->
+          <div class="loc-scroll">
+
+            <!-- Search -->
+            <div class="loc-search-row">
+              <span class="loc-search-ico">🔍</span>
+              <input
+                id="area-search-input"
+                class="loc-search-input"
+                type="text"
+                placeholder="Search area, locality or pincode…"
+                autocomplete="off"
+                oninput="LocationModal.filterAreas()"
+                onkeydown="if(event.key==='Enter') LocationModal.confirmTyped()"
+              />
+              <span class="loc-search-clear" id="loc-search-clear" onclick="LocationModal.clearSearch()" style="display:none">✕</span>
+            </div>
+            <!-- Suggestions -->
+            <div class="loc-suggestions" id="area-suggestions"></div>
+
+            <!-- Use GPS -->
+            <div class="loc-gps-row" id="gps-detecting" onclick="LocationModal.detectGPS()">
+              <div class="loc-gps-dot" id="gps-dot"></div>
+              <div class="loc-gps-body">
+                <div class="loc-gps-label">Use current location</div>
+                <div class="loc-gps-sub" id="gps-status-text">Tap to detect via GPS</div>
+              </div>
+              <span class="loc-gps-arrow">›</span>
+            </div>
+
+            <!-- Saved addresses -->
+            <div class="loc-section-hd">SAVED ADDRESSES</div>
+            <div class="loc-addr-list">
+
+              <div class="loc-addr-card" id="lac-h" onclick="LocationModal.selectSaved('h','Andheri West','Home','🏠')">
+                <div class="lac-icon" style="background:#dbeafe">🏠</div>
+                <div class="lac-body">
+                  <div class="lac-label">Home</div>
+                  <div class="lac-line">Flat 402, Sunshine Apt, Andheri West</div>
+                  <div class="lac-dist">📍 Current area · 0.2 km</div>
+                </div>
+                <div class="lac-radio"><div class="lac-radio-dot"></div></div>
+              </div>
+
+              <div class="loc-addr-card" id="lac-o" onclick="LocationModal.selectSaved('o','Bandra East','Office','🏢')">
+                <div class="lac-icon" style="background:#dcfce7">🏢</div>
+                <div class="lac-body">
+                  <div class="lac-label">Office</div>
+                  <div class="lac-line">WeWork, BKC, Bandra East</div>
+                  <div class="lac-dist">📍 8.4 km away</div>
+                </div>
+                <div class="lac-radio"><div class="lac-radio-dot"></div></div>
+              </div>
+
+              <div class="loc-addr-card" id="lac-p" onclick="LocationModal.selectSaved('p','Borivali West','Parents home','👨‍👩‍👦')">
+                <div class="lac-icon" style="background:#fef9c3">👨‍👩‍👦</div>
+                <div class="lac-body">
+                  <div class="lac-label">Parents home</div>
+                  <div class="lac-line">12B, Sai Nagar, Borivali West</div>
+                  <div class="lac-dist">📍 18.1 km away</div>
+                </div>
+                <div class="lac-radio"><div class="lac-radio-dot"></div></div>
+              </div>
+
+              <!-- Add new -->
+              <div class="loc-addr-add" onclick="LocationModal.focusSearch()">
+                <div class="lac-icon-add">＋</div>
+                <div class="lac-body">
+                  <div class="lac-label" style="color:var(--blue)">Add new address</div>
+                  <div class="lac-line">Home, office or any location</div>
+                </div>
+              </div>
+
+            </div>
+
+            <!-- Recent searches -->
+            <div class="loc-section-hd">RECENT SEARCHES</div>
+            <div class="loc-recent-row">
+              <div class="loc-recent-chip" onclick="LocationModal.selectRecent(this,'Andheri West, Mumbai')">🕐 Andheri West</div>
+              <div class="loc-recent-chip" onclick="LocationModal.selectRecent(this,'Juhu, Mumbai')">🕐 Juhu</div>
+              <div class="loc-recent-chip" onclick="LocationModal.selectRecent(this,'Bandra West, Mumbai')">🕐 Bandra West</div>
+              <div class="loc-recent-chip" onclick="LocationModal.selectRecent(this,'Powai, Mumbai')">🕐 Powai</div>
+            </div>
+
+          </div><!-- end loc-scroll -->
+        </div><!-- end loc-sheet -->
+      </div><!-- end loc-overlay -->
+
+      <!-- Header -->
+      <div class="hd">
+        <div class="hd-row">
+          <div>
+            <div class="hd-greeting" id="hd-greeting">
+              Welcome back <span class="wave">👋</span>
+            </div>
+            <div class="hd-loc-row" onclick="LocationModal.open()">
+              <div class="hd-loc-dot" id="location-dot"></div>
+              <span class="hd-loc-label" id="location-label">Home — Andheri West</span>
+              <span class="hd-loc-arrow">▼</span>
+            </div>
+          </div>
+          <div class="hd-bell" onclick="Router.go('notifications')">
+            <span class="hd-bell-icon">🔔</span>
+            <span class="hd-bell-badge" id="hd-bell-badge" style="display:none"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Search -->
+      <div class="search-wrap" style="flex-shrink:0">
+        <div class="search-box">
+          <span style="font-size:13px;color:var(--text-tertiary)">🔍</span>
+          <input class="search-input" id="search-input" placeholder="Center name, area, wash type..." autocomplete="off" oninput="HomeScreen.searchTimer&&clearTimeout(HomeScreen.searchTimer);HomeScreen.searchTimer=setTimeout(()=>{HomeScreen._showDropdown(this.value);HomeScreen._filterCards(this.value);},120)" onfocus="if(!this.value)HomeScreen._showDefaultDropdown();else HomeScreen._showDropdown(this.value)" style="border:none;background:transparent;font-size:12px;flex:1;outline:none">
+          <span class="search-clear" id="search-clear" onmousedown="HomeScreen.clearSearch()">✕</span>
+        </div>
+        <div class="search-dropdown" id="search-dropdown"></div>
+      </div>
+
+      <!-- Filter chips -->
+      <div class="filter-chips">
+        <div class="filter-chip active" data-filter="all"      onclick="HomeScreen.applyFilter(this,'all')">All</div>
+        <div class="filter-chip"        data-filter="nearest"  onclick="HomeScreen.applyFilter(this,'nearest')">📍 Nearest</div>
+        <div class="filter-chip"        data-filter="toprated" onclick="HomeScreen.applyFilter(this,'toprated')">⭐ Top rated</div>
+        <div class="filter-chip"        data-filter="d2d"      onclick="HomeScreen.applyFilter(this,'d2d')">🚗 D2D</div>
+        <div class="filter-chip"        data-filter="open"     onclick="HomeScreen.applyFilter(this,'open')">🟢 Open now</div>
+        <div class="filter-chip"        data-filter="steam"    onclick="HomeScreen.applyFilter(this,'steam')">💨 Steam</div>
+      </div>
+
+      <!-- Scrollable content -->
+      <div class="scroll-area">
+        <!-- Promo banner -->
+        <div class="promo-banner" onclick="Router.go('summary')">
+          <span style="font-size:18px">🎁</span>
+          <div>
+            <div style="font-size:11px;font-weight:700;color:#5d4037">SPARKFIRST10 — 10% off first wash!</div>
+            <div style="font-size:10px;color:#8d6e63;margin-top:1px">Tap to apply at checkout</div>
+          </div>
+        </div>
+
+        <!-- Mini map -->
+        <div class="mini-map">
+          <svg width="100%" height="74" style="position:absolute;inset:0;pointer-events:none"><line x1="0" y1="24" x2="100%" y2="24" stroke="#bfdbfe" stroke-width=".5"/><line x1="0" y1="48" x2="100%" y2="48" stroke="#bfdbfe" stroke-width=".5"/><line x1="80" y1="0" x2="80" y2="74" stroke="#bfdbfe" stroke-width=".5"/><line x1="160" y1="0" x2="160" y2="74" stroke="#bfdbfe" stroke-width=".5"/><line x1="240" y1="0" x2="240" y2="74" stroke="#bfdbfe" stroke-width=".5"/></svg>
+          <div class="map-user-dot" style="top:28px;left:124px"></div>
+          <div class="map-pin" style="background:#1a73e8;top:8px;left:88px"  onclick="HomeScreen.openCenter('c1')"></div>
+          <div class="map-pin" style="background:#2e7d32;top:20px;left:154px" onclick="HomeScreen.openCenter('c2')"></div>
+          <div class="map-pin" style="background:#e65100;top:34px;left:54px"  onclick="HomeScreen.openCenter('c3')"></div>
+          <div class="map-pin" style="background:#5e35b1;top:9px;left:214px" onclick="HomeScreen.openCenter('c4')"></div>
+          <div class="map-pin" style="background:#c62828;top:42px;left:184px" onclick="HomeScreen.openCenter('c5')"></div>
+          <div class="mtag" style="position:absolute;bottom:5px;right:7px;font-size:9px;color:#1e40af;background:#eff6ff;padding:2px 6px;border-radius:6px">📍 5 centers near you</div>
+        </div>
+
+        <!-- Results header -->
+        <div class="results-header">
+          <div style="font-size:12px;font-weight:700;color:var(--text-primary)" id="results-title">Nearby centers</div>
+          <div style="font-size:10px;color:var(--text-secondary)" id="results-count">5 found</div>
+        </div>
+
+        <!-- Center cards -->
+        <div id="center-cards"></div>
+        <div class="nr" id="no-results" style="display:none">😕 No centers found.<br><span style="font-size:11px">Try a different filter.</span></div>
+        <div style="height:12px"></div>
+      </div>
+
+      <!-- Bottom nav -->
+      <div class="bottom-nav">
+        <button class="nav-btn active" data-tab="home" onclick="Router.go('home')"><span class="nav-icon">⌂</span>Home</button>
+        <button class="nav-btn" data-tab="bookings" onclick="Router.go('bookings')"><span class="nav-icon">📋</span>Bookings</button>
+        <button class="nav-btn" data-tab="profile" onclick="Router.go('profile')"><span class="nav-icon">👤</span>Profile</button>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         CENTER DETAIL SCREEN
+    ══════════════════════════════════════ -->
+    <div data-screen="detail" id="sc-detail">
+      <div class="header-sub" id="detail-header" style="background:var(--blue)">
+        <button class="header-back" onclick="Router.go('home')">← Back</button>
+        <div class="header-title" id="detail-center-name">Shine Auto Wash</div>
+        <div class="header-subtitle" id="detail-center-sub">⭐ 4.8 · 1.2 km · Andheri West</div>
+      </div>
+
+      <!-- Photo thumbnails -->
+      <div class="photo-strip">
+        <div class="photo-thumb" style="background:#dbeafe">🚗</div>
+        <div class="photo-thumb" style="background:#dcfce7">💧</div>
+        <div class="photo-thumb" style="background:#fef9c3">✨</div>
+        <div class="photo-thumb" style="background:#ede9fe">💨</div>
+      </div>
+
+      <!-- Wash type tabs -->
+      <div class="wash-tabs">
+        <div class="wash-tab active" data-type="water" onclick="DetailScreen.switchWashType('water',this)"><span class="wash-tab-icon">💧</span><span class="wash-tab-name">Water</span></div>
+        <div class="wash-tab"        data-type="dry"   onclick="DetailScreen.switchWashType('dry',this)">  <span class="wash-tab-icon">🧴</span><span class="wash-tab-name">Dry Wash</span></div>
+        <div class="wash-tab"        data-type="steam" onclick="DetailScreen.switchWashType('steam',this)"><span class="wash-tab-icon">💨</span><span class="wash-tab-name">Steam</span></div>
+        <div class="wash-tab"        data-type="d2d"   onclick="DetailScreen.switchWashType('d2d',this)">  <span class="wash-tab-icon">🚗</span><span class="wash-tab-name">D2D</span></div>
+      </div>
+
+      <!-- Scroll area -->
+      <div class="scroll-area" id="detail-scroll">
+        <div style="height:8px"></div>
+        <div id="package-list"></div>
+
+        <!-- Slot section -->
+        <div class="slot-section" id="slot-section">
+          <div style="font-size:11px;font-weight:700;color:var(--text-primary);margin-bottom:7px">🕐 Pick your slot</div>
+          <div class="date-row" id="detail-date-chips"></div>
+          <div class="slot-time-label">Morning</div>
+          <div class="slot-grid">
+            <div class="slot-chip full">9:00<span class="slot-count">Full</span></div>
+            <div class="slot-chip full">9:30<span class="slot-count">Full</span></div>
+            <div class="slot-chip" onclick="DetailScreen.selectSlot(this,'10:00 AM')">10:00<span class="slot-count">2 left</span></div>
+            <div class="slot-chip active" onclick="DetailScreen.selectSlot(this,'10:30 AM')">10:30<span class="slot-count">5 left</span></div>
+            <div class="slot-chip" onclick="DetailScreen.selectSlot(this,'11:00 AM')">11:00<span class="slot-count">4 left</span></div>
+            <div class="slot-chip" onclick="DetailScreen.selectSlot(this,'11:30 AM')">11:30<span class="slot-count">3 left</span></div>
+            <div class="slot-chip full">12:00<span class="slot-count">Full</span></div>
+            <div class="slot-chip" onclick="DetailScreen.selectSlot(this,'12:30 PM')">12:30<span class="slot-count">2 left</span></div>
+          </div>
+          <div class="slot-time-label">Afternoon</div>
+          <div class="slot-grid">
+            <div class="slot-chip" onclick="DetailScreen.selectSlot(this,'1:00 PM')">1:00<span class="slot-count">5 left</span></div>
+            <div class="slot-chip" onclick="DetailScreen.selectSlot(this,'2:00 PM')">2:00<span class="slot-count">5 left</span></div>
+            <div class="slot-chip" onclick="DetailScreen.selectSlot(this,'3:00 PM')">3:00<span class="slot-count">4 left</span></div>
+            <div class="slot-chip" onclick="DetailScreen.selectSlot(this,'4:00 PM')">4:00<span class="slot-count">5 left</span></div>
+            <div class="slot-chip" onclick="DetailScreen.selectSlot(this,'5:00 PM')">5:00<span class="slot-count">3 left</span></div>
+            <div class="slot-chip full">6:00<span class="slot-count">Full</span></div>
+          </div>
+        </div>
+        <div style="height:14px"></div>
+      </div>
+
+      <!-- Bottom bar -->
+      <div class="bottom-bar">
+        <div class="bottom-bar-summary" id="booking-summary-bar">
+          <div style="flex:1;min-width:0">
+            <div class="bottom-bar-pkg-name" id="bar-pkg-name">—</div>
+            <div class="bottom-bar-pkg-sub"  id="bar-pkg-sub">—</div>
+          </div>
+          <div class="bottom-bar-price" id="bar-pkg-price">—</div>
+        </div>
+        <button class="bottom-bar-cta empty" id="booking-cta" onclick="DetailScreen.proceed()">Select a package to continue</button>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         SUMMARY SCREEN
+    ══════════════════════════════════════ -->
+    <div data-screen="summary" id="sc-summary">
+      <!-- Promo overlay -->
+      <div class="promo-overlay" id="promo-overlay" onclick="if(event.target===this)SummaryScreen.closePromoSheet()">
+        <div class="promo-sheet">
+          <div style="width:35px;height:4px;background:var(--border-medium);border-radius:2px;margin:10px auto 0"></div>
+          <div class="sheet-header">
+            <div class="sheet-title">🎟️ Promo codes</div>
+            <button class="sheet-close" onclick="SummaryScreen.closePromoSheet()">✕</button>
+          </div>
+          <div class="promo-input-row">
+            <input class="promo-text-input" id="promo-code-input" placeholder="Type code manually..." oninput="this.value=this.value.toUpperCase()" onkeydown="if(event.key==='Enter')SummaryScreen.applyManualCode()">
+            <button class="promo-apply-btn" onclick="SummaryScreen.applyManualCode()">Apply</button>
+          </div>
+          <div id="promo-error" style="font-size:11px;color:var(--red);padding:0 13px 7px;display:none"></div>
+          <div style="display:flex;align-items:center;gap:7px;padding:0 13px 9px"><div style="flex:1;height:.5px;background:var(--border-light)"></div><div style="font-size:9px;color:var(--text-tertiary);white-space:nowrap">or choose from available offers</div><div style="flex:1;height:.5px;background:var(--border-light)"></div></div>
+          <div style="padding:0 13px 13px" id="promo-cards-wrap"></div>
+        </div>
+      </div>
+
+      <!-- Vehicle picker sheet -->
+      <div class="veh-overlay" id="veh-overlay" onclick="if(event.target===this)VehiclePicker.close()">
+        <div class="veh-sheet" id="veh-sheet">
+          <div class="veh-sheet-handle-bar"><div class="veh-sheet-handle"></div></div>
+          <div class="veh-sheet-header">
+            <span class="veh-sheet-title">Select vehicle to wash</span>
+            <button class="veh-sheet-close" onclick="VehiclePicker.close()">✕</button>
+          </div>
+          <div id="veh-list" class="veh-list"></div>
+          <div class="veh-add-row" onclick="Router.go('vehicles')">
+            <div class="veh-add-icon-wrap">＋</div>
+            <div>
+              <div class="veh-add-label">Add new vehicle</div>
+              <div class="veh-add-sub">Car, bike, SUV or any vehicle</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="header-sub" style="background:var(--blue)">
+        <button class="header-back" onclick="Router.go('detail')">← Edit selection</button>
+        <div class="header-title">Booking summary</div>
+        <div class="header-subtitle">Review before confirming</div>
+      </div>
+
+      <div class="scroll-area">
+        <div style="padding:11px 13px 0">
+          <div class="section-head">Booking details</div>
+          <div class="summary-card">
+            <div class="summary-row"><span class="summary-label">Center</span><span class="summary-value" id="sum-center-name">—</span></div>
+            <div class="summary-row"><span class="summary-label">Package</span><span class="summary-value" id="sum-pkg-name">—</span></div>
+            <div class="summary-row"><span class="summary-label">Wash type</span><span class="summary-value" id="sum-wash-type">—</span></div>
+            <div class="summary-row"><span class="summary-label">Date & time</span><span class="summary-value" id="sum-slot">—</span></div>
+            <div class="summary-row"><span class="summary-label">Duration</span><span class="summary-value" id="sum-duration">—</span></div>
+          </div>
+
+          <!-- Vehicle picker section -->
+          <div class="section-head">
+            Vehicle to wash
+            <span class="section-head-sub" id="veh-section-sub"></span>
+          </div>
+          <div id="vehicle-picker-section"></div>
+
+          <div class="section-head">What's included</div>
+          <div class="summary-card" id="sum-included"></div>
+
+          <div class="section-head">Promo code</div>
+          <div class="promo-trigger" id="promo-trigger" onclick="SummaryScreen.openPromoSheet()">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="font-size:15px">🎟️</span>
+              <div>
+                <div class="promo-trigger-text" id="promo-trigger-text">Select promo code</div>
+                <div class="promo-trigger-badge" id="promo-trigger-badge">—</div>
+              </div>
+            </div>
+            <span id="promo-trigger-arrow" style="font-size:12px;color:var(--text-tertiary)">›</span>
+          </div>
+          <div class="promo-applied-strip" id="promo-applied-strip">
+            <div style="display:flex;align-items:center;gap:6px">
+              <span style="font-size:13px">✅</span>
+              <div>
+                <div style="font-size:11px;font-weight:700;color:#166534" id="promo-applied-name">—</div>
+                <div style="font-size:10px;color:#166534;opacity:.8" id="promo-applied-desc">—</div>
+              </div>
+            </div>
+            <button onclick="SummaryScreen.removePromo()" style="font-size:10px;padding:3px 8px;border-radius:7px;border:1px solid #86efac;background:transparent;color:var(--green);font-weight:700;cursor:pointer">Remove</button>
+          </div>
+
+          <div class="section-head">Price breakdown</div>
+          <div class="summary-card transparent">
+            <div class="summary-row"><span class="summary-label">Package price</span><span class="summary-value" id="sum-base-price">—</span></div>
+            <div class="summary-row" id="sum-app-discount-row" style="display:none">
+              <span class="summary-label" style="color:var(--green)">🎁 SparkWash offer</span>
+              <span class="summary-value" style="color:var(--green)" id="sum-app-discount-val">—</span>
+            </div>
+            <div class="summary-row" id="sum-center-discount-row" style="display:none">
+              <span class="summary-label" style="color:var(--blue)">🏢 Center offer</span>
+              <span class="summary-value" style="color:var(--blue)" id="sum-center-discount-val">—</span>
+            </div>
+          </div>
+
+          <!-- Pay at center box -->
+          <div style="background:linear-gradient(135deg,var(--navy),#1e40af);border-radius:14px;padding:14px 16px;margin:10px 0;display:flex;align-items:center;justify-content:space-between">
+            <div>
+              <div style="font-size:11px;color:rgba(255,255,255,.75);margin-bottom:2px">💵 Pay at center on arrival</div>
+              <div style="font-size:10px;color:rgba(255,255,255,.6)">No online payment · Pay directly to center staff</div>
+            </div>
+            <div style="font-size:22px;font-weight:900;color:#fff" id="sum-collect-amount">—</div>
+          </div>
+
+          <!-- Settlement note (shown only when SparkWash promo applied) -->
+          <div id="sum-settlement-note" style="display:none;align-items:center;gap:6px;background:#f0fdf4;border-radius:10px;padding:9px 12px;margin-bottom:6px;font-size:11px;color:var(--green)">
+            <span>✅</span>
+            <span>SparkWash promo credited to center within 24 hrs of wash completion</span>
+          </div>
+
+          <button class="btn btn-green" id="confirm-pay-btn" onclick="SummaryScreen.confirmAndPay()">✅ Confirm Booking →</button>
+          <div style="font-size:10px;color:var(--text-tertiary);text-align:center;margin:7px 0 13px">Free cancellation up to 1 hr before · Pay at center after wash</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         CONFIRMED SCREEN
+    ══════════════════════════════════════ -->
+    <div data-screen="confirmed" id="sc-confirmed">
+      <div class="scroll-area">
+        <div class="confirm-body">
+          <div class="confirm-icon">✅</div>
+          <div style="font-size:17px;font-weight:700;color:var(--text-primary);margin-bottom:4px;text-align:center">Booking confirmed!</div>
+          <div style="font-size:11px;color:var(--text-secondary);margin-bottom:12px;text-align:center">WhatsApp sent to +91 98765 43210</div>
+          <div class="confirm-card">
+            <div class="confirm-row"><span class="confirm-label">Booking ID</span><span class="confirm-value" id="conf-booking-id">#SW20490</span></div>
+            <div class="confirm-row"><span class="confirm-label">Center</span><span class="confirm-value" id="conf-center-name">Shine Auto Wash</span></div>
+            <div class="confirm-row"><span class="confirm-label">Package</span><span class="confirm-value" id="conf-pkg-name">—</span></div>
+            <div class="confirm-row"><span class="confirm-label">Vehicle</span><span class="confirm-value" id="conf-vehicle">—</span></div>
+            <div class="confirm-row"><span class="confirm-label">Date & time</span><span class="confirm-value" id="conf-slot">—</span></div>
+            <div class="confirm-row"><span class="confirm-label">Duration</span><span class="confirm-value" id="conf-duration">—</span></div>
+            <div class="confirm-row"><span class="confirm-label">💵 Pay at center</span><span class="confirm-value" style="color:var(--navy);font-weight:800" id="conf-amount-paid">—</span></div>
+            <div class="confirm-row"><span class="confirm-label">Status</span><span class="confirm-value" style="color:var(--green)">✓ Confirmed</span></div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;width:100%;margin-bottom:7px">
+            <button onclick="Router.go('manage')"   style="padding:10px;background:#eff6ff;color:var(--blue);border:none;border-radius:10px;font-size:11px;font-weight:700;cursor:pointer">📋 Manage</button>
+            <button onclick="Router.go('bookings')" style="padding:10px;background:#e8f5e9;color:var(--green);border:none;border-radius:10px;font-size:11px;font-weight:700;cursor:pointer">📋 My Bookings</button>
+          </div>
+          <button onclick="Router.go('home')" style="width:100%;padding:9px;background:transparent;border:.5px solid var(--border-medium);border-radius:10px;font-size:11px;color:var(--text-secondary);cursor:pointer">Book another wash</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         MANAGE SCREEN
+    ══════════════════════════════════════ -->
+    <div data-screen="manage" id="sc-manage">
+      <!-- Modify overlay -->
+      <div class="overlay" id="modify-overlay">
+        <div class="bottom-sheet">
+          <div class="sheet-handle"></div>
+          <div class="modify-sheet-content">
+            <div style="font-size:13px;font-weight:700;color:var(--text-primary);margin-bottom:10px">✏️ Modify booking</div>
+            <div class="modify-section-label">Change date</div>
+            <div id="modify-date-chips" style="display:flex;gap:5px;margin-bottom:9px;overflow-x:auto;scrollbar-width:none"></div>
+            <div class="modify-section-label">Change slot</div>
+            <div class="modify-slot-grid">
+              <div class="modify-slot full">9:00</div>
+              <div class="modify-slot" onclick="BookingScreen.selectModifySlot(this,'9:30 AM')">9:30</div>
+              <div class="modify-slot" onclick="BookingScreen.selectModifySlot(this,'10:00 AM')">10:00</div>
+              <div class="modify-slot active" onclick="BookingScreen.selectModifySlot(this,'10:30 AM')">10:30</div>
+              <div class="modify-slot" onclick="BookingScreen.selectModifySlot(this,'11:00 AM')">11:00</div>
+              <div class="modify-slot" onclick="BookingScreen.selectModifySlot(this,'11:30 AM')">11:30</div>
+              <div class="modify-slot full">12:00</div>
+              <div class="modify-slot" onclick="BookingScreen.selectModifySlot(this,'2:00 PM')">2:00</div>
+            </div>
+            <div class="modify-section-label">Change package</div>
+            <select class="form-input" style="cursor:pointer;margin-bottom:9px">
+              <option>💧 Exterior Wash — ₹199</option>
+              <option selected>💧 Exterior + Vacuum — ₹349</option>
+              <option>💧 Full Body Detailing — ₹549</option>
+              <option>🧴 Basic Dry Wash — ₹149</option>
+              <option>💨 Full Steam Wash — ₹549</option>
+              <option>🚗 D2D Water + Vacuum — ₹449</option>
+            </select>
+            <button class="btn btn-primary" onclick="BookingScreen.saveModify()" style="margin-bottom:5px">✓ Save changes</button>
+            <button onclick="BookingScreen.closeModify()" style="width:100%;padding:8px;background:transparent;border:none;font-size:11px;color:var(--text-secondary);cursor:pointer">Cancel</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="header-sub" style="background:var(--blue)">
+        <button class="header-back" onclick="Router.go('confirmed')">← Back</button>
+        <div class="header-title">Manage booking</div>
+        <div class="header-subtitle">#SW20490 · Shine Auto Wash</div>
+      </div>
+      <div class="scroll-area">
+        <div style="display:flex;align-items:center;gap:7px;padding:9px 11px;border-radius:10px;margin:10px 13px;font-size:11px;font-weight:700;background:#e8f5e9;color:#2e7d32">
+          <div class="pulse"></div><span>Booking confirmed — waiting for wash</span>
+        </div>
+        <div class="manage-map-wrap">
+          <div class="manage-map" onclick="UI.toast('📍 Opening Google Maps...')">
+            <svg width="100%" height="82" style="position:absolute;inset:0"><rect width="100%" height="82" fill="#dbeafe"/><rect x="0" y="34" width="100%" height="14" fill="#e2eaf6"/><rect x="62" y="0" width="12" height="82" fill="#e2eaf6"/><rect x="142" y="0" width="12" height="82" fill="#e2eaf6"/><rect x="9" y="7" width="46" height="23" rx="3" fill="#c7d9f0"/><rect x="78" y="7" width="56" height="23" rx="3" fill="#c7d9f0"/><rect x="78" y="52" width="56" height="22" rx="3" fill="#bfdbfe" stroke="#93c5fd" stroke-width="1"/><text x="106" y="66" font-size="7" fill="#1e40af" text-anchor="middle" font-weight="bold">SHINE AUTO</text></svg>
+            <div style="position:absolute;top:35px;left:106px;transform:translate(-50%,-100%);font-size:18px">📍</div>
+            <div class="manage-map-nav-bar">🗺️ Navigate to wash center</div>
+          </div>
+          <div class="manage-info-card">
+            <div><div style="font-size:11px;font-weight:700;color:var(--text-primary)">Shine Auto Wash</div><div style="font-size:10px;color:var(--text-secondary)">Andheri West · 1.2 km</div></div>
+            <div style="display:flex;gap:5px">
+              <button class="btn btn-sm btn-outline" onclick="UI.toast('📞 Calling...')">📞 Call</button>
+              <button class="btn btn-sm btn-primary" onclick="UI.toast('📍 Opening Maps...')">Navigate</button>
+            </div>
+          </div>
+        </div>
+        <div style="margin:0 13px 9px;background:var(--bg-secondary);border-radius:10px;padding:9px 11px">
+          <div class="section-label" style="margin-bottom:6px">Your booking</div>
+          <div class="booking-meta-grid">
+            <div class="booking-meta-label">Package</div><div class="booking-meta-value" id="manage-pkg">—</div>
+            <div class="booking-meta-label">Vehicle</div><div class="booking-meta-value" id="manage-vehicle">—</div>
+            <div class="booking-meta-label">Date</div><div class="booking-meta-value" id="manage-date">—</div>
+            <div class="booking-meta-label">Time</div><div class="booking-meta-value" id="manage-time">—</div>
+            <div class="booking-meta-label">Total</div><div class="booking-meta-value" id="manage-paid" style="color:var(--blue)">—</div>
+          </div>
+        </div>
+        <div style="padding:0 13px 5px;font-size:11px;font-weight:700;color:var(--text-primary)">Live status</div>
+        <div style="padding:0 13px 8px">
+          <div class="status-step done"><div class="step-dot">✓</div><div><div class="step-title">Booking confirmed</div><div class="step-sub">28 Apr · 10:05 AM</div></div></div>
+          <div class="status-step done"><div class="step-dot">✓</div><div><div class="step-title">Center accepted</div><div class="step-sub">28 Apr · 10:08 AM</div></div></div>
+          <div class="status-step current"><div class="step-dot" style="border-color:var(--blue);color:var(--blue)">⟳</div><div><div class="step-title">Waiting for your arrival</div><div class="step-sub">Slot: <span id="manage-slot-label">10:30 AM</span></div></div></div>
+          <div class="status-step"><div class="step-dot"></div><div><div class="step-title">Wash in progress</div><div class="step-sub">Pending</div></div></div>
+          <div class="status-step"><div class="step-dot"></div><div><div class="step-title">Wash complete</div><div class="step-sub">Pending</div></div></div>
+          <div class="status-step"><div class="step-dot"></div><div><div class="step-title">Rate your experience</div><div class="step-sub">Pending</div></div></div>
+        </div>
+        <div class="action-btn-row" style="padding:0 13px 12px">
+          <div class="action-btn primary" onclick="BookingScreen.openModify()">✏️ Modify</div>
+          <div class="action-btn" onclick="UI.toast('📤 Sharing...')">📤 Share</div>
+          <div class="action-btn danger" onclick="BookingScreen.cancelBooking()">✕ Cancel</div>
+        </div>
+      </div>
+      <div class="bottom-nav">
+        <button class="nav-btn" data-tab="home" onclick="Router.go('home')"><span class="nav-icon">⌂</span>Home</button>
+        <button class="nav-btn active" data-tab="bookings" onclick="Router.go('bookings')"><span class="nav-icon">📋</span>Bookings</button>
+        <button class="nav-btn" data-tab="profile" onclick="Router.go('profile')"><span class="nav-icon">👤</span>Profile</button>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         MY BOOKINGS SCREEN
+    ══════════════════════════════════════ -->
+    <div data-screen="bookings" id="sc-bookings">
+      <div class="header-sub" style="background:var(--blue)">
+        <button class="header-back" onclick="Router.go('home')">← Back</button>
+        <div class="header-title">My bookings</div>
+      </div>
+      <div class="scroll-area">
+        <!-- Upcoming bookings — rendered dynamically by BookingScreen.renderBookings() -->
+        <div class="booking-section-label" style="margin-top:4px">Upcoming</div>
+        <div id="bklist-upcoming"></div>
+
+        <!-- Past bookings — rendered dynamically from PAST_BOOKINGS -->
+        <div class="booking-section-label">Past bookings</div>
+        <div id="bklist-past"></div>
+
+        <div style="height:16px"></div>
+      </div>
+      <div class="bottom-nav">
+        <button class="nav-btn" data-tab="home" onclick="Router.go('home')"><span class="nav-icon">⌂</span>Home</button>
+        <button class="nav-btn active" data-tab="bookings"><span class="nav-icon">📋</span>Bookings</button>
+        <button class="nav-btn" data-tab="profile" onclick="Router.go('profile')"><span class="nav-icon">👤</span>Profile</button>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         PROFILE SCREEN
+    ══════════════════════════════════════ -->
+    <div data-screen="profile" id="sc-profile">
+      <div class="profile-top">
+        <div class="profile-avatar" onclick="Router.go('edit-profile')">
+          <span id="profile-initials">RK</span>
+          <div class="avatar-edit-btn">✏️</div>
+        </div>
+        <div class="profile-name" id="profile-name">Rahul Kumar</div>
+        <div class="profile-phone" id="profile-phone">+91 98765 43210 · Mumbai</div>
+      </div>
+      <div class="scroll-area">
+        <div class="menu-row" onclick="Router.go('bookings')"><div class="menu-icon" style="background:#dbeafe">📋</div><div class="menu-label">My bookings<div class="menu-sublabel">2 upcoming · 9 completed</div></div><span class="menu-arrow">›</span></div>
+        <div class="menu-row" onclick="Router.go('reviews')"><div class="menu-icon" style="background:#fef9c3">⭐</div><div class="menu-label">My reviews<div class="menu-sublabel">5 centers rated</div></div><span class="menu-arrow">›</span></div>
+        <div class="menu-row" onclick="Router.go('promos')"><div class="menu-icon" style="background:#dcfce7">🎟️</div><div class="menu-label">Promo codes<div class="menu-sublabel">2 active codes</div></div><span class="menu-arrow">›</span></div>
+        <div class="menu-row" onclick="Router.go('addresses')"><div class="menu-icon" style="background:#ede9fe">📍</div><div class="menu-label">Saved addresses<div class="menu-sublabel">Home · Office · Parents</div></div><span class="menu-arrow">›</span></div>
+        <div class="menu-row" onclick="Router.go('vehicles')"><div class="menu-icon" style="background:#fee2e2">🚗</div><div class="menu-label">My vehicles<div class="menu-sublabel">MH-01-AB-1234 · Alto 800</div></div><span class="menu-arrow">›</span></div>
+        <div class="menu-row" onclick="Router.go('payments')"><div class="menu-icon" style="background:#e0f2fe">💳</div><div class="menu-label">Payment methods<div class="menu-sublabel">UPI · 2 cards saved</div></div><span class="menu-arrow">›</span></div>
+        <div class="menu-row" onclick="Router.go('notifications')"><div class="menu-icon" style="background:#fff7ed">🔔</div><div class="menu-label">Notifications<div class="menu-sublabel">WhatsApp · Push · SMS</div></div><span class="menu-arrow">›</span></div>
+        <div class="menu-row" onclick="Router.go('language')"><div class="menu-icon" style="background:#f0fdf4">🌐</div><div class="menu-label">Language<div class="menu-sublabel" id="lang-sub-label">English</div></div><span class="menu-arrow">›</span></div>
+        <div class="menu-row" onclick="Router.go('help')"><div class="menu-icon" style="background:#fdf4ff">❓</div><div class="menu-label">Help & support<div class="menu-sublabel">Chat · Call · FAQ</div></div><span class="menu-arrow">›</span></div>
+        <div class="menu-row" onclick="ProfileScreen.logout()"><div class="menu-icon" style="background:#fff1f2">🔐</div><div class="menu-label" style="color:var(--red)">Logout</div><span class="menu-arrow" style="color:var(--red)">›</span></div>
+        <div style="height:12px"></div>
+      </div>
+      <div class="bottom-nav">
+        <button class="nav-btn" data-tab="home" onclick="Router.go('home')"><span class="nav-icon">⌂</span>Home</button>
+        <button class="nav-btn" data-tab="bookings" onclick="Router.go('bookings')"><span class="nav-icon">📋</span>Bookings</button>
+        <button class="nav-btn active" data-tab="profile"><span class="nav-icon">👤</span>Profile</button>
+      </div>
+    </div>
+
+    <!-- ══ EDIT PROFILE ══ -->
+    <div data-screen="edit-profile" id="sc-edit-profile">
+      <div class="header-sub" style="background:var(--blue)"><button class="header-back" onclick="Router.go('profile')">← Back</button><div class="header-title">Edit profile</div><div class="header-subtitle">Update your name & phone number</div></div>
+      <div class="scroll-area"><div style="padding:16px 14px 0">
+        <div style="text-align:center;margin-bottom:20px">
+          <div style="width:72px;height:72px;border-radius:50%;background:linear-gradient(135deg,var(--blue),var(--navy));margin:0 auto 10px;display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:700;color:#fff;position:relative;cursor:pointer" onclick="UI.toast('📷 Opening camera...')">
+            <span id="edit-initials">RK</span>
+            <div style="position:absolute;bottom:0;right:0;width:24px;height:24px;border-radius:50%;background:var(--blue);border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:12px">📷</div>
+          </div>
+          <div style="font-size:11px;color:var(--text-secondary)">Tap to change photo</div>
+        </div>
+        <div class="section-label">Personal details</div>
+        <label class="form-label">Full name</label><input class="form-input" id="inp-name" value="Rahul Kumar" placeholder="Your full name">
+        <label class="form-label">Email address</label><input class="form-input" id="inp-email" value="rahul.kumar@gmail.com" type="email">
+        <label class="form-label" style="display:flex;align-items:center;justify-content:space-between">Phone number<span style="font-size:10px;color:var(--blue);cursor:pointer;font-weight:600" onclick="Router.go('change-phone')">Change →</span></label>
+        <input class="form-input readonly" value="+91 98765 43210" readonly>
+        <label class="form-label">City</label>
+        <select class="form-input" style="cursor:pointer"><option selected>Mumbai</option><option>Delhi</option><option>Bangalore</option><option>Pune</option><option>Hyderabad</option><option>Chennai</option></select>
+        <button class="btn btn-green" onclick="ProfileScreen.saveProfile()">Save changes</button>
+        <div style="height:16px"></div>
+      </div></div>
+    </div>
+
+    <!-- ══ CHANGE PHONE ══ -->
+    <div data-screen="change-phone" id="sc-change-phone">
+      <div class="header-sub" style="background:var(--blue)"><button class="header-back" onclick="Router.go('edit-profile')">← Back</button><div class="header-title">Change phone number</div><div class="header-subtitle">OTP via WhatsApp & SMS</div></div>
+      <div class="scroll-area"><div style="padding:16px 14px 0">
+        <div style="text-align:center;margin-bottom:18px"><div style="font-size:36px;margin-bottom:8px">📱</div><div style="font-size:13px;font-weight:700;color:var(--text-primary)">Enter new phone number</div><div style="font-size:11px;color:var(--text-secondary);margin-top:4px">We'll verify with OTP</div></div>
+        <label class="form-label">New phone number</label>
+        <div style="display:flex;gap:8px;margin-bottom:12px">
+          <div style="padding:10px 12px;border:1.5px solid var(--border-medium);border-radius:10px;font-size:13px;font-weight:700;color:var(--text-primary);background:var(--bg-secondary)">+91</div>
+          <input class="form-input" id="inp-phone" placeholder="10-digit number" maxlength="10" style="flex:1;margin-bottom:0" type="tel">
+        </div>
+        <button class="btn btn-primary" onclick="ProfileScreen.sendOTP()">Send OTP</button>
+        <div id="otp-section" style="display:none;margin-top:18px">
+          <div style="text-align:center;margin-bottom:4px;font-size:12px;color:var(--text-secondary)">OTP sent to +91 <span id="otp-phone-display">XXXXXXXXXX</span></div>
+          <div class="otp-row">
+            <input class="otp-box" id="otp1" maxlength="1" oninput="ProfileScreen.otpNext(this,'otp2')" type="tel">
+            <input class="otp-box" id="otp2" maxlength="1" oninput="ProfileScreen.otpNext(this,'otp3')" type="tel">
+            <input class="otp-box" id="otp3" maxlength="1" oninput="ProfileScreen.otpNext(this,'otp4')" type="tel">
+            <input class="otp-box" id="otp4" maxlength="1" oninput="ProfileScreen.otpNext(this,null)" type="tel">
+          </div>
+          <div style="text-align:center;font-size:11px;color:var(--text-secondary);margin-bottom:14px">Didn't receive? <span style="color:var(--blue);cursor:pointer;font-weight:600" onclick="UI.toast('📱 OTP resent!')">Resend</span></div>
+          <button class="btn btn-green" onclick="ProfileScreen.verifyOTP()">Verify & update</button>
+        </div>
+        <div style="height:16px"></div>
+      </div></div>
+    </div>
+
+    <!-- ══ REVIEWS ══ -->
+    <div data-screen="reviews" id="sc-reviews">
+      <div class="header-sub" style="background:var(--blue)"><button class="header-back" onclick="Router.go('profile')">← Back</button><div class="header-title">My reviews</div><div class="header-subtitle">Your ratings & feedback</div></div>
+      <div class="scroll-area"><div style="padding:12px 13px 0">
+        <div class="review-card"><div style="display:flex;justify-content:space-between;align-items:flex-start"><div style="font-size:12px;font-weight:700;color:var(--text-primary)">Shine Auto Wash</div><div class="review-stars">★★★★★</div></div><div style="font-size:10px;color:var(--text-secondary);margin-top:1px">20 Apr · Full Steam Wash</div><div style="font-size:11px;color:var(--text-secondary);margin-top:6px;line-height:1.5">"Excellent service! Thorough and professional. Will come again."</div></div>
+        <div class="review-card"><div style="display:flex;justify-content:space-between;align-items:flex-start"><div style="font-size:12px;font-weight:700;color:var(--text-primary)">PureClean Juhu</div><div class="review-stars">★★★★<span style="color:var(--text-tertiary)">★</span></div></div><div style="font-size:10px;color:var(--text-secondary);margin-top:1px">12 Apr · Exterior + Vacuum</div><div style="font-size:11px;color:var(--text-secondary);margin-top:6px;line-height:1.5">"Good wash overall. Took a bit longer but quality was good."</div></div>
+        <div class="review-card"><div style="display:flex;justify-content:space-between;align-items:flex-start"><div style="font-size:12px;font-weight:700;color:var(--text-primary)">CleanDrive Express</div><div class="review-stars">★★★★★</div></div><div style="font-size:10px;color:var(--text-secondary);margin-top:1px">5 Apr · Exterior Wash</div><div style="font-size:11px;color:var(--text-secondary);margin-top:6px;line-height:1.5">"Super quick and efficient. Great value for money."</div></div>
+        <div style="height:16px"></div>
+      </div></div>
+    </div>
+
+    <!-- ══ PROMO CODES ══ -->
+    <div data-screen="promos" id="sc-promos">
+      <div class="header-sub" style="background:var(--blue)"><button class="header-back" onclick="Router.go('profile')">← Back</button><div class="header-title">Promo codes</div><div class="header-subtitle">Your offers & referral codes</div></div>
+      <div class="scroll-area"><div style="padding:12px 13px 0">
+        <div class="section-label">Enter a code</div>
+        <div style="display:flex;gap:8px;margin-bottom:14px">
+          <input class="form-input" id="profile-promo-input" placeholder="e.g. WASH20, BDAY100" style="flex:1;margin-bottom:0;text-transform:uppercase" oninput="this.value=this.value.toUpperCase()">
+          <button class="btn btn-primary btn-sm" style="padding:10px 14px;margin-top:0" onclick="ProfileScreen.addPromoCode()">Apply</button>
+        </div>
+        <div id="profile-promo-msg" style="font-size:11px;margin:-8px 0 10px;display:none"></div>
+        <div class="section-label">Active codes</div>
+        <div class="promo-code-card"><div><div class="promo-code-name">SPARKFIRST10</div><div class="promo-code-desc">10% off your first wash</div></div><div class="promo-code-badge">Not used</div></div>
+        <div class="promo-code-card"><div><div class="promo-code-name">MUMBAI30</div><div class="promo-code-desc">₹30 off — Mumbai launch</div></div><div class="promo-code-badge">Not used</div></div>
+        <div id="extra-promo-codes"></div>
+        <div class="section-label" style="margin-top:4px">Refer & earn</div>
+        <div style="background:var(--bg-secondary);border-radius:12px;padding:12px;margin-bottom:8px">
+          <div style="font-size:12px;font-weight:700;color:var(--text-primary);margin-bottom:3px">🎉 Refer friends & earn ₹50 each</div>
+          <div style="font-size:11px;color:var(--text-secondary);margin-bottom:8px">Both you and your friend get ₹50 off their next wash.</div>
+          <div style="display:flex;align-items:center;justify-content:space-between;background:var(--bg-primary);border-radius:9px;padding:8px 12px">
+            <span style="font-size:13px;font-weight:800;color:var(--blue);font-family:'Courier New',monospace">RAHUL50</span>
+            <button onclick="UI.toast('📋 Code RAHUL50 copied!')" style="font-size:10px;padding:4px 10px;border-radius:8px;background:var(--blue);color:#fff;border:none;cursor:pointer;font-weight:700">Copy</button>
+          </div>
+        </div>
+        <div style="height:12px"></div>
+      </div></div>
+    </div>
+
+    <!-- ══ ADDRESSES ══ -->
+    <div data-screen="addresses" id="sc-addresses">
+      <div class="header-sub" style="background:var(--blue)"><button class="header-back" onclick="Router.go('profile')">← Back</button><div class="header-title">Saved addresses</div><div class="header-subtitle">Tap any to set as default</div></div>
+      <div class="scroll-area"><div style="padding:12px 13px 0">
+        <div class="section-label">Your addresses</div>
+        <div class="addr-card-saved selected" id="addr-home" style="display:flex;align-items:center;gap:9px;padding:10px 12px;border:1.5px solid var(--blue);border-radius:12px;margin-bottom:7px;cursor:pointer;background:#f0f7ff">
+          <div style="width:34px;height:34px;border-radius:9px;background:#dbeafe;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0">🏠</div>
+          <div style="flex:1;min-width:0"><div style="display:flex;align-items:center;gap:6px"><div style="font-size:12px;font-weight:700;color:var(--text-primary)">Home</div><div class="badge badge-default">Default</div></div><div style="font-size:10px;color:var(--text-secondary);margin-top:1px">Flat 402, Sunshine Apt, Andheri West</div></div>
+          <span style="font-size:13px;color:var(--text-tertiary)">›</span>
+        </div>
+        <div class="addr-card-saved" id="addr-office" onclick="ProfileScreen.setDefaultAddress('office')" style="display:flex;align-items:center;gap:9px;padding:10px 12px;border:.5px solid var(--border-light);border-radius:12px;margin-bottom:7px;cursor:pointer;background:var(--bg-primary)">
+          <div style="width:34px;height:34px;border-radius:9px;background:#dcfce7;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0">🏢</div>
+          <div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:700;color:var(--text-primary)">Office</div><div style="font-size:10px;color:var(--text-secondary);margin-top:1px">WeWork, BKC, Bandra East</div></div>
+          <span style="font-size:13px;color:var(--text-tertiary)">›</span>
+        </div>
+        <div class="addr-card-saved" id="addr-parents" onclick="ProfileScreen.setDefaultAddress('parents')" style="display:flex;align-items:center;gap:9px;padding:10px 12px;border:.5px solid var(--border-light);border-radius:12px;margin-bottom:7px;cursor:pointer;background:var(--bg-primary)">
+          <div style="width:34px;height:34px;border-radius:9px;background:#fef9c3;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0">👨‍👩‍👦</div>
+          <div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:700;color:var(--text-primary)">Parents home</div><div style="font-size:10px;color:var(--text-secondary);margin-top:1px">12B, Sai Nagar, Borivali West</div></div>
+          <span style="font-size:13px;color:var(--text-tertiary)">›</span>
+        </div>
+        <div class="addr-add-new" onclick="Router.go('add-address')"><div class="addr-add-icon">➕</div><div class="addr-add-label">Add new address</div></div>
+        <div style="height:12px"></div>
+      </div></div>
+    </div>
+
+    <!-- ══ ADD ADDRESS ══ -->
+    <div data-screen="add-address" id="sc-add-address">
+      <div class="header-sub" style="background:var(--blue)"><button class="header-back" onclick="Router.go('addresses')">← Back</button><div class="header-title">Add new address</div></div>
+      <div class="scroll-area"><div style="padding:14px 13px 0">
+        <label class="form-label">Label</label>
+        <div style="display:flex;gap:8px;margin-bottom:12px">
+          <div id="lbl-home2" onclick="ProfileScreen.pickAddressLabel('home2')" style="padding:7px 14px;border-radius:20px;font-size:11px;font-weight:600;border:1.5px solid var(--blue);background:var(--blue);color:#fff;cursor:pointer">🏠 Home</div>
+          <div id="lbl-work" onclick="ProfileScreen.pickAddressLabel('work')" style="padding:7px 14px;border-radius:20px;font-size:11px;font-weight:600;border:1.5px solid var(--border-medium);color:var(--text-secondary);cursor:pointer">🏢 Work</div>
+          <div id="lbl-other" onclick="ProfileScreen.pickAddressLabel('other')" style="padding:7px 14px;border-radius:20px;font-size:11px;font-weight:600;border:1.5px solid var(--border-medium);color:var(--text-secondary);cursor:pointer">📍 Other</div>
+        </div>
+        <label class="form-label">Area / locality</label><input class="form-input" id="addr-area" placeholder="e.g. Andheri West, Juhu, Powai">
+        <label class="form-label">Flat / building</label><input class="form-input" placeholder="e.g. Flat 402, Sunshine Apt">
+        <label class="form-label">Landmark (optional)</label><input class="form-input" placeholder="e.g. Near D-Mart">
+        <label class="form-label">Pincode</label><input class="form-input" placeholder="6-digit pincode" maxlength="6" type="tel">
+        <button class="btn btn-green" onclick="ProfileScreen.saveAddress()">Save address</button>
+        <div style="height:16px"></div>
+      </div></div>
+    </div>
+
+    <!-- ══ VEHICLES ══ -->
+    <div data-screen="vehicles" id="sc-vehicles">
+      <div class="header-sub" style="background:var(--blue)"><button class="header-back" onclick="Router.go('profile')">← Back</button><div class="header-title">My vehicles</div></div>
+      <div class="scroll-area"><div style="padding:12px 13px 0">
+        <div class="section-label">Saved vehicles</div>
+        <div class="vehicle-card"><div style="width:38px;height:38px;border-radius:9px;background:#dbeafe;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">🚗</div><div style="flex:1"><div class="vehicle-plate">MH-01-AB-1234</div><div class="vehicle-model">Maruti Alto 800 · White</div><div style="font-size:9px;background:#e8f5e9;color:#2e7d32;padding:1px 7px;border-radius:7px;display:inline-block;margin-top:3px;font-weight:700">Primary</div></div><div onclick="UI.toast('Edit vehicle')" style="font-size:12px;color:var(--blue);cursor:pointer;font-weight:700">Edit</div></div>
+        <div class="vehicle-card"><div style="width:38px;height:38px;border-radius:9px;background:#dcfce7;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">🏍️</div><div style="flex:1"><div class="vehicle-plate">MH-01-CD-5678</div><div class="vehicle-model">Honda Activa · Black</div></div><div onclick="ProfileScreen.removeVehicle('MH-01-CD-5678')" style="font-size:18px;color:var(--red);cursor:pointer">🗑️</div></div>
+        <div class="section-label" style="margin-top:4px">Add vehicle</div>
+        <label class="form-label">Registration number</label><input class="form-input" id="inp-vreg" placeholder="e.g. MH 02 AB 1234" style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase()">
+        <label class="form-label">Make & model</label><input class="form-input" placeholder="e.g. Honda City, Swift Dzire">
+        <label class="form-label">Colour</label><input class="form-input" placeholder="e.g. White, Silver, Black">
+        <button class="btn btn-green" onclick="ProfileScreen.addVehicle()">Add vehicle</button>
+        <div style="height:16px"></div>
+      </div></div>
+    </div>
+
+    <!-- ══ PAYMENTS ══ -->
+    <div data-screen="payments" id="sc-payments">
+      <div class="header-sub" style="background:var(--blue)"><button class="header-back" onclick="Router.go('profile')">← Back</button><div class="header-title">Payment methods</div></div>
+      <div class="scroll-area"><div style="padding:12px 13px 0">
+        <div class="section-label">Saved UPI</div>
+        <div class="payment-saved-card default"><div style="width:36px;height:36px;border-radius:9px;background:#e8f5e9;display:flex;align-items:center;justify-content:center;font-size:18px">📱</div><div style="flex:1"><div style="font-size:12px;font-weight:700;color:var(--text-primary)">rahul.kumar@oksbi</div><div style="font-size:10px;color:var(--text-secondary);margin-top:1px">SBI UPI</div></div><div class="badge badge-default">Default</div></div>
+        <div class="section-label" style="margin-top:4px">Saved cards</div>
+        <div class="payment-saved-card"><div style="width:36px;height:36px;border-radius:9px;background:#fff7ed;display:flex;align-items:center;justify-content:center;font-size:18px">💳</div><div style="flex:1"><div style="font-size:12px;font-weight:700;color:var(--text-primary)">•••• •••• •••• 4521</div><div style="font-size:10px;color:var(--text-secondary);margin-top:1px">HDFC Visa · Exp 08/27</div></div><div onclick="UI.toast('🗑️ Card removed!')" style="font-size:16px;color:var(--red);cursor:pointer">🗑️</div></div>
+        <div class="payment-saved-card"><div style="width:36px;height:36px;border-radius:9px;background:#eff6ff;display:flex;align-items:center;justify-content:center;font-size:18px">💳</div><div style="flex:1"><div style="font-size:12px;font-weight:700;color:var(--text-primary)">•••• •••• •••• 8832</div><div style="font-size:10px;color:var(--text-secondary);margin-top:1px">ICICI Mastercard · Exp 03/26</div></div><div onclick="UI.toast('🗑️ Card removed!')" style="font-size:16px;color:var(--red);cursor:pointer">🗑️</div></div>
+        <div class="addr-add-new" onclick="UI.toast('💳 Add card — coming soon!')"><div class="addr-add-icon">➕</div><div class="addr-add-label">Add UPI / Card / Netbanking</div></div>
+        <div style="height:12px"></div>
+      </div></div>
+    </div>
+
+    <!-- ══ NOTIFICATIONS ══ -->
+    <div data-screen="notifications" id="sc-notifications">
+      <div class="header-sub" style="background:var(--blue)">
+        <button class="header-back" onclick="Router.go('profile')">← Back</button>
+        <div class="header-title">Notifications</div>
+        <button id="notif-mark-all-btn" class="notif-header-action" onclick="NotificationScreen.markAllRead()">Mark all read</button>
+      </div>
+
+      <!-- Tab bar -->
+      <div class="notif-tabs">
+        <div class="notif-tab active" id="ntab-inbox" onclick="NotificationScreen.switchTab('inbox')">
+          Inbox <span class="notif-tab-badge" id="notif-tab-badge" style="display:none"></span>
+        </div>
+        <div class="notif-tab" id="ntab-settings" onclick="NotificationScreen.switchTab('settings')">
+          Settings
+        </div>
+      </div>
+
+      <!-- Inbox panel -->
+      <div class="scroll-area" id="notif-inbox-panel">
+        <div id="notif-list"></div>
+      </div>
+
+      <!-- Settings panel -->
+      <div class="scroll-area" id="notif-settings-panel" style="display:none">
+        <!-- rendered by NotificationScreen._renderSettings() -->
+      </div>
+    </div>
+
+    <!-- ══ LANGUAGE ══ -->
+    <div data-screen="language" id="sc-language">
+      <div class="header-sub" style="background:var(--blue)"><button class="header-back" onclick="Router.go('profile')">← Back</button><div class="header-title">Language</div></div>
+      <div class="scroll-area"><div style="padding:14px 13px 0">
+        <div class="section-label">App language</div>
+        <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">
+          <div id="lang-en" onclick="ProfileScreen.setLanguage('English','en')" style="display:flex;align-items:center;gap:9px;padding:11px 12px;border:1.5px solid var(--blue);border-radius:12px;cursor:pointer;background:#f0f7ff"><span style="font-size:22px">🇬🇧</span><div style="flex:1"><div style="font-size:12px;font-weight:700;color:var(--text-primary)">English</div><div style="font-size:10px;color:var(--text-secondary);margin-top:1px">Default app language</div></div><div id="lang-check-en" style="font-size:16px;color:var(--blue)">✓</div></div>
+          <div id="lang-hi" onclick="ProfileScreen.setLanguage('हिंदी','hi')" style="display:flex;align-items:center;gap:9px;padding:11px 12px;border:.5px solid var(--border-light);border-radius:12px;cursor:pointer"><span style="font-size:22px">🇮🇳</span><div style="flex:1"><div style="font-size:12px;font-weight:700;color:var(--text-primary)">हिंदी</div><div style="font-size:10px;color:var(--text-secondary);margin-top:1px">Hindi</div></div><div id="lang-check-hi"></div></div>
+          <div id="lang-mr" onclick="ProfileScreen.setLanguage('मराठी','mr')" style="display:flex;align-items:center;gap:9px;padding:11px 12px;border:.5px solid var(--border-light);border-radius:12px;cursor:pointer"><span style="font-size:22px">🇮🇳</span><div style="flex:1"><div style="font-size:12px;font-weight:700;color:var(--text-primary)">मराठी</div><div style="font-size:10px;color:var(--text-secondary);margin-top:1px">Marathi</div></div><div id="lang-check-mr"></div></div>
+          <div id="lang-gu" onclick="ProfileScreen.setLanguage('ગુજરાતી','gu')" style="display:flex;align-items:center;gap:9px;padding:11px 12px;border:.5px solid var(--border-light);border-radius:12px;cursor:pointer"><span style="font-size:22px">🇮🇳</span><div style="flex:1"><div style="font-size:12px;font-weight:700;color:var(--text-primary)">ગુજરાતી</div><div style="font-size:10px;color:var(--text-secondary);margin-top:1px">Gujarati</div></div><div id="lang-check-gu"></div></div>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- ══ HELP ══ -->
+    <div data-screen="help" id="sc-help">
+      <div class="header-sub" style="background:var(--blue)">
+        <button class="header-back" onclick="Router.go('profile')">← Back</button>
+        <div class="header-title">Help & support</div>
+      </div>
+      <div class="scroll-area"><div style="padding:12px 13px 0">
+
+        <!-- Quick contact banner -->
+        <div class="help-banner">
+          <div class="help-banner-icon">🎧</div>
+          <div>
+            <div style="font-size:12px;font-weight:700;color:#1e40af">We're here to help!</div>
+            <div style="font-size:10px;color:#3b82f6;margin-top:1px">Average response time: under 5 minutes</div>
+          </div>
+        </div>
+
+        <div class="section-label">Contact us</div>
+        <div class="help-contact-card" onclick="Router.go('chat')">
+          <div class="help-icon-wrap" style="background:#f0fdf4">💬</div>
+          <div style="flex:1">
+            <div class="help-card-title">Chat with support</div>
+            <div class="help-card-sub">In-app chat · usually replies instantly</div>
+          </div>
+          <span class="help-card-arrow">›</span>
+        </div>
+        <div class="help-contact-card" onclick="HelpScreen.openCallSheet()">
+          <div class="help-icon-wrap" style="background:#eff6ff">📞</div>
+          <div style="flex:1">
+            <div class="help-card-title">Call support</div>
+            <div class="help-card-sub">Mon–Sat, 9 AM – 8 PM · 3 numbers available</div>
+          </div>
+          <span class="help-card-arrow">›</span>
+        </div>
+        <div class="help-contact-card" onclick="HelpScreen.openEmail()">
+          <div class="help-icon-wrap" style="background:#fefce8">📧</div>
+          <div style="flex:1">
+            <div class="help-card-title">Email us</div>
+            <div class="help-card-sub">support@sparkwash.in</div>
+          </div>
+          <span class="help-card-arrow">›</span>
+        </div>
+
+        <div class="section-label" style="margin-top:6px">FAQs</div>
+        <div class="help-faq-group">
+          <div class="help-faq-item" onclick="HelpScreen.toggleFaq(this)">
+            <div class="help-faq-q"><span>📖</span> How do I book a wash?</div>
+            <div class="help-faq-a">Tap a wash center on the home screen → choose a package → pick a date & slot → confirm payment. Done in under 2 minutes!</div>
+          </div>
+          <div class="help-faq-item" onclick="HelpScreen.toggleFaq(this)">
+            <div class="help-faq-q"><span>💰</span> What is the cancellation policy?</div>
+            <div class="help-faq-a">Free cancellation up to 2 hours before your slot. Cancellations within 2 hours incur a ₹25 fee. Refunds process in 3–5 business days.</div>
+          </div>
+          <div class="help-faq-item" onclick="HelpScreen.toggleFaq(this)">
+            <div class="help-faq-q"><span>🎁</span> How do promo codes work?</div>
+            <div class="help-faq-a">Apply promo codes on the booking summary screen before confirming payment. Each code can be used once per account.</div>
+          </div>
+          <div class="help-faq-item" onclick="HelpScreen.toggleFaq(this)">
+            <div class="help-faq-q"><span>🚗</span> Can I add multiple vehicles?</div>
+            <div class="help-faq-a">Yes! Go to Profile → My Vehicles to add cars, bikes, or SUVs. You can set one as primary for faster booking.</div>
+          </div>
+          <div class="help-faq-item" onclick="HelpScreen.toggleFaq(this)">
+            <div class="help-faq-q"><span>🔒</span> Is my payment secure?</div>
+            <div class="help-faq-a">Yes. All payments are processed via PCI-DSS compliant gateways. SparkWash never stores your card details.</div>
+          </div>
+        </div>
+
+        <div style="text-align:center;padding:18px 0 8px;font-size:10px;color:var(--text-tertiary)">SparkWash v1.0.0 · Made with ❤️ in India</div>
+      </div></div>
+
+      <!-- ── Call sheet overlay ── -->
+      <div class="call-sheet-overlay" id="call-sheet-overlay"
+           style="display:none"
+           onclick="if(event.target===this)HelpScreen.closeCallSheet()">
+        <div class="call-sheet">
+          <div class="call-sheet-handle-bar"><div class="veh-sheet-handle"></div></div>
+          <div class="call-sheet-header">
+            <div>
+              <div class="call-sheet-title">📞 Call customer care</div>
+              <div class="call-sheet-sub">Choose a number to call</div>
+            </div>
+            <button class="veh-sheet-close" onclick="HelpScreen.closeCallSheet()">✕</button>
+          </div>
+          <div class="call-numbers-list">
+            <div class="call-number-card">
+              <div class="call-num-icon" style="background:#dbeafe">📞</div>
+              <div class="call-num-body">
+                <div class="call-num-label">Toll-free helpline</div>
+                <div class="call-num-display">1800-572-0001</div>
+                <div class="call-num-sub">Free call · Mon–Sat, 9 AM – 8 PM</div>
+              </div>
+              <button class="call-dial-btn" onclick="HelpScreen.dial('18005720001')">Call</button>
+            </div>
+            <div class="call-number-card">
+              <div class="call-num-icon" style="background:#dcfce7">💬</div>
+              <div class="call-num-body">
+                <div class="call-num-label">WhatsApp support</div>
+                <div class="call-num-display">+91 98100 00001</div>
+                <div class="call-num-sub">Message or call · replies in ~5 min</div>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:5px">
+                <button class="call-dial-btn wa" onclick="HelpScreen.openWhatsApp('919810000001')">Chat</button>
+                <button class="call-dial-btn" onclick="HelpScreen.dial('919810000001')">Call</button>
+              </div>
+            </div>
+            <div class="call-number-card">
+              <div class="call-num-icon" style="background:#fef9c3">📱</div>
+              <div class="call-num-body">
+                <div class="call-num-label">Direct mobile</div>
+                <div class="call-num-display">+91 98100 00002</div>
+                <div class="call-num-sub">Mon–Sat, 9 AM – 6 PM</div>
+              </div>
+              <button class="call-dial-btn" onclick="HelpScreen.dial('919810000002')">Call</button>
+            </div>
+          </div>
+          <div style="padding:0 15px 14px;font-size:10px;color:var(--text-tertiary);text-align:center">
+            Tapping "Call" will open your phone's dialer
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ CHAT ══ -->
+    <div data-screen="chat" id="sc-chat">
+      <div class="chat-header">
+        <button class="chat-back-btn" onclick="Router.go('help')">←</button>
+        <div class="chat-header-info">
+          <div class="chat-header-avatar">SW</div>
+          <div>
+            <div class="chat-header-name">SparkWash Support</div>
+            <div class="chat-header-status"><span class="chat-online-dot"></span> Online · usually replies instantly</div>
+          </div>
+        </div>
+        <button class="chat-call-icon-btn" onclick="HelpScreen.openCallSheet()" title="Call support">📞</button>
+      </div>
+
+      <div class="chat-messages" id="chat-messages"></div>
+
+      <div class="chat-quick-wrap" id="chat-quick-wrap">
+        <div class="chat-quick" onclick="ChatScreen.sendQuick('I have a booking issue')">📋 Booking issue</div>
+        <div class="chat-quick" onclick="ChatScreen.sendQuick('Payment problem')">💳 Payment</div>
+        <div class="chat-quick" onclick="ChatScreen.sendQuick('I want to cancel my booking')">✕ Cancel</div>
+        <div class="chat-quick" onclick="ChatScreen.sendQuick('Something else')">💬 Other</div>
+      </div>
+
+      <div class="chat-input-bar">
+        <input id="chat-input" class="chat-input" type="text"
+               placeholder="Type a message…"
+               onkeyup="ChatScreen.handleKeyup(event)" />
+        <button class="chat-send-btn" onclick="ChatScreen.send()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+            <path d="M22 2L11 13" stroke="white" stroke-width="2.2" stroke-linecap="round"/>
+            <path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="white" stroke-width="2.2" stroke-linejoin="round"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+
+    <!-- ══════════════════════════════════════
+         LOGIN SCREEN
+    ══════════════════════════════════════ -->
+    <div data-screen="login" id="sc-login">
+      <div class="auth-screen">
+        <!-- Brand header -->
+        <div class="auth-brand">
+          <div class="auth-brand-logo">🚿</div>
+          <div class="auth-brand-name">SparkWash</div>
+          <div class="auth-brand-tagline">India's smartest car wash booking</div>
+        </div>
+
+        <!-- Step 1: Enter mobile / email -->
+        <div id="login-step-identifier" class="auth-card" style="display:flex">
+          <div class="auth-card-title">Welcome back</div>
+          <div class="auth-card-sub">Enter your mobile number or email to continue</div>
+
+          <div class="auth-field-wrap">
+            <label class="auth-label">Mobile number or Email</label>
+            <input
+              id="login-identifier-input"
+              class="auth-input"
+              type="text"
+              inputmode="email"
+              placeholder="9876543210 or you@email.com"
+              autocomplete="username"
+              onkeydown="if(event.key==='Enter') LoginScreen.handleSendOtp()"
+            />
+            <div id="login-id-error" class="auth-error" style="display:none"></div>
+          </div>
+
+          <!-- Dev mode OTP hint (hidden until OTP is sent) -->
+          <div id="login-dev-otp" class="auth-dev-hint" style="display:none"></div>
+
+          <button id="login-send-otp-btn" class="btn btn-primary auth-btn" onclick="LoginScreen.handleSendOtp()">
+            Send OTP
+          </button>
+
+          <div class="auth-divider"><span>Don't have an account?</span></div>
+          <button class="btn btn-outline auth-btn" onclick="Router.go('signup')">
+            Create account
+          </button>
+        </div>
+
+        <!-- Step 2: Enter OTP -->
+        <div id="login-step-otp" class="auth-card" style="display:none">
+          <div class="auth-card-title">Enter OTP</div>
+          <div class="auth-card-sub">
+            6-digit OTP sent to <strong id="login-otp-dest"></strong><br>
+            Hi <span id="login-otp-who"></span>! 👋
+          </div>
+
+          <div class="auth-otp-boxes">
+            <input id="login-otp-box-0" class="auth-otp-box" type="tel" maxlength="1" inputmode="numeric" onkeyup="LoginScreen.handleOtpKeyup(event,0)" onpaste="LoginScreen.handleOtpPaste(event)">
+            <input id="login-otp-box-1" class="auth-otp-box" type="tel" maxlength="1" inputmode="numeric" onkeyup="LoginScreen.handleOtpKeyup(event,1)">
+            <input id="login-otp-box-2" class="auth-otp-box" type="tel" maxlength="1" inputmode="numeric" onkeyup="LoginScreen.handleOtpKeyup(event,2)">
+            <input id="login-otp-box-3" class="auth-otp-box" type="tel" maxlength="1" inputmode="numeric" onkeyup="LoginScreen.handleOtpKeyup(event,3)">
+            <input id="login-otp-box-4" class="auth-otp-box" type="tel" maxlength="1" inputmode="numeric" onkeyup="LoginScreen.handleOtpKeyup(event,4)">
+            <input id="login-otp-box-5" class="auth-otp-box" type="tel" maxlength="1" inputmode="numeric" onkeyup="LoginScreen.handleOtpKeyup(event,5)">
+          </div>
+
+          <div id="login-otp-error" class="auth-error" style="display:none"></div>
+
+          <div class="auth-resend-row">
+            <span id="login-resend-timer" class="auth-resend-timer" style="display:none"></span>
+            <button id="login-resend-btn" class="auth-link-btn" onclick="LoginScreen.handleResendOtp()" style="display:none">
+              Resend OTP
+            </button>
+          </div>
+
+          <button id="login-verify-otp-btn" class="btn btn-primary auth-btn" onclick="LoginScreen.handleVerifyOtp()">
+            Verify & Login
+          </button>
+
+          <button class="btn btn-outline auth-btn" onclick="LoginScreen.showStep1()">
+            ← Change number / email
+          </button>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         SIGNUP SCREEN
+    ══════════════════════════════════════ -->
+    <div data-screen="signup" id="sc-signup">
+      <div class="auth-screen">
+        <!-- Brand header -->
+        <div class="auth-brand">
+          <div class="auth-brand-logo">🚿</div>
+          <div class="auth-brand-name">SparkWash</div>
+          <div class="auth-brand-tagline">Create your account</div>
+        </div>
+
+        <div id="signup-form" class="auth-card" style="display:flex">
+          <div class="auth-card-title">Create account</div>
+          <div class="auth-card-sub">Fill in the details below to get started</div>
+
+          <!-- Full Name -->
+          <div class="auth-field-wrap">
+            <label class="auth-label">Full name <span class="auth-required">*</span></label>
+            <input
+              id="signup-name-input"
+              class="auth-input"
+              type="text"
+              placeholder="Rahul Kumar"
+              autocomplete="name"
+              onkeydown="if(event.key==='Enter') document.getElementById('signup-mobile-input')?.focus()"
+            />
+            <div id="signup-name-error" class="auth-error" style="display:none"></div>
+          </div>
+
+          <!-- Mobile Number -->
+          <div class="auth-field-wrap">
+            <label class="auth-label">Mobile number <span class="auth-required">*</span></label>
+            <div class="auth-phone-wrap">
+              <span class="auth-phone-prefix">+91</span>
+              <input
+                id="signup-mobile-input"
+                class="auth-input auth-input-phone"
+                type="tel"
+                inputmode="numeric"
+                placeholder="9876543210"
+                maxlength="10"
+                autocomplete="tel"
+                onkeydown="if(event.key==='Enter') document.getElementById('signup-email-input')?.focus()"
+              />
+            </div>
+            <div id="signup-mobile-error" class="auth-error" style="display:none"></div>
+          </div>
+
+          <!-- Email -->
+          <div class="auth-field-wrap">
+            <label class="auth-label">Email address <span class="auth-required">*</span></label>
+            <input
+              id="signup-email-input"
+              class="auth-input"
+              type="email"
+              placeholder="you@example.com"
+              autocomplete="email"
+              onkeydown="if(event.key==='Enter') SignupScreen.handleSubmit()"
+            />
+            <div id="signup-email-error" class="auth-error" style="display:none"></div>
+          </div>
+
+          <div id="signup-general-error" class="auth-error" style="display:none"></div>
+
+          <button id="signup-submit-btn" class="btn btn-primary auth-btn" onclick="SignupScreen.handleSubmit()">
+            Create Account
+          </button>
+
+          <div class="auth-divider"><span>Already have an account?</span></div>
+          <button class="btn btn-outline auth-btn" onclick="Router.go('login')">
+            Log in
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- end screens container -->
+</div><!-- end phone -->
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<!-- Scripts (order matters) -->
+<script src="js/data.js"></script>
+<script src="js/state.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/router.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/location.js"></script>
+<script src="js/home.js"></script>
+<script src="js/detail.js"></script>
+<script src="js/summary.js"></script>
+<script src="js/booking.js"></script>
+<script src="js/notifications.js"></script>
+<script src="js/help.js"></script>
+<script src="js/profile.js"></script>
+<script>
+  // Boot — check session before showing any screen
+  document.addEventListener('DOMContentLoaded', async () => {
+    Router.init();
+    HomeScreen.init();
+    ProfileScreen.init();
+    SignupScreen.init();
+    NotifState.load();
+    NotificationScreen._updateBadge();
+
+    // Check if user has a valid session
+    const user = await Auth.checkSession();
+    if (user) {
+      AppState.setAuthUser(user);
+      Router.go('home', false);
+    } else {
+      Router.go('login', false);
+    }
+  });
+</script>
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js')
+        .then(r => console.log('SW registered', r.scope))
+        .catch(e => console.warn('SW registration failed', e));
+    });
+  }
+</script>
+</body>
+</html>

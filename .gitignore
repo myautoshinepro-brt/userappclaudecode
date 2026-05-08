@@ -1,0 +1,12 @@
+node_modules/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+.env
+.DS_Store
+Thumbs.db
+*.log
+dist/
+android/
+ios/
+.capacitor/

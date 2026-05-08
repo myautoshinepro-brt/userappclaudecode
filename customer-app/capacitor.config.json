@@ -1,0 +1,31 @@
+{
+  "appId": "com.sparkwash.customer",
+  "appName": "SparkWash",
+  "webDir": ".",
+  "server": {
+    "androidScheme": "https",
+    "cleartext": true,
+    "url": "https://YOUR_DEPLOYED_URL_HERE"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 2000,
+      "backgroundColor": "#1e40af",
+      "androidSplashResourceName": "splash",
+      "androidScaleType": "CENTER_CROP",
+      "showSpinner": false
+    },
+    "StatusBar": {
+      "style": "DARK",
+      "backgroundColor": "#1e40af"
+    }
+  },
+  "android": {
+    "allowMixedContent": true,
+    "minWebViewVersion": 60
+  },
+  "ios": {
+    "scheme": "SparkWash",
+    "limitsNavigationsToAppBoundDomains": false
+  }
+}

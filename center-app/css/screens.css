@@ -1,0 +1,229 @@
+/* SparkWash Center App — screens.css */
+
+/* ── LOGIN ── */
+.login-screen {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  background: linear-gradient(160deg, #1e40af 0%, #1a73e8 55%, #f0f4ff 100%);
+}
+.login-top {
+  padding: 48px 28px 32px;
+  text-align: center;
+}
+.login-logo      { font-size: 44px; margin-bottom: 8px; }
+.login-brand     { font-size: 26px; font-weight: 900; color: #fff; letter-spacing: -.5px; }
+.login-tagline   { font-size: 13px; color: rgba(255,255,255,.8); margin-top: 4px; }
+.login-card {
+  flex: 1;
+  background: #fff;
+  border-radius: 28px 28px 0 0;
+  padding: 28px 22px 32px;
+}
+.login-heading  { font-size: 20px; font-weight: 800; color: var(--text-primary); margin-bottom: 4px; }
+.login-sub      { font-size: 13px; color: var(--text-secondary); margin-bottom: 22px; }
+.otp-sent-info  {
+  background: #e3f2fd;
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+  font-size: 12px;
+  color: #1565c0;
+  margin-bottom: 14px;
+  line-height: 1.5;
+}
+.otp-sent-info strong { display: block; font-size: 14px; margin-bottom: 2px; }
+.resend-row     { text-align: center; font-size: 12px; color: var(--text-secondary); margin-top: 4px; }
+.resend-btn     {
+  color: var(--navy);
+  font-weight: 700;
+  cursor: pointer;
+  background: none;
+  border: none;
+  font-size: 12px;
+}
+.resend-btn:disabled { color: var(--text-tertiary); cursor: default; }
+
+/* ── DASHBOARD ── */
+.dash-header {
+  background: linear-gradient(135deg, #1e40af 0%, #1a73e8 100%);
+  padding: 16px 16px 20px;
+  flex-shrink: 0;
+}
+.dash-header-row {
+  display: flex; align-items: center; justify-content: space-between;
+}
+.dash-greeting   { font-size: 18px; font-weight: 800; color: #fff; }
+.dash-center-name { font-size: 12px; color: rgba(255,255,255,.8); margin-top: 2px; }
+.dash-avatar {
+  width: 38px; height: 38px;
+  border-radius: 50%;
+  background: rgba(255,255,255,.2);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 15px; font-weight: 800; color: #fff;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.dash-date-row {
+  display: flex; align-items: center; gap: 6px;
+  margin-top: 10px; font-size: 12px; color: rgba(255,255,255,.85);
+}
+.dash-stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 14px;
+}
+.dash-revenue-card {
+  background: linear-gradient(135deg, #1e40af 0%, #1a73e8 100%);
+  border-radius: var(--radius-md);
+  padding: 14px;
+  grid-column: 1 / -1;
+}
+.dash-revenue-label { font-size: 11px; color: rgba(255,255,255,.8); font-weight: 600; }
+.dash-revenue-value { font-size: 28px; font-weight: 900; color: #fff; line-height: 1.1; margin-top: 4px; }
+.dash-revenue-sub   { font-size: 11px; color: rgba(255,255,255,.75); margin-top: 2px; }
+
+.dash-section { padding: 0 14px 14px; }
+.dash-section-title {
+  font-size: 12px; font-weight: 700; color: var(--text-secondary);
+  text-transform: uppercase; letter-spacing: .05em;
+  margin-bottom: 8px;
+}
+.dash-quick-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 0 14px 14px;
+}
+.quick-action-btn {
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-md);
+  padding: 12px 10px;
+  text-align: center;
+  cursor: pointer;
+  border: 1px solid var(--border-light);
+  transition: all .15s;
+}
+.quick-action-btn:active { transform: scale(.97); }
+.qa-icon  { font-size: 22px; margin-bottom: 4px; }
+.qa-label { font-size: 11px; font-weight: 700; color: var(--text-primary); }
+.qa-count {
+  display: inline-block;
+  background: var(--red);
+  color: #fff;
+  border-radius: var(--radius-pill);
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  margin-top: 2px;
+}
+.qa-count.green { background: var(--green); }
+
+/* ── BOOKINGS SCREEN ── */
+.bookings-header {
+  background: linear-gradient(135deg, #1e40af 0%, #1a73e8 100%);
+  padding: 14px 16px 16px;
+  flex-shrink: 0;
+}
+.bookings-filter-bar {
+  padding: 10px 14px;
+  border-bottom: .5px solid var(--border-light);
+  flex-shrink: 0;
+}
+.bookings-list { padding: 10px 14px; }
+
+.booking-detail-section { padding: 14px; }
+.booking-detail-row {
+  display: flex; align-items: flex-start;
+  padding: 10px 0;
+  border-bottom: .5px solid var(--border-light);
+  gap: 10px;
+}
+.booking-detail-row:last-child { border-bottom: none; }
+.bd-ico   { font-size: 16px; width: 22px; text-align: center; flex-shrink: 0; margin-top: 1px; }
+.bd-label { font-size: 11px; color: var(--text-secondary); margin-bottom: 2px; }
+.bd-value { font-size: 13px; font-weight: 600; }
+
+/* ── QUEUE SCREEN ── */
+.queue-header {
+  background: linear-gradient(135deg, #1e40af 0%, #1a73e8 100%);
+  padding: 14px 16px 16px;
+  flex-shrink: 0;
+}
+.queue-summary {
+  display: flex;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: .5px solid var(--border-light);
+  flex-shrink: 0;
+}
+.queue-summary-chip {
+  flex: 1;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-sm);
+  padding: 8px;
+  text-align: center;
+}
+.qsc-value { font-size: 18px; font-weight: 800; color: var(--text-primary); }
+.qsc-label { font-size: 10px; color: var(--text-secondary); font-weight: 600; }
+.queue-list { padding: 10px 14px; }
+
+/* ── SLOT MANAGER ── */
+.slots-header {
+  background: linear-gradient(135deg, #1e40af 0%, #1a73e8 100%);
+  padding: 14px 16px 16px;
+  flex-shrink: 0;
+}
+.slots-body { padding: 10px 14px; }
+.slots-wash-section { margin-bottom: 18px; }
+.slots-wash-title {
+  font-size: 12px; font-weight: 800; color: var(--text-primary);
+  text-transform: uppercase; letter-spacing: .05em;
+  margin-bottom: 8px;
+  display: flex; align-items: center; gap: 6px;
+}
+.slots-legend {
+  display: flex; gap: 12px; margin-bottom: 10px;
+  font-size: 10px; color: var(--text-secondary);
+}
+.legend-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 4px;
+}
+
+/* ── PROFILE / SETTINGS ── */
+.profile-header {
+  background: linear-gradient(135deg, #1e40af 0%, #1a73e8 100%);
+  padding: 20px 16px 24px;
+  flex-shrink: 0;
+  text-align: center;
+}
+.profile-avatar {
+  width: 64px; height: 64px;
+  border-radius: 50%;
+  background: rgba(255,255,255,.2);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 24px; font-weight: 800; color: #fff;
+  margin: 0 auto 10px;
+  border: 2.5px solid rgba(255,255,255,.4);
+}
+.profile-name    { font-size: 18px; font-weight: 800; color: #fff; }
+.profile-center  { font-size: 12px; color: rgba(255,255,255,.8); margin-top: 2px; }
+.profile-mobile  { font-size: 12px; color: rgba(255,255,255,.7); margin-top: 2px; }
+.profile-section {
+  background: var(--bg-primary);
+  border-radius: var(--radius-md);
+  border: .5px solid var(--border-light);
+  margin: 0 14px 10px;
+  overflow: hidden;
+}
+.profile-section-title {
+  font-size: 10px; font-weight: 700; color: var(--text-tertiary);
+  text-transform: uppercase; letter-spacing: .06em;
+  padding: 10px 16px 4px;
+}
+
+/* ── EDIT CENTER SCREEN ── */
+.edit-body { padding: 16px; }

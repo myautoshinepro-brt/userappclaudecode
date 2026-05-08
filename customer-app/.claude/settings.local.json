@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install *)",
+      "Bash(timeout 5 node server.js)",
+      "Bash(node -e \"const db = require\\('./db/database'\\); console.log\\('DB OK'\\); const auth = require\\('./routes/auth'\\); console.log\\('Routes OK'\\);\")",
+      "Read(//c/Users/ravit/.claude/projects/c--Users-ravit-Downloads-sparkwash-sparkwash/memory/**)",
+      "Bash(timeout 4 node server.js)"
+    ]
+  }
+}
