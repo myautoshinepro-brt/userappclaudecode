@@ -2096,18 +2096,42 @@ const SettlementsScreen = {
 // ── CENTER APPLICATIONS SCREEN ────────────────────────────────
 const ApplicationsScreen = {
   _filter: 'all',
+  _loaded: false,
 
   render() {
+    if (!this._loaded) { this._load(); return; }
     this._renderFilterChips();
     this._renderList();
   },
 
+  async _load() {
+    setHtml('apps-list', `<div style="text-align:center;padding:40px;color:var(--muted)">⏳ Loading applications…</div>`);
+    try {
+      const res  = await fetch(`${CENTER_APP_URL}/api/admin/applications`, {
+        headers: { 'x-admin-key': ADMIN_API_KEY },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to load');
+      APPLICATIONS  = data.data;
+      this._loaded  = true;
+      this._renderFilterChips();
+      this._renderList();
+    } catch (err) {
+      setHtml('apps-list', `
+        <div style="text-align:center;padding:40px">
+          <div style="color:var(--red);font-size:13px;margin-bottom:12px">❌ ${err.message}</div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:12px">Make sure center-app is running at ${CENTER_APP_URL}</div>
+          <button class="btn btn-sm" onclick="ApplicationsScreen._loaded=false;ApplicationsScreen.render()">Retry</button>
+        </div>`);
+    }
+  },
+
   _renderFilterChips() {
     const filters = [
-      { key:'all',      label:'All',      count: APPLICATIONS.length },
-      { key:'pending',  label:'⏳ Pending',  count: APPLICATIONS.filter(a => a.status === 'pending').length },
-      { key:'approved', label:'✅ Approved', count: APPLICATIONS.filter(a => a.status === 'approved').length },
-      { key:'rejected', label:'❌ Rejected', count: APPLICATIONS.filter(a => a.status === 'rejected').length },
+      { key:'all',      label:'All',         count: APPLICATIONS.length },
+      { key:'pending',  label:'⏳ Pending',   count: APPLICATIONS.filter(a => a.status === 'pending').length },
+      { key:'approved', label:'✅ Approved',  count: APPLICATIONS.filter(a => a.status === 'approved').length },
+      { key:'rejected', label:'❌ Rejected',  count: APPLICATIONS.filter(a => a.status === 'rejected').length },
     ];
     setHtml('apps-filter-chips', filters.map(f => `
       <div class="chip ${this._filter === f.key ? 'chip-on' : ''}" onclick="ApplicationsScreen._setFilter('${f.key}')">
@@ -2130,66 +2154,102 @@ const ApplicationsScreen = {
       const badge = isPending  ? `<span class="badge" style="background:#fef3c7;color:#92400e">⏳ Pending</span>`
                   : isApproved ? `<span class="badge b-conf">✅ Approved</span>`
                   : `<span class="badge b-canc">❌ Rejected</span>`;
+
+      const images = (() => {
+        try { return JSON.parse(a.center_images || '[]'); } catch { return []; }
+      })();
+      const certs = (() => {
+        try { return JSON.parse(a.certificates || '[]'); } catch { return []; }
+      })();
+      const washTypes = (a.wash_types || '').split(',').filter(Boolean)
+        .map(t => ({ water:'💧 Water', dry:'🧴 Dry', steam:'♨️ Steam', d2d:'🚗 D2D' }[t] || t))
+        .join(' · ');
+
+      const imgStrip = images.length
+        ? `<div style="display:flex;gap:6px;margin-bottom:8px;overflow-x:auto">
+            ${images.map(src => `<img src="${src}" style="width:60px;height:60px;object-fit:cover;border-radius:8px;flex-shrink:0">`).join('')}
+           </div>` : '';
+
+      const certList = certs.length
+        ? `<div style="font-size:11px"><span style="color:var(--muted)">📄 Docs:</span> ${certs.map(c => c.name).join(', ')}</div>` : '';
+
+      const geoInfo = a.geo_lat
+        ? `<div style="font-size:11px"><span style="color:var(--muted)">📍 Geo:</span> ${parseFloat(a.geo_lat).toFixed(4)}, ${parseFloat(a.geo_lng).toFixed(4)}</div>` : '';
+
       return `
         <div class="card card-pad" style="margin-bottom:10px">
           <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px">
             <div>
               <div style="font-weight:700;font-size:14px">${a.name}</div>
-              <div style="font-size:11px;color:var(--muted)">${a.ownerName} · Applied ${a.appliedAt}</div>
+              <div style="font-size:11px;color:var(--muted)">${a.owner_name} · ${new Date(a.created_at).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})}</div>
             </div>
             ${badge}
           </div>
+          ${imgStrip}
           <div style="display:grid;gap:4px;margin-bottom:8px">
             <div style="font-size:11px"><span style="color:var(--muted)">📱 Mobile:</span> ${a.mobile}</div>
             <div style="font-size:11px"><span style="color:var(--muted)">📧 Email:</span> ${a.email || '—'}</div>
             <div style="font-size:11px"><span style="color:var(--muted)">🏙️ City:</span> ${a.city}</div>
-            <div style="font-size:11px"><span style="color:var(--muted)">📍 Address:</span> ${a.address}</div>
+            <div style="font-size:11px"><span style="color:var(--muted)">🏠 Address:</span> ${a.address}</div>
+            ${geoInfo}
+            <div style="font-size:11px"><span style="color:var(--muted)">🚿 Wash types:</span> ${washTypes || '—'}</div>
             <div style="font-size:11px"><span style="color:var(--muted)">🧾 GSTIN:</span> ${a.gstin || '<span style="color:#dc2626">Not provided</span>'}</div>
-            <div style="font-size:11px"><span style="color:var(--muted)">🏦 Bank:</span> ${a.bank_account ? `${a.account_name} · ····${a.bank_account.slice(-4)} · IFSC: ${a.ifsc}` : '<span style="color:#dc2626">Not provided</span>'}</div>
+            <div style="font-size:11px"><span style="color:var(--muted)">🏦 Bank:</span> ${a.bank_account ? `${a.account_name || ''} · ····${a.bank_account.slice(-4)} · ${a.ifsc || ''}` : '<span style="color:#dc2626">Not provided</span>'}</div>
+            ${certList}
             ${a.notes ? `<div style="font-size:11px"><span style="color:var(--muted)">📝 Notes:</span> ${a.notes}</div>` : ''}
           </div>
           ${isPending ? `
             <div style="display:flex;gap:8px">
-              <button class="btn btn-sm btn-red" style="flex:1" onclick="ApplicationsScreen.reject('${a.id}')">✕ Reject</button>
-              <button class="btn btn-sm btn-green" style="flex:1" onclick="ApplicationsScreen.approve('${a.id}')">✓ Approve & Create Center</button>
+              <button class="btn btn-sm btn-red" style="flex:1" onclick="ApplicationsScreen.reject(${a.id})">✕ Reject</button>
+              <button class="btn btn-sm btn-green" style="flex:1" onclick="ApplicationsScreen.approve(${a.id})">✓ Approve & Go Live</button>
             </div>` : ''}
         </div>`;
     }).join(''));
   },
 
-  approve(id) {
+  async approve(id) {
     const a = APPLICATIONS.find(x => x.id === id);
     if (!a) return;
-    if (!a.gstin || !a.bank_account) {
-      if (!confirm(`⚠️ ${a.name} is missing GST or bank details.\n\nApprove anyway and add details later?`)) return;
-    } else if (!confirm(`Approve ${a.name}?\n\nThis will create a center account and allow them to log in.`)) return;
-    a.status = 'approved';
-    a.notes  = 'Documents verified';
-    // Add to CENTERS
-    const newId = 'c' + (CENTERS.length + 1 + Date.now() % 1000);
-    CENTERS.push({
-      id: newId, name: a.name, owner: a.ownerName, phone: a.mobile, area: a.city,
-      address: a.address, gstin: a.gstin, rating: 0, totalReviews: 0,
-      isOpen: false, washTypes: ['water'], totalBookings: 0, activeNow: 0, todayRevenue: 0,
-      visible: false, displayOrder: CENTERS.length + 1, cityId: 'city1', pendingSettlement: 0,
-      bankAccount: a.bank_account, ifsc: a.ifsc, accountName: a.account_name, bankName: a.bank_name,
-    });
-    logChange(id, 'Application approved', `${a.name} center account created`);
-    UI.toast(`✅ ${a.name} approved — center account created`);
-    this._renderList();
-    this._renderFilterChips();
-    SuperAdmin._renderApplications?.();
+    const msg = (!a.gstin || !a.bank_account)
+      ? `⚠️ ${a.name} is missing GST or bank details.\n\nApprove anyway? They can add details later.`
+      : `Approve ${a.name}?\n\nThis will create a center account and send them a confirmation.`;
+    if (!confirm(msg)) return;
+
+    try {
+      const res  = await fetch(`${CENTER_APP_URL}/api/admin/applications/${id}/approve`, {
+        method:  'POST',
+        headers: { 'x-admin-key': ADMIN_API_KEY, 'Content-Type': 'application/json' },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed');
+      UI.toast(`✅ ${a.name} approved — center account created`);
+      logChange(id, 'Application approved', `${a.name} center account created`);
+      this._loaded = false;
+      this.render();
+    } catch (err) {
+      UI.toast(`❌ ${err.message}`);
+    }
   },
 
-  reject(id) {
+  async reject(id) {
     const a = APPLICATIONS.find(x => x.id === id);
     if (!a || !confirm(`Reject application from ${a.name}?`)) return;
-    a.status = 'rejected';
-    a.notes  = 'Application rejected by admin';
-    logChange(id, 'Application rejected', `${a.name}`);
-    UI.toast(`❌ Application rejected`);
-    this._renderList();
-    this._renderFilterChips();
-    SuperAdmin._renderApplications?.();
+    const notes = prompt('Reason for rejection (optional):') || 'Application rejected by admin';
+
+    try {
+      const res  = await fetch(`${CENTER_APP_URL}/api/admin/applications/${id}/reject`, {
+        method:  'POST',
+        headers: { 'x-admin-key': ADMIN_API_KEY, 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ notes }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed');
+      UI.toast(`Application rejected`);
+      logChange(id, 'Application rejected', a.name);
+      this._loaded = false;
+      this.render();
+    } catch (err) {
+      UI.toast(`❌ ${err.message}`);
+    }
   },
 };

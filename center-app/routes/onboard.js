@@ -9,7 +9,11 @@ function isMobile(val) {
 
 // POST /api/onboard/apply
 router.post('/apply', (req, res) => {
-  const { name, owner_name, mobile, email, city, address, gstin, bank_account, ifsc, account_name } = req.body || {};
+  const {
+    name, owner_name, mobile, email, city, address,
+    gstin, bank_account, ifsc, account_name, bank_name,
+    geo_lat, geo_lng, center_images, certificates, wash_types,
+  } = req.body || {};
 
   if (!name?.trim())       return res.status(400).json({ error: 'Center name is required.' });
   if (!owner_name?.trim()) return res.status(400).json({ error: 'Owner name is required.' });
@@ -18,12 +22,18 @@ router.post('/apply', (req, res) => {
   if (!address?.trim())    return res.status(400).json({ error: 'Address is required.' });
 
   const norm = mobile.replace(/\s+/g, '');
+  const data = {
+    name, owner_name, mobile: norm, email, city, address,
+    gstin, bank_account, ifsc, account_name, bank_name,
+    geo_lat: geo_lat || null, geo_lng: geo_lng || null,
+    center_images: Array.isArray(center_images) ? center_images : [],
+    certificates:  Array.isArray(certificates)  ? certificates  : [],
+    wash_types: wash_types || 'water,dry',
+  };
 
-  // Check if already an active center
   const existingCenter = db.findCenterByMobile(norm);
   if (existingCenter) return res.status(400).json({ error: 'This number is already registered as a center.' });
 
-  // Check if application already exists
   const existingApp = db.getApplicationByMobile(norm);
   if (existingApp) {
     if (existingApp.status === 'pending')
@@ -34,13 +44,12 @@ router.post('/apply', (req, res) => {
       });
     if (existingApp.status === 'approved')
       return res.status(400).json({ error: 'This number is already approved. Try logging in.' });
-    // rejected — allow re-apply by updating
-    db.reapplyApplication(existingApp.id, { name, owner_name, email, city, address, gstin, bank_account, ifsc, account_name });
+    db.reapplyApplication(existingApp.id, data);
     console.log(`♻️  Re-application: ${name} (${norm})`);
     return res.json({ success: true, message: 'Application re-submitted successfully.', id: existingApp.id });
   }
 
-  const info = db.createApplication({ name, owner_name, mobile: norm, email, city, address, gstin, bank_account, ifsc, account_name });
+  const info = db.createApplication(data);
   console.log(`📋 New center application: ${name} (${norm})`);
   res.json({ success: true, message: 'Application submitted! SparkWash team will review and contact you within 24–48 hours.', id: info.lastInsertRowid });
 });

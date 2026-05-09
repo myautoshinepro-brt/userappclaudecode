@@ -6,7 +6,7 @@ const Onboarding = {
 
   start(mobile) {
     this._step = 1;
-    this._data = { mobile: mobile || '' };
+    this._data = { mobile: mobile || '', center_images: [], certificates: [], wash_types: 'water,dry' };
     Router.go('onboard');
   },
 
@@ -14,169 +14,362 @@ const Onboarding = {
     this._renderStep(this._step);
   },
 
+  _labels: ['Basic Info', 'Location', 'Wash Types', 'Photos & Docs', 'Bank & GST'],
+
   _renderStep(step) {
-    const steps = ['Basic Info', 'Legal & GST', 'Bank Details'];
-    const progress = `
-      <div style="display:flex;gap:0;margin-bottom:20px">
-        ${steps.map((s, i) => {
-          const done    = i + 1 < step;
-          const current = i + 1 === step;
-          return `
-            <div style="flex:1;text-align:center">
-              <div style="width:28px;height:28px;border-radius:50%;margin:0 auto 4px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;
-                background:${done ? 'var(--green)' : current ? 'var(--navy)' : 'var(--border)'};
-                color:${done || current ? '#fff' : 'var(--muted)'}">
-                ${done ? '✓' : i + 1}
-              </div>
-              <div style="font-size:9px;color:${current ? 'var(--navy)' : 'var(--muted)'};font-weight:${current ? '700' : '400'}">${s}</div>
-            </div>
-            ${i < steps.length - 1 ? `<div style="flex:0 0 20px;height:1px;background:${done ? 'var(--green)' : 'var(--border)'};margin-top:14px"></div>` : ''}`;
-        }).join('')}
-      </div>`;
+    const labels = this._labels;
+    const dots = labels.map((s, i) => {
+      const done    = i + 1 < step;
+      const current = i + 1 === step;
+      const bg      = done ? 'var(--green)' : current ? 'var(--navy)' : 'var(--border)';
+      const fg      = done || current ? '#fff' : 'var(--muted)';
+      const cursor  = done ? 'pointer' : 'default';
+      const click   = done ? `onclick="Onboarding._goToStep(${i + 1})"` : '';
+      const sep     = i < labels.length - 1
+        ? `<div style="flex:0 0 10px;height:1px;background:${done ? 'var(--green)' : 'var(--border)'};margin-top:11px"></div>`
+        : '';
+      return `
+        <div ${click} style="flex:1;text-align:center;cursor:${cursor}">
+          <div style="width:22px;height:22px;border-radius:50%;margin:0 auto 3px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;background:${bg};color:${fg}">
+            ${done ? '✓' : i + 1}
+          </div>
+          <div style="font-size:8px;color:${current ? 'var(--navy)' : 'var(--muted)'};font-weight:${current ? '700' : '400'};white-space:nowrap">${s}</div>
+        </div>${sep}`;
+    }).join('');
 
     const area = document.getElementById('onboard-form-area');
     if (!area) return;
-    area.innerHTML = progress + this._stepForm(step);
+    area.innerHTML = `<div style="display:flex;gap:0;margin-bottom:20px">${dots}</div>` + this._stepForm(step);
   },
 
   _stepForm(step) {
     const d = this._data;
+
+    // ── Step 1: Basic Info ─────────────────────────────────────
     if (step === 1) return `
       <div class="input-group">
         <div class="input-label">Center Name *</div>
-        <div class="input-with-icon">
-          <span class="input-ico">🏪</span>
+        <div class="input-with-icon"><span class="input-ico">🏪</span>
           <input id="ob-name" class="input-field" type="text" placeholder="e.g. AutoSpa Andheri" value="${d.name || ''}">
         </div>
       </div>
       <div class="input-group">
-        <div class="input-label">Owner Name *</div>
-        <div class="input-with-icon">
-          <span class="input-ico">👤</span>
-          <input id="ob-owner" class="input-field" type="text" placeholder="Your full name" value="${d.owner_name || ''}">
+        <div class="input-label">Owner / Contact Person *</div>
+        <div class="input-with-icon"><span class="input-ico">👤</span>
+          <input id="ob-owner" class="input-field" type="text" placeholder="Full name" value="${d.owner_name || ''}">
         </div>
       </div>
       <div class="input-group">
         <div class="input-label">Mobile Number *</div>
-        <div class="input-with-icon">
-          <span class="input-ico">📱</span>
+        <div class="input-with-icon"><span class="input-ico">📱</span>
           <input id="ob-mobile" class="input-field" type="tel" maxlength="10" placeholder="10-digit mobile"
             oninput="this.value=this.value.replace(/\\D/g,'')" value="${d.mobile || ''}">
         </div>
       </div>
       <div class="input-group">
-        <div class="input-label">Email</div>
-        <div class="input-with-icon">
-          <span class="input-ico">📧</span>
+        <div class="input-label">Email Address</div>
+        <div class="input-with-icon"><span class="input-ico">📧</span>
           <input id="ob-email" class="input-field" type="email" placeholder="center@email.com" value="${d.email || ''}">
         </div>
       </div>
+      <button class="btn btn-primary btn-full" onclick="Onboarding._next1()">Next →</button>`;
+
+    // ── Step 2: Location ───────────────────────────────────────
+    if (step === 2) return `
       <div class="input-group">
         <div class="input-label">City *</div>
-        <div class="input-with-icon">
-          <span class="input-ico">🏙️</span>
+        <div class="input-with-icon"><span class="input-ico">🏙️</span>
           <input id="ob-city" class="input-field" type="text" placeholder="e.g. Mumbai" value="${d.city || ''}">
         </div>
       </div>
       <div class="input-group">
         <div class="input-label">Full Address *</div>
-        <div class="input-with-icon">
-          <span class="input-ico">📍</span>
-          <input id="ob-address" class="input-field" type="text" placeholder="Shop no, street, area" value="${d.address || ''}">
+        <div class="input-with-icon"><span class="input-ico">📍</span>
+          <input id="ob-address" class="input-field" type="text" placeholder="Shop no, street, area, landmark" value="${d.address || ''}">
         </div>
-      </div>
-      <button class="btn btn-primary btn-full" onclick="Onboarding._next1()">Next →</button>`;
-
-    if (step === 2) return `
-      <div style="background:#fef9c3;border-radius:10px;padding:10px 12px;margin-bottom:16px;font-size:11px;color:#92400e">
-        💡 GST details are required for SparkWash to process settlements. You can add them later too.
       </div>
       <div class="input-group">
-        <div class="input-label">GSTIN</div>
-        <div class="input-with-icon">
-          <span class="input-ico">🧾</span>
-          <input id="ob-gstin" class="input-field" type="text" placeholder="22AAAAA0000A1Z5" maxlength="15"
-            oninput="this.value=this.value.toUpperCase()" value="${d.gstin || ''}">
+        <div class="input-label">Geo Location <span style="color:var(--muted);font-weight:400">(optional)</span></div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button class="btn btn-ghost" style="flex:1" onclick="Onboarding._getGeo()" id="ob-geo-btn">
+            📍 Detect My Location
+          </button>
+          <div id="ob-geo-status" style="font-size:10px;color:var(--muted);flex:1;text-align:right">
+            ${d.geo_lat ? `✅ ${d.geo_lat.toFixed(4)}, ${d.geo_lng.toFixed(4)}` : 'Not captured'}
+          </div>
         </div>
+        <div style="font-size:10px;color:var(--muted);margin-top:4px">Helps customers find your center on the map</div>
       </div>
       <div style="display:flex;gap:8px;margin-top:8px">
         <button class="btn btn-ghost" style="flex:1" onclick="Onboarding._prev()">← Back</button>
         <button class="btn btn-primary" style="flex:2" onclick="Onboarding._next2()">Next →</button>
       </div>`;
 
-    if (step === 3) return `
-      <div style="background:#f0f9ff;border-radius:10px;padding:10px 12px;margin-bottom:16px;font-size:11px;color:#0369a1">
-        💳 Bank details are needed for SparkWash to credit settlements. You can add them later too.
+    // ── Step 3: Wash Types ─────────────────────────────────────
+    if (step === 3) {
+      const selected = (d.wash_types || '').split(',').filter(Boolean);
+      const types = [
+        { id: 'water', icon: '💧', label: 'Water Wash',   sub: '₹149–549' },
+        { id: 'dry',   icon: '🧴', label: 'Dry Wash',     sub: '₹149–399' },
+        { id: 'steam', icon: '♨️', label: 'Steam Wash',   sub: '₹349–799' },
+        { id: 'd2d',   icon: '🚗', label: 'Door-to-Door', sub: '₹299–899' },
+      ];
+      return `
+        <div style="font-size:12px;color:var(--muted);margin-bottom:12px">Select the wash types your center offers: *</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
+          ${types.map(w => {
+            const on = selected.includes(w.id);
+            return `
+              <div id="ob-wcard-${w.id}" onclick="Onboarding._toggleWash('${w.id}')"
+                style="border:2px solid ${on ? 'var(--navy)' : 'var(--border)'};border-radius:12px;padding:14px 10px;cursor:pointer;text-align:center;transition:border-color .15s;background:${on ? '#eff6ff' : '#fff'}">
+                <div style="font-size:26px;margin-bottom:4px">${w.icon}</div>
+                <div style="font-size:12px;font-weight:700;color:var(--text-primary)">${w.label}</div>
+                <div style="font-size:10px;color:var(--muted)">${w.sub}</div>
+              </div>`;
+          }).join('')}
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-ghost" style="flex:1" onclick="Onboarding._prev()">← Back</button>
+          <button class="btn btn-primary" style="flex:2" onclick="Onboarding._next3()">Next →</button>
+        </div>`;
+    }
+
+    // ── Step 4: Photos & Documents ─────────────────────────────
+    if (step === 4) {
+      const imgs  = d.center_images || [];
+      const certs = d.certificates  || [];
+      const imgPreviews = imgs.map((src, i) => `
+        <div style="position:relative;width:72px;height:72px">
+          <img src="${src}" style="width:72px;height:72px;object-fit:cover;border-radius:8px;border:1px solid var(--border)">
+          <button onclick="Onboarding._removeImage(${i})"
+            style="position:absolute;top:-6px;right:-6px;width:18px;height:18px;border-radius:50%;background:var(--red);color:#fff;border:none;font-size:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1">×</button>
+        </div>`).join('');
+      const addBtn = imgs.length < 4 ? `
+        <label style="width:72px;height:72px;border:2px dashed var(--border);border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;gap:2px;font-size:10px;color:var(--muted)">
+          📷<span>Add</span>
+          <input type="file" accept="image/*" style="display:none" onchange="Onboarding._addImage(this)">
+        </label>` : '';
+      const certList = certs.map((c, i) => `
+        <div style="display:flex;align-items:center;gap:8px;background:var(--surface);border-radius:8px;padding:8px 10px">
+          <span>📄</span>
+          <div style="flex:1;font-size:11px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.name}</div>
+          <button onclick="Onboarding._removeCert(${i})" style="background:none;border:none;color:var(--red);font-size:16px;cursor:pointer;line-height:1">×</button>
+        </div>`).join('');
+      return `
+        <div class="input-group">
+          <div class="input-label">Center Photos <span style="color:var(--muted);font-weight:400">(up to 4)</span></div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:6px">
+            ${imgPreviews}${addBtn}
+          </div>
+          <div style="font-size:10px;color:var(--muted)">Photos help customers trust your center</div>
+        </div>
+        <div class="input-group" style="margin-top:14px">
+          <div class="input-label">Business Documents</div>
+          <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:8px">${certList}</div>
+          <label class="btn btn-ghost btn-full" style="cursor:pointer;justify-content:center">
+            📎 Upload Certificate / Document
+            <input type="file" accept=".pdf,.jpg,.jpeg,.png" style="display:none" onchange="Onboarding._addCert(this)">
+          </label>
+          <div style="font-size:10px;color:var(--muted);margin-top:4px">GST certificate, trade license, business registration, etc.</div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:14px">
+          <button class="btn btn-ghost" style="flex:1" onclick="Onboarding._prev()">← Back</button>
+          <button class="btn btn-primary" style="flex:2" onclick="Onboarding._next4()">Next →</button>
+        </div>`;
+    }
+
+    // ── Step 5: Bank & GST ─────────────────────────────────────
+    if (step === 5) return `
+      <div style="background:#fef9c3;border-radius:10px;padding:10px 12px;margin-bottom:14px;font-size:11px;color:#92400e">
+        💡 Bank & GST details are needed for settlements. You can update them in settings later too.
+      </div>
+      <div class="input-group">
+        <div class="input-label">GSTIN</div>
+        <div class="input-with-icon"><span class="input-ico">🧾</span>
+          <input id="ob-gstin" class="input-field" type="text" placeholder="22AAAAA0000A1Z5" maxlength="15"
+            oninput="this.value=this.value.toUpperCase()" value="${d.gstin || ''}">
+        </div>
+      </div>
+      <div class="input-group">
+        <div class="input-label">Bank Name</div>
+        <div class="input-with-icon"><span class="input-ico">🏦</span>
+          <input id="ob-bankname" class="input-field" type="text" placeholder="e.g. HDFC Bank" value="${d.bank_name || ''}">
+        </div>
       </div>
       <div class="input-group">
         <div class="input-label">Account Holder Name</div>
-        <div class="input-with-icon">
-          <span class="input-ico">👤</span>
+        <div class="input-with-icon"><span class="input-ico">👤</span>
           <input id="ob-acname" class="input-field" type="text" placeholder="Name as per bank" value="${d.account_name || ''}">
         </div>
       </div>
       <div class="input-group">
-        <div class="input-label">Bank Account Number</div>
-        <div class="input-with-icon">
-          <span class="input-ico">🏦</span>
+        <div class="input-label">Account Number</div>
+        <div class="input-with-icon"><span class="input-ico">🔢</span>
           <input id="ob-account" class="input-field" type="text" placeholder="Account number" value="${d.bank_account || ''}">
         </div>
       </div>
       <div class="input-group">
         <div class="input-label">IFSC Code</div>
-        <div class="input-with-icon">
-          <span class="input-ico">🔢</span>
+        <div class="input-with-icon"><span class="input-ico">📋</span>
           <input id="ob-ifsc" class="input-field" type="text" placeholder="e.g. HDFC0001234" maxlength="11"
             oninput="this.value=this.value.toUpperCase()" value="${d.ifsc || ''}">
         </div>
       </div>
       <div style="display:flex;gap:8px;margin-top:8px">
         <button class="btn btn-ghost" style="flex:1" onclick="Onboarding._prev()">← Back</button>
-        <button class="btn btn-primary" id="ob-submit-btn" style="flex:2" onclick="Onboarding._submit()">Submit Application</button>
+        <button class="btn btn-primary" id="ob-submit-btn" style="flex:2" onclick="Onboarding._submit()">Submit Application ✓</button>
       </div>`;
 
     return '';
   },
 
+  // ── Wash type toggle ────────────────────────────────────────
+  _toggleWash(type) {
+    let types = (this._data.wash_types || '').split(',').filter(Boolean);
+    if (types.includes(type)) types = types.filter(t => t !== type);
+    else types.push(type);
+    this._data.wash_types = types.join(',');
+    const card = document.getElementById(`ob-wcard-${type}`);
+    if (card) {
+      const on = types.includes(type);
+      card.style.borderColor = on ? 'var(--navy)' : 'var(--border)';
+      card.style.background  = on ? '#eff6ff'     : '#fff';
+    }
+  },
+
+  // ── Geo location ────────────────────────────────────────────
+  _getGeo() {
+    if (!navigator.geolocation) { UI.toast('Geolocation not supported on this device'); return; }
+    const btn    = document.getElementById('ob-geo-btn');
+    const status = document.getElementById('ob-geo-status');
+    if (btn) btn.textContent = '⏳ Detecting...';
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        this._data.geo_lat = pos.coords.latitude;
+        this._data.geo_lng = pos.coords.longitude;
+        if (status) status.textContent = `✅ ${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)}`;
+        if (btn)    btn.textContent    = '✅ Location Captured';
+        UI.toast('Location captured!');
+      },
+      () => {
+        if (btn) btn.textContent = '📍 Detect My Location';
+        UI.toast('Could not get location — please allow location access');
+      }
+    );
+  },
+
+  // ── Image helpers ───────────────────────────────────────────
+  _resizeImage(file) {
+    return new Promise(resolve => {
+      const reader = new FileReader();
+      reader.onload = e => {
+        const img = new Image();
+        img.onload = () => {
+          const MAX = 800;
+          let w = img.width, h = img.height;
+          if (w > MAX || h > MAX) {
+            if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
+            else       { w = Math.round(w * MAX / h); h = MAX; }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = w; canvas.height = h;
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+          resolve(canvas.toDataURL('image/jpeg', 0.75));
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  },
+
+  async _addImage(input) {
+    const file = input.files[0];
+    if (!file) return;
+    if (!this._data.center_images) this._data.center_images = [];
+    if (this._data.center_images.length >= 4) { UI.toast('Maximum 4 photos allowed'); return; }
+    try {
+      const b64 = await this._resizeImage(file);
+      this._data.center_images.push(b64);
+      this._renderStep(4);
+    } catch { UI.toast('Failed to process image'); }
+  },
+
+  _removeImage(idx) {
+    this._data.center_images.splice(idx, 1);
+    this._renderStep(4);
+  },
+
+  _addCert(input) {
+    const file = input.files[0];
+    if (!file) return;
+    if (!this._data.certificates) this._data.certificates = [];
+    const reader = new FileReader();
+    reader.onload = e => {
+      this._data.certificates.push({ name: file.name, data: e.target.result });
+      this._renderStep(4);
+    };
+    reader.readAsDataURL(file);
+  },
+
+  _removeCert(idx) {
+    this._data.certificates.splice(idx, 1);
+    this._renderStep(4);
+  },
+
+  // ── Step validators ─────────────────────────────────────────
   _next1() {
-    const name    = document.getElementById('ob-name')?.value.trim();
-    const owner   = document.getElementById('ob-owner')?.value.trim();
-    const mobile  = document.getElementById('ob-mobile')?.value.trim();
-    const email   = document.getElementById('ob-email')?.value.trim();
-    const city    = document.getElementById('ob-city')?.value.trim();
-    const address = document.getElementById('ob-address')?.value.trim();
-
-    if (!name)    { UI.toast('Center name is required'); return; }
-    if (!owner)   { UI.toast('Owner name is required'); return; }
+    const name   = document.getElementById('ob-name')?.value.trim();
+    const owner  = document.getElementById('ob-owner')?.value.trim();
+    const mobile = document.getElementById('ob-mobile')?.value.trim();
+    const email  = document.getElementById('ob-email')?.value.trim();
+    if (!name)  { UI.toast('Center name is required'); return; }
+    if (!owner) { UI.toast('Owner name is required'); return; }
     if (!/^[6-9]\d{9}$/.test(mobile)) { UI.toast('Enter a valid 10-digit mobile number'); return; }
-    if (!city)    { UI.toast('City is required'); return; }
-    if (!address) { UI.toast('Address is required'); return; }
-
-    Object.assign(this._data, { name, owner_name: owner, mobile, email, city, address });
-    this._step = 2;
-    this._renderStep(2);
+    Object.assign(this._data, { name, owner_name: owner, mobile, email });
+    this._step = 2; this._renderStep(2);
   },
 
   _next2() {
-    const gstin = document.getElementById('ob-gstin')?.value.trim();
-    if (gstin && !/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(gstin)) {
-      UI.toast('Enter a valid 15-character GSTIN or leave blank');
-      return;
-    }
-    this._data.gstin = gstin || '';
-    this._step = 3;
-    this._renderStep(3);
+    const city    = document.getElementById('ob-city')?.value.trim();
+    const address = document.getElementById('ob-address')?.value.trim();
+    if (!city)    { UI.toast('City is required'); return; }
+    if (!address) { UI.toast('Full address is required'); return; }
+    Object.assign(this._data, { city, address });
+    this._step = 3; this._renderStep(3);
+  },
+
+  _next3() {
+    const types = (this._data.wash_types || '').split(',').filter(Boolean);
+    if (!types.length) { UI.toast('Please select at least one wash type'); return; }
+    this._step = 4; this._renderStep(4);
+  },
+
+  _next4() {
+    this._step = 5; this._renderStep(5);
+  },
+
+  _goToStep(step) {
+    if (step < this._step) { this._step = step; this._renderStep(step); }
   },
 
   _prev() {
     if (this._step > 1) { this._step--; this._renderStep(this._step); }
   },
 
+  // ── Submit ──────────────────────────────────────────────────
   async _submit() {
-    const account = document.getElementById('ob-account')?.value.trim();
-    const ifsc    = document.getElementById('ob-ifsc')?.value.trim();
-    const acname  = document.getElementById('ob-acname')?.value.trim();
-    Object.assign(this._data, { bank_account: account, ifsc, account_name: acname });
+    const gstin    = document.getElementById('ob-gstin')?.value.trim();
+    const bankname = document.getElementById('ob-bankname')?.value.trim();
+    const acname   = document.getElementById('ob-acname')?.value.trim();
+    const account  = document.getElementById('ob-account')?.value.trim();
+    const ifsc     = document.getElementById('ob-ifsc')?.value.trim();
+
+    if (gstin && !/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(gstin)) {
+      UI.toast('Enter a valid 15-character GSTIN or leave blank');
+      return;
+    }
+
+    Object.assign(this._data, { gstin, bank_name: bankname, account_name: acname, bank_account: account, ifsc });
 
     const btn = document.getElementById('ob-submit-btn');
     UI.setLoading(btn, true);
@@ -190,32 +383,44 @@ const Onboarding = {
       if (!res.ok) { UI.toast(data.error || 'Submission failed'); return; }
       this._renderSuccess();
     } catch {
-      UI.toast('Network error. Try again.');
+      UI.toast('Network error. Please try again.');
     } finally {
       UI.setLoading(btn, false);
     }
   },
 
+  // ── Success screen ──────────────────────────────────────────
   _renderSuccess() {
     const area = document.getElementById('onboard-form-area');
     if (!area) return;
     area.innerHTML = `
-      <div style="text-align:center;padding:20px 0">
-        <div style="font-size:56px;margin-bottom:12px">🎉</div>
-        <div style="font-weight:800;font-size:18px;margin-bottom:8px">Application Submitted!</div>
-        <div style="font-size:13px;color:var(--muted);margin-bottom:20px;line-height:1.5">
-          We've received your application for <strong>${this._data.name}</strong>.<br>
-          The SparkWash team will review and contact you within <strong>24–48 hours</strong>.
+      <div style="text-align:center;padding:16px 0">
+        <div style="font-size:52px;margin-bottom:10px">🎉</div>
+        <div style="font-weight:800;font-size:18px;margin-bottom:6px">Application Submitted!</div>
+        <div style="font-size:13px;color:var(--muted);margin-bottom:16px;line-height:1.5">
+          Your application for <strong>${this._data.name}</strong> is received.<br>
+          Review usually takes <strong>24–48 hours</strong>.
         </div>
-        <div class="card card-pad" style="text-align:left;margin-bottom:16px">
-          <div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:8px">WHAT HAPPENS NEXT</div>
-          <div style="font-size:12px;display:grid;gap:8px">
-            <div>✅ Our team reviews your details</div>
-            <div>📞 We call you for a quick verification</div>
-            <div>🏪 Center account created & credentials shared</div>
-            <div>🚀 You go live on SparkWash!</div>
+
+        <div style="background:#fef9c3;border:1px solid #fcd34d;border-radius:12px;padding:14px;margin-bottom:14px;text-align:left">
+          <div style="font-size:12px;font-weight:800;color:#92400e;margin-bottom:6px">⏳ Verification In Progress</div>
+          <div style="font-size:12px;color:#78350f;line-height:1.6">
+            Our team is verifying your center details, location, and documents.
+            Once approved you will receive a confirmation via <strong>email, SMS, and phone call</strong>
+            on <strong>${this._data.mobile}</strong>.
           </div>
         </div>
+
+        <div class="card card-pad" style="text-align:left;margin-bottom:14px">
+          <div style="font-size:10px;font-weight:700;color:var(--muted);margin-bottom:8px">WHAT HAPPENS NEXT</div>
+          <div style="font-size:12px;display:grid;gap:7px">
+            <div>✅ Team reviews your details & documents</div>
+            <div>📞 We call you on <strong>${this._data.mobile}</strong> for a quick check</div>
+            <div>📧 Approval email sent to <strong>${this._data.email || 'your email'}</strong></div>
+            <div>🚀 Your center goes live on SparkWash!</div>
+          </div>
+        </div>
+
         <button class="btn btn-primary btn-full" onclick="Auth.renderLogin();Router.go('login')">Back to Login</button>
         <button class="btn btn-ghost btn-full" style="margin-top:8px" onclick="Onboarding._checkStatus()">Check Application Status</button>
       </div>`;
@@ -229,7 +434,7 @@ const Onboarding = {
       const data = await res.json();
       if (!res.ok) { UI.toast(data.error || 'Not found'); return; }
       const icon = data.status === 'approved' ? '✅' : data.status === 'rejected' ? '❌' : '⏳';
-      UI.toast(`${icon} Application ${data.status} · ${data.notes || ''}`);
+      UI.toast(`${icon} Application ${data.status}${data.notes ? ' · ' + data.notes : ''}`);
     } catch { UI.toast('Network error'); }
   },
 };

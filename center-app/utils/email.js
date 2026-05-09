@@ -165,4 +165,70 @@ async function sendWashDoneEmail(booking, center) {
   }
 }
 
-module.exports = { sendWashDoneEmail };
+// ── Application approval / rejection email ────────────────────
+async function sendApplicationStatusEmail(app, status) {
+  const t = getTransporter();
+  if (!t) {
+    console.log(`📧 Application ${status} email skipped — SMTP not configured`);
+    return;
+  }
+  if (!app.email) {
+    console.log(`📧 Application ${status} email skipped — no email for ${app.name}`);
+    return;
+  }
+
+  const isApproved = status === 'approved';
+  const html = `
+<!DOCTYPE html><html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+  <div style="max-width:480px;margin:0 auto;padding:24px 16px">
+    <div style="background:linear-gradient(135deg,#0f172a,#1e3a5f);border-radius:16px 16px 0 0;padding:28px 24px;text-align:center">
+      <div style="font-size:40px;margin-bottom:8px">${isApproved ? '✅' : '❌'}</div>
+      <div style="color:#fff;font-size:22px;font-weight:800">SparkWash</div>
+      <div style="color:#94a3b8;font-size:12px;margin-top:4px">Center Registration Update</div>
+    </div>
+    <div style="background:#fff;padding:24px;border-radius:0 0 16px 16px;box-shadow:0 4px 12px rgba(0,0,0,.08)">
+      <h2 style="margin:0 0 8px;font-size:18px;color:#0f172a">${isApproved ? '🎉 Application Approved!' : '❌ Application Not Approved'}</h2>
+      <p style="margin:0 0 20px;color:#6b7280;font-size:13px">
+        Dear <strong>${app.owner_name}</strong>,<br><br>
+        ${isApproved
+          ? `We are excited to inform you that your center <strong>${app.name}</strong> has been <strong>approved</strong> on SparkWash!`
+          : `We regret to inform you that your center application for <strong>${app.name}</strong> could not be approved at this time.`}
+      </p>
+      ${isApproved ? `
+      <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:12px;padding:16px;margin-bottom:20px">
+        <div style="font-size:13px;color:#14532d;line-height:1.8">
+          ✅ Your center is now <strong>live on SparkWash</strong><br>
+          📱 Login using your mobile: <strong>${app.mobile}</strong><br>
+          🚀 Start accepting customer bookings today!
+        </div>
+      </div>` : `
+      <div style="background:#fef2f2;border:1px solid #fca5a5;border-radius:12px;padding:16px;margin-bottom:20px">
+        <div style="font-size:13px;color:#7f1d1d;line-height:1.8">
+          ${app.notes ? `📝 Reason: ${app.notes}<br>` : ''}
+          You may re-apply with updated information on the SparkWash center app.
+        </div>
+      </div>`}
+      <div style="text-align:center;font-size:11px;color:#9ca3af;line-height:1.6;margin-top:8px">
+        Questions? Reach out to SparkWash support.<br>
+        SparkWash · Powered by technology, driven by cleanliness
+      </div>
+    </div>
+  </div>
+</body></html>`;
+
+  const from    = process.env.SMTP_FROM || `"SparkWash" <${process.env.SMTP_USER}>`;
+  const subject = isApproved
+    ? `✅ Your SparkWash center is approved — ${app.name}`
+    : `SparkWash center application update — ${app.name}`;
+
+  try {
+    const info = await t.sendMail({ from, to: app.email, subject, html });
+    console.log(`📧 Application ${status} email sent to ${app.email} (${info.messageId})`);
+  } catch (err) {
+    console.error(`📧 Failed to send application ${status} email:`, err.message);
+  }
+}
+
+module.exports = { sendWashDoneEmail, sendApplicationStatusEmail };

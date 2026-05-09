@@ -35,12 +35,11 @@ let SETTLEMENTS = [
 ];
 
 // Center onboarding applications — submitted via center app, reviewed by SA
-let APPLICATIONS = [
-  { id:'ap1', name:'AutoSpa Goregaon',  ownerName:'Sanjay Mehta',   mobile:'9876500101', email:'sanjay@autospa.in',   city:'Mumbai', address:'Shop 3, SV Road, Goregaon West',     gstin:'27AMGSK1234G1Z1', bankAccount:'00112233445566', ifsc:'HDFC0001234', accountName:'AutoSpa Services',  status:'pending',  appliedAt:'7 May 2026', notes:'' },
-  { id:'ap2', name:'GlowWash Powai',    ownerName:'Rekha Desai',     mobile:'9876500202', email:'rekha@glowwash.in',   city:'Mumbai', address:'Unit 7, Hiranandani, Powai',          gstin:'27BRDSK5678H2Z2', bankAccount:'00223344556677', ifsc:'ICIC0002345', accountName:'GlowWash Pvt Ltd', status:'pending',  appliedAt:'8 May 2026', notes:'' },
-  { id:'ap3', name:'ShinePoint Thane',  ownerName:'Mohan Rao',       mobile:'9876500303', email:'mohan@shinepoint.in', city:'Thane',  address:'Plot 12, Manpada Road, Thane West',   gstin:'27CMRSK9012I3Z3', bankAccount:'00334455667788', ifsc:'SBIN0003456', accountName:'Mohan Rao',        status:'approved', appliedAt:'5 May 2026', notes:'Documents verified' },
-  { id:'ap4', name:'QuickShine Kurla',  ownerName:'Fatima Sheikh',   mobile:'9876500404', email:'fatima@qshine.in',    city:'Mumbai', address:'Shop 8, LBS Marg, Kurla West',        gstin:'', bankAccount:'', ifsc:'', accountName:'', status:'rejected', appliedAt:'4 May 2026', notes:'GST and bank details missing' },
-];
+// Center-app backend URL — update this when deploying to production
+const CENTER_APP_URL  = localStorage.getItem('sw_center_app_url') || 'http://localhost:3001';
+const ADMIN_API_KEY   = localStorage.getItem('sw_admin_api_key')  || 'sparkwash-admin-2026';
+
+let APPLICATIONS = []; // loaded from real API by ApplicationsScreen
 
 const WASH_LABELS = {
   water: { label:'💧 Water Wash',    color:'#1e40af', bg:'#dbeafe' },

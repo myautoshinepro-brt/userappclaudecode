@@ -135,6 +135,14 @@ try { db.exec("ALTER TABLE centers ADD COLUMN ifsc          TEXT"); } catch { /*
 try { db.exec("ALTER TABLE centers ADD COLUMN account_name  TEXT"); } catch { /* exists */ }
 try { db.exec("ALTER TABLE centers ADD COLUMN bank_name     TEXT"); } catch { /* exists */ }
 
+// ── Migration: enhanced application fields ──
+try { db.exec("ALTER TABLE applications ADD COLUMN geo_lat       REAL"); } catch { /* exists */ }
+try { db.exec("ALTER TABLE applications ADD COLUMN geo_lng       REAL"); } catch { /* exists */ }
+try { db.exec("ALTER TABLE applications ADD COLUMN center_images TEXT"); } catch { /* exists */ }
+try { db.exec("ALTER TABLE applications ADD COLUMN certificates  TEXT"); } catch { /* exists */ }
+try { db.exec("ALTER TABLE applications ADD COLUMN wash_types    TEXT"); } catch { /* exists */ }
+try { db.exec("ALTER TABLE applications ADD COLUMN bank_name     TEXT"); } catch { /* exists */ }
+
 // ── Applications table for center onboarding ──
 db.exec(`
   CREATE TABLE IF NOT EXISTS applications (
@@ -597,24 +605,64 @@ module.exports = {
   getApplicationByMobile(mobile) {
     return db.prepare('SELECT * FROM applications WHERE mobile=?').get(mobile);
   },
+  getApplicationById(id) {
+    return db.prepare('SELECT * FROM applications WHERE id=?').get(id);
+  },
   createApplication(data) {
     return db.prepare(`
-      INSERT INTO applications (name, owner_name, mobile, email, city, address, gstin, bank_account, ifsc, account_name)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(data.name, data.owner_name, data.mobile, data.email || null, data.city,
-           data.address, data.gstin || null, data.bank_account || null,
-           data.ifsc || null, data.account_name || null);
+      INSERT INTO applications (name, owner_name, mobile, email, city, address, gstin, bank_account, ifsc, account_name, bank_name, geo_lat, geo_lng, center_images, certificates, wash_types)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      data.name, data.owner_name, data.mobile, data.email || null, data.city, data.address,
+      data.gstin || null, data.bank_account || null, data.ifsc || null, data.account_name || null,
+      data.bank_name || null, data.geo_lat || null, data.geo_lng || null,
+      data.center_images ? JSON.stringify(data.center_images) : null,
+      data.certificates  ? JSON.stringify(data.certificates)  : null,
+      data.wash_types || null
+    );
   },
   updateApplicationStatus(id, status, notes) {
     return db.prepare(`UPDATE applications SET status=?, notes=?, updated_at=datetime('now') WHERE id=?`)
       .run(status, notes || null, id);
   },
   reapplyApplication(id, data) {
-    return db.prepare(`UPDATE applications SET name=?,owner_name=?,email=?,city=?,address=?,gstin=?,bank_account=?,ifsc=?,account_name=?,status='pending',notes=NULL,updated_at=datetime('now') WHERE id=?`)
-      .run(data.name, data.owner_name, data.email||null, data.city, data.address,
-           data.gstin||null, data.bank_account||null, data.ifsc||null, data.account_name||null, id);
+    return db.prepare(`
+      UPDATE applications SET
+        name=?, owner_name=?, email=?, city=?, address=?, gstin=?,
+        bank_account=?, ifsc=?, account_name=?, bank_name=?,
+        geo_lat=?, geo_lng=?, center_images=?, certificates=?, wash_types=?,
+        status='pending', notes=NULL, updated_at=datetime('now')
+      WHERE id=?
+    `).run(
+      data.name, data.owner_name, data.email || null, data.city, data.address,
+      data.gstin || null, data.bank_account || null, data.ifsc || null,
+      data.account_name || null, data.bank_name || null,
+      data.geo_lat || null, data.geo_lng || null,
+      data.center_images ? JSON.stringify(data.center_images) : null,
+      data.certificates  ? JSON.stringify(data.certificates)  : null,
+      data.wash_types || null, id
+    );
+  },
+  approveApplication(id) {
+    const app = db.prepare('SELECT * FROM applications WHERE id=?').get(id);
+    if (!app) return null;
+    const info = db.prepare(`
+      INSERT INTO centers (name, owner_name, mobile, email, address, city, gstin, wash_types, bank_account, ifsc, account_name, bank_name)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      app.name, app.owner_name, app.mobile, app.email,
+      app.address, app.city, app.gstin || null,
+      app.wash_types || 'water,dry',
+      app.bank_account || null, app.ifsc || null,
+      app.account_name || null, app.bank_name || null
+    );
+    db.prepare(`UPDATE applications SET status='approved', notes='Documents verified', updated_at=datetime('now') WHERE id=?`).run(id);
+    return { app, centerId: info.lastInsertRowid };
   },
   getAllApplications() {
     return db.prepare('SELECT * FROM applications ORDER BY created_at DESC').all();
+  },
+  getAllCenters() {
+    return db.prepare(`SELECT id, name, owner_name, mobile, email, address, city, gstin, wash_types, open_time, close_time, is_open, created_at FROM centers ORDER BY created_at DESC`).all();
   },
 };
