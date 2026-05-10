@@ -1,7 +1,8 @@
 [build]
-  base    = "admin-app"
-  publish = "."
-  command = ""
+  base      = "admin-app"
+  publish   = "."
+  command   = ""
+  functions = ""
 
 [[redirects]]
   from   = "/*"
