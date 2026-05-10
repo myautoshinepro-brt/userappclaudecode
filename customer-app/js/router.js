@@ -94,6 +94,9 @@ const Router = {
   },
 
   _updateNav(screenId) {
+    const nav = document.querySelector('.bottom-nav');
+    if (nav) nav.style.display = this.PUBLIC_SCREENS.has(screenId) ? 'none' : '';
+
     const navMap = {
       home:     'home',
       bookings: 'bookings',
