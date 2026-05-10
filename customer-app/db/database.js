@@ -1,8 +1,10 @@
 const Database = require('better-sqlite3');
 const path     = require('path');
+const fs       = require('fs');
 
 // In production (Railway) set DB_PATH=/data/sparkwash.sqlite pointing to a persistent volume
 const DB_PATH = process.env.DB_PATH || path.join(__dirname, 'sparkwash.sqlite');
+fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
 const db      = new Database(DB_PATH);
 
 // Enable WAL mode for better concurrent read performance
