@@ -36,7 +36,7 @@ let SETTLEMENTS = [
 
 // Center onboarding applications — submitted via center app, reviewed by SA
 // Center-app backend URL — update this when deploying to production
-const CENTER_APP_URL  = localStorage.getItem('sw_center_app_url') || 'http://localhost:3001';
+const CENTER_APP_URL = localStorage.getItem('sw_center_app_url') || 'https://userappclaudecode-production-7ece.up.railway.app';
 const ADMIN_API_KEY   = localStorage.getItem('sw_admin_api_key')  || 'sparkwash-admin-2026';
 
 let APPLICATIONS = []; // loaded from real API by ApplicationsScreen
