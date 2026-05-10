@@ -1,6 +1,7 @@
-const express = require('express');
-const jwt     = require('jsonwebtoken');
-const db      = require('../db/database');
+const express            = require('express');
+const jwt                = require('jsonwebtoken');
+const db                 = require('../db/database');
+const { sendOtpEmail }   = require('../utils/email');
 
 const router         = express.Router();
 const JWT_SECRET     = process.env.JWT_SECRET || 'sparkwash_center_dev_secret';
@@ -50,9 +51,16 @@ router.post('/send-otp', (req, res) => {
   db.saveOtp(norm, otp, OTP_MINUTES);
   console.log(`\n🔐 OTP for ${norm}: ${otp}  (expires in ${OTP_MINUTES} min)\n`);
 
+  // Send OTP to center's registered email if available
+  if (center.email) {
+    sendOtpEmail(center.email, otp, center.owner_name, OTP_MINUTES).catch(() => {});
+  }
+
   const payload = {
     success:    true,
-    message:    'OTP sent to your registered mobile number.',
+    message:    center.email
+      ? `OTP sent to your registered email (${center.email}).`
+      : 'OTP generated — check server logs.',
     centerName: center.name,
     ownerName:  center.owner_name,
   };

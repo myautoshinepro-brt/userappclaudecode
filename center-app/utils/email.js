@@ -231,4 +231,55 @@ async function sendApplicationStatusEmail(app, status) {
   }
 }
 
-module.exports = { sendWashDoneEmail, sendApplicationStatusEmail };
+// ── OTP email ─────────────────────────────────────────────────
+async function sendOtpEmail(toEmail, otp, name, expiresMinutes) {
+  const t = getTransporter();
+  if (!t) {
+    console.log('📧 OTP email skipped — SMTP not configured');
+    return false;
+  }
+
+  const from = process.env.SMTP_FROM || `"SparkWash" <${process.env.SMTP_USER}>`;
+
+  const html = `
+<!DOCTYPE html><html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+  <div style="max-width:480px;margin:0 auto;padding:24px 16px">
+    <div style="background:linear-gradient(135deg,#0f172a,#1e3a5f);border-radius:16px 16px 0 0;padding:28px 24px;text-align:center">
+      <div style="font-size:40px;margin-bottom:8px">🚿</div>
+      <div style="color:#fff;font-size:22px;font-weight:800">SparkWash Center</div>
+      <div style="color:#94a3b8;font-size:12px;margin-top:4px">Center Management Portal</div>
+    </div>
+    <div style="background:#fff;padding:28px 24px;border-radius:0 0 16px 16px;box-shadow:0 4px 12px rgba(0,0,0,.08)">
+      <h2 style="margin:0 0 6px;font-size:18px;color:#0f172a">Your Login OTP</h2>
+      <p style="margin:0 0 24px;color:#6b7280;font-size:13px">
+        Hi <strong>${name || 'there'}</strong>! Use the code below to log in to the SparkWash Center portal.
+      </p>
+      <div style="background:#f0fdf4;border:2px dashed #86efac;border-radius:14px;padding:24px;text-align:center;margin-bottom:20px">
+        <div style="font-size:11px;color:#16a34a;font-weight:700;letter-spacing:1px;margin-bottom:8px">ONE-TIME PASSWORD</div>
+        <div style="font-size:42px;font-weight:900;letter-spacing:10px;color:#15803d;font-family:monospace">${otp}</div>
+        <div style="font-size:11px;color:#6b7280;margin-top:10px">Expires in ${expiresMinutes} minutes</div>
+      </div>
+      <div style="background:#fef9c3;border-radius:10px;padding:12px 14px;margin-bottom:20px;font-size:12px;color:#92400e">
+        🔒 Never share this OTP with anyone. SparkWash will never call and ask for it.
+      </div>
+      <div style="text-align:center;font-size:11px;color:#9ca3af;line-height:1.6">
+        If you didn't request this, simply ignore this email.<br>
+        SparkWash · Powered by technology, driven by cleanliness
+      </div>
+    </div>
+  </div>
+</body></html>`;
+
+  try {
+    await t.sendMail({ from, to: toEmail, subject: `${otp} is your SparkWash Center OTP`, html });
+    console.log(`📧 OTP email sent to ${toEmail}`);
+    return true;
+  } catch (err) {
+    console.error(`📧 Failed to send OTP email to ${toEmail}:`, err.message);
+    return false;
+  }
+}
+
+module.exports = { sendWashDoneEmail, sendApplicationStatusEmail, sendOtpEmail };

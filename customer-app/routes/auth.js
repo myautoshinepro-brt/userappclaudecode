@@ -1,6 +1,7 @@
-const express = require('express');
-const jwt     = require('jsonwebtoken');
-const db      = require('../db/database');
+const express        = require('express');
+const jwt            = require('jsonwebtoken');
+const db             = require('../db/database');
+const { sendOtpEmail } = require('../utils/email');
 
 const router          = express.Router();
 const JWT_SECRET      = process.env.JWT_SECRET || 'sparkwash_dev_secret';
@@ -106,8 +107,12 @@ router.post('/send-otp', (req, res) => {
   const otp = generateOtp();
   db.saveOtp(parsed.value, otp, OTP_MINUTES);
 
-  // In production, send via SMS (Twilio) or email (SendGrid/Nodemailer)
   console.log(`\n🔐 OTP for ${parsed.value}: ${otp}  (expires in ${OTP_MINUTES} min)\n`);
+
+  // Send OTP via email when identifier is an email address
+  if (parsed.type === 'email') {
+    sendOtpEmail(parsed.value, otp, user.full_name, OTP_MINUTES).catch(() => {});
+  }
 
   const responsePayload = {
     success: true,
@@ -115,7 +120,6 @@ router.post('/send-otp', (req, res) => {
     userName: user.full_name,
   };
 
-  // Return OTP in response only in dev mode
   if (DEV_MODE) responsePayload.devOtp = otp;
 
   res.json(responsePayload);
