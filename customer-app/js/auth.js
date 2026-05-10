@@ -113,6 +113,8 @@ const LoginScreen = (() => {
 
   function showStep1(prefill = '') {
     _identifier = prefill;
+    const hint = document.getElementById('login-dev-otp');
+    if (hint) { hint.style.display = 'none'; hint.textContent = ''; }
     _renderStep('login-step-identifier', () => {
       const inp = document.getElementById('login-identifier-input');
       if (inp) { inp.value = prefill; inp.focus(); }
