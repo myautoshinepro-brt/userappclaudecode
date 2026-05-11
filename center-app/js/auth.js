@@ -56,8 +56,21 @@ const Auth = {
       <button class="btn btn-primary btn-full" id="send-otp-btn" onclick="Auth.sendOtp()">
         Send OTP
       </button>
+      <div style="margin-top:16px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:10px 12px">
+        <div style="font-size:11px;color:#166534;font-weight:600;margin-bottom:8px">🧪 Demo centers (tap to fill)</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px">
+          <button onclick="Auth._fillDemo('9876543210')" style="background:#fff;border:1px solid #86efac;border-radius:20px;padding:4px 10px;font-size:11px;color:#166534;font-weight:600;cursor:pointer">Shine Auto Wash</button>
+          <button onclick="Auth._fillDemo('9876543211')" style="background:#fff;border:1px solid #86efac;border-radius:20px;padding:4px 10px;font-size:11px;color:#166534;font-weight:600;cursor:pointer">SparkWash Bandra</button>
+          <button onclick="Auth._fillDemo('9876543212')" style="background:#fff;border:1px solid #86efac;border-radius:20px;padding:4px 10px;font-size:11px;color:#166534;font-weight:600;cursor:pointer">QuickWash Thane</button>
+        </div>
+      </div>
     `;
     setTimeout(() => document.getElementById('login-mobile')?.focus(), 100);
+  },
+
+  _fillDemo(mobile) {
+    const inp = document.getElementById('login-mobile');
+    if (inp) { inp.value = mobile; inp.focus(); }
   },
 
   async sendOtp() {
@@ -98,7 +111,7 @@ const Auth = {
       <div class="otp-sent-info">
         <strong>👋 ${ownerName || 'Welcome back!'}</strong>
         ${centerName || ''} — OTP sent to ${this._mobile}
-        ${devOtp ? `<br><span style="font-weight:700;font-size:14px">Dev OTP: ${devOtp}</span>` : ''}
+        ${devOtp ? `<div style="display:flex;align-items:center;justify-content:space-between;background:#f5f3ff;border:1px solid #c4b5fd;border-radius:8px;padding:8px 12px;margin-top:8px"><span style="font-size:12px;color:#7c3aed;font-weight:700">🔑 OTP: ${devOtp}</span><button type="button" onclick="Auth._fillOtp('${devOtp}')" style="background:#7c3aed;color:#fff;border:none;border-radius:5px;padding:3px 9px;font-size:11px;font-weight:700;cursor:pointer">Tap to fill ↑</button></div>` : ''}
       </div>
       <div class="otp-row">
         <input class="otp-box" id="otp0" maxlength="1" type="tel" oninput="Auth._otpInput(this,0)" onkeydown="Auth._otpKey(event,0)">
@@ -121,6 +134,14 @@ const Auth = {
     `;
     document.getElementById('otp0')?.focus();
     this._startResendTimer();
+  },
+
+  _fillOtp(otp) {
+    [...otp].forEach((d, i) => {
+      const box = document.getElementById(`otp${i}`);
+      if (box) box.value = d;
+    });
+    this.verifyOtp();
   },
 
   _otpInput(el, idx) {

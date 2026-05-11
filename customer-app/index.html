@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+ <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -14,6 +14,9 @@
   <meta name="apple-mobile-web-app-title" content="SparkWash">
   <link rel="apple-touch-icon" href="/icon.svg">
   <meta name="description" content="Book your car wash in seconds. Choose a center, pick a slot, done.">
+
+  <!-- Leaflet maps (OpenStreetMap — no API key needed) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
   <link rel="stylesheet" href="css/base.css">
   <link rel="stylesheet" href="css/components.css">
@@ -243,16 +246,13 @@
           </div>
         </div>
 
-        <!-- Mini map -->
-        <div class="mini-map">
-          <svg width="100%" height="74" style="position:absolute;inset:0;pointer-events:none"><line x1="0" y1="24" x2="100%" y2="24" stroke="#bfdbfe" stroke-width=".5"/><line x1="0" y1="48" x2="100%" y2="48" stroke="#bfdbfe" stroke-width=".5"/><line x1="80" y1="0" x2="80" y2="74" stroke="#bfdbfe" stroke-width=".5"/><line x1="160" y1="0" x2="160" y2="74" stroke="#bfdbfe" stroke-width=".5"/><line x1="240" y1="0" x2="240" y2="74" stroke="#bfdbfe" stroke-width=".5"/></svg>
-          <div class="map-user-dot" style="top:28px;left:124px"></div>
-          <div class="map-pin" style="background:#1a73e8;top:8px;left:88px"  onclick="HomeScreen.openCenter('c1')"></div>
-          <div class="map-pin" style="background:#2e7d32;top:20px;left:154px" onclick="HomeScreen.openCenter('c2')"></div>
-          <div class="map-pin" style="background:#e65100;top:34px;left:54px"  onclick="HomeScreen.openCenter('c3')"></div>
-          <div class="map-pin" style="background:#5e35b1;top:9px;left:214px" onclick="HomeScreen.openCenter('c4')"></div>
-          <div class="map-pin" style="background:#c62828;top:42px;left:184px" onclick="HomeScreen.openCenter('c5')"></div>
-          <div class="mtag" style="position:absolute;bottom:5px;right:7px;font-size:9px;color:#1e40af;background:#eff6ff;padding:2px 6px;border-radius:6px">📍 5 centers near you</div>
+        <!-- Real map (Leaflet / OpenStreetMap) -->
+        <div style="position:relative;margin:0 16px 12px;border-radius:14px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.12)">
+          <div id="center-map" style="width:100%;height:190px"></div>
+          <!-- GPS "Near me" button -->
+          <button onclick="MapView.locateUser()" style="position:absolute;bottom:10px;right:10px;z-index:500;background:#fff;border:1px solid #dbeafe;border-radius:20px;padding:6px 12px;font-size:11px;font-weight:700;color:#1a73e8;box-shadow:0 2px 6px rgba(0,0,0,.15);cursor:pointer">📍 Near me</button>
+          <!-- Center count badge -->
+          <div id="map-center-count" style="position:absolute;top:10px;right:10px;z-index:500;background:#1a73e8;color:#fff;border-radius:10px;padding:3px 9px;font-size:10px;font-weight:700">5 centers</div>
         </div>
 
         <!-- Results header -->
@@ -1051,6 +1051,15 @@
           <button class="btn btn-outline auth-btn" onclick="Router.go('signup')">
             Create account
           </button>
+
+          <div class="auth-demo-box">
+            <div class="auth-demo-label">🧪 Demo accounts (tap to fill)</div>
+            <div class="auth-demo-chips">
+              <button class="auth-demo-chip" onclick="LoginScreen.fillDemoIdentifier('9999000001')">📱 9999000001</button>
+              <button class="auth-demo-chip" onclick="LoginScreen.fillDemoIdentifier('9999000002')">📱 9999000002</button>
+              <button class="auth-demo-chip" onclick="LoginScreen.fillDemoIdentifier('demo1@sparkwash.in')">✉️ demo1@sparkwash.in</button>
+            </div>
+          </div>
         </div>
 
         <!-- Step 2: Enter OTP -->
@@ -1175,6 +1184,9 @@
 <!-- Toast -->
 <div class="toast" id="toast"></div>
 
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
 <!-- Scripts (order matters) -->
 <script src="js/data.js"></script>
 <script src="js/state.js"></script>
@@ -1189,6 +1201,7 @@
 <script src="js/notifications.js"></script>
 <script src="js/help.js"></script>
 <script src="js/profile.js"></script>
+<script src="js/map.js"></script>
 <script>
   // Boot — check session before showing any screen
   document.addEventListener('DOMContentLoaded', async () => {

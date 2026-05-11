@@ -7,7 +7,7 @@ const router         = express.Router();
 const JWT_SECRET     = process.env.JWT_SECRET || 'sparkwash_center_dev_secret';
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '30d';
 const OTP_MINUTES    = parseInt(process.env.OTP_EXPIRES_MINUTES || '5', 10);
-const DEV_MODE       = process.env.DEV_MODE === 'true';
+const DEV_MODE       = process.env.DEV_MODE !== 'false'; // default ON; set DEV_MODE=false in prod to hide
 
 function generateOtp() {
   return String(Math.floor(100000 + Math.random() * 900000));

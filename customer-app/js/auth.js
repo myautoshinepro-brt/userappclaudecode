@@ -283,7 +283,22 @@ const LoginScreen = (() => {
 
   function _showDevOtpHint(otp) {
     const el = document.getElementById('login-dev-otp');
-    if (el) { el.textContent = `Dev OTP: ${otp}`; el.style.display = 'block'; }
+    if (!el) return;
+    el.innerHTML = `<span>🔑 OTP: <strong>${otp}</strong></span><button type="button" class="auth-dev-fill-btn" onclick="LoginScreen.fillOtpBoxes('${otp}')">Tap to fill ↑</button>`;
+    el.style.display = 'flex';
+  }
+
+  function fillOtpBoxes(otp) {
+    [...otp].forEach((d, i) => {
+      const box = document.getElementById(`login-otp-box-${i}`);
+      if (box) box.value = d;
+    });
+    handleVerifyOtp();
+  }
+
+  function fillDemoIdentifier(val) {
+    const inp = document.getElementById('login-identifier-input');
+    if (inp) { inp.value = val; inp.focus(); }
   }
 
   // ── UTILITIES ────────────────────────────────────────────
@@ -309,7 +324,7 @@ const LoginScreen = (() => {
     }
   }
 
-  return { showStep1, showStep2, handleSendOtp, handleOtpKeyup, handleOtpPaste, handleVerifyOtp, handleResendOtp };
+  return { showStep1, showStep2, handleSendOtp, handleOtpKeyup, handleOtpPaste, handleVerifyOtp, handleResendOtp, fillOtpBoxes, fillDemoIdentifier };
 })();
 
 

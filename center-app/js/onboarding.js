@@ -52,12 +52,14 @@ const Onboarding = {
         <div class="input-with-icon"><span class="input-ico">🏪</span>
           <input id="ob-name" class="input-field" type="text" placeholder="e.g. AutoSpa Andheri" value="${d.name || ''}">
         </div>
+        <div id="ob-err-name" style="color:#dc2626;font-size:11px;margin-top:3px;display:none"></div>
       </div>
       <div class="input-group">
         <div class="input-label">Owner / Contact Person *</div>
         <div class="input-with-icon"><span class="input-ico">👤</span>
           <input id="ob-owner" class="input-field" type="text" placeholder="Full name" value="${d.owner_name || ''}">
         </div>
+        <div id="ob-err-owner" style="color:#dc2626;font-size:11px;margin-top:3px;display:none"></div>
       </div>
       <div class="input-group">
         <div class="input-label">Mobile Number *</div>
@@ -65,12 +67,14 @@ const Onboarding = {
           <input id="ob-mobile" class="input-field" type="tel" maxlength="10" placeholder="10-digit mobile"
             oninput="this.value=this.value.replace(/\\D/g,'')" value="${d.mobile || ''}">
         </div>
+        <div id="ob-err-mobile" style="color:#dc2626;font-size:11px;margin-top:3px;display:none"></div>
       </div>
       <div class="input-group">
         <div class="input-label">Email Address</div>
         <div class="input-with-icon"><span class="input-ico">📧</span>
           <input id="ob-email" class="input-field" type="email" placeholder="center@email.com" value="${d.email || ''}">
         </div>
+        <div id="ob-err-email" style="color:#dc2626;font-size:11px;margin-top:3px;display:none"></div>
       </div>
       <button class="btn btn-primary btn-full" onclick="Onboarding._next1()">Next →</button>`;
 
@@ -81,12 +85,14 @@ const Onboarding = {
         <div class="input-with-icon"><span class="input-ico">🏙️</span>
           <input id="ob-city" class="input-field" type="text" placeholder="e.g. Mumbai" value="${d.city || ''}">
         </div>
+        <div id="ob-err-city" style="color:#dc2626;font-size:11px;margin-top:3px;display:none"></div>
       </div>
       <div class="input-group">
         <div class="input-label">Full Address *</div>
         <div class="input-with-icon"><span class="input-ico">📍</span>
           <input id="ob-address" class="input-field" type="text" placeholder="Shop no, street, area, landmark" value="${d.address || ''}">
         </div>
+        <div id="ob-err-address" style="color:#dc2626;font-size:11px;margin-top:3px;display:none"></div>
       </div>
       <div class="input-group">
         <div class="input-label">Geo Location <span style="color:var(--muted);font-weight:400">(optional)</span></div>
@@ -184,11 +190,12 @@ const Onboarding = {
         💡 Bank & GST details are needed for settlements. You can update them in settings later too.
       </div>
       <div class="input-group">
-        <div class="input-label">GSTIN</div>
+        <div class="input-label">GSTIN <span style="color:var(--muted);font-weight:400">(optional)</span></div>
         <div class="input-with-icon"><span class="input-ico">🧾</span>
           <input id="ob-gstin" class="input-field" type="text" placeholder="22AAAAA0000A1Z5" maxlength="15"
             oninput="this.value=this.value.toUpperCase()" value="${d.gstin || ''}">
         </div>
+        <div id="ob-err-gstin" style="color:#dc2626;font-size:11px;margin-top:3px;display:none"></div>
       </div>
       <div class="input-group">
         <div class="input-label">Bank Name</div>
@@ -214,6 +221,7 @@ const Onboarding = {
           <input id="ob-ifsc" class="input-field" type="text" placeholder="e.g. HDFC0001234" maxlength="11"
             oninput="this.value=this.value.toUpperCase()" value="${d.ifsc || ''}">
         </div>
+        <div id="ob-err-ifsc" style="color:#dc2626;font-size:11px;margin-top:3px;display:none"></div>
       </div>
       <div style="display:flex;gap:8px;margin-top:8px">
         <button class="btn btn-ghost" style="flex:1" onclick="Onboarding._prev()">← Back</button>
@@ -238,6 +246,8 @@ const Onboarding = {
   },
 
   // ── Geo location ────────────────────────────────────────────
+  _geoMap: null,
+
   _getGeo() {
     if (!navigator.geolocation) { UI.toast('Geolocation not supported on this device'); return; }
     const btn    = document.getElementById('ob-geo-btn');
@@ -245,17 +255,42 @@ const Onboarding = {
     if (btn) btn.textContent = '⏳ Detecting...';
     navigator.geolocation.getCurrentPosition(
       pos => {
-        this._data.geo_lat = pos.coords.latitude;
-        this._data.geo_lng = pos.coords.longitude;
-        if (status) status.textContent = `✅ ${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)}`;
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        this._data.geo_lat = lat;
+        this._data.geo_lng = lng;
+        if (status) status.textContent = `✅ ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
         if (btn)    btn.textContent    = '✅ Location Captured';
         UI.toast('Location captured!');
+        this._showGeoMap(lat, lng);
       },
       () => {
         if (btn) btn.textContent = '📍 Detect My Location';
         UI.toast('Could not get location — please allow location access');
-      }
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
     );
+  },
+
+  _showGeoMap(lat, lng) {
+    // Insert map preview below the geo row if not already there
+    let container = document.getElementById('ob-geo-map');
+    if (!container) {
+      const status = document.getElementById('ob-geo-status');
+      if (!status) return;
+      container = document.createElement('div');
+      container.id = 'ob-geo-map';
+      container.style.cssText = 'height:150px;border-radius:10px;overflow:hidden;margin-top:10px;border:1px solid var(--border)';
+      status.parentNode.insertBefore(container, status.nextSibling);
+    }
+    if (typeof L === 'undefined') return;
+    if (this._geoMap) { this._geoMap.remove(); this._geoMap = null; }
+    this._geoMap = L.map('ob-geo-map', { zoomControl: false, attributionControl: false })
+      .setView([lat, lng], 15);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18 }).addTo(this._geoMap);
+    L.circleMarker([lat, lng], {
+      radius: 10, fillColor: '#1e40af', color: '#fff', weight: 3, fillOpacity: 1,
+    }).addTo(this._geoMap).bindPopup('Your center location').openPopup();
   },
 
   // ── Image helpers ───────────────────────────────────────────
@@ -317,14 +352,26 @@ const Onboarding = {
   },
 
   // ── Step validators ─────────────────────────────────────────
+  _obErr(id, msg) {
+    const el = document.getElementById(id);
+    if (el) { el.textContent = msg; el.style.display = 'block'; }
+  },
+  _obClear(...ids) {
+    ids.forEach(id => { const el = document.getElementById(id); if (el) { el.style.display = 'none'; el.textContent = ''; } });
+  },
+
   _next1() {
     const name   = document.getElementById('ob-name')?.value.trim();
     const owner  = document.getElementById('ob-owner')?.value.trim();
     const mobile = document.getElementById('ob-mobile')?.value.trim();
     const email  = document.getElementById('ob-email')?.value.trim();
-    if (!name)  { UI.toast('Center name is required'); return; }
-    if (!owner) { UI.toast('Owner name is required'); return; }
-    if (!/^[6-9]\d{9}$/.test(mobile)) { UI.toast('Enter a valid 10-digit mobile number'); return; }
+    this._obClear('ob-err-name','ob-err-owner','ob-err-mobile','ob-err-email');
+    let valid = true;
+    if (!name)  { this._obErr('ob-err-name', 'Center name is required.'); valid = false; }
+    if (!owner) { this._obErr('ob-err-owner', 'Owner name is required.'); valid = false; }
+    if (!/^[6-9]\d{9}$/.test(mobile)) { this._obErr('ob-err-mobile', 'Enter a valid 10-digit mobile number.'); valid = false; }
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { this._obErr('ob-err-email', 'Enter a valid email address.'); valid = false; }
+    if (!valid) return;
     Object.assign(this._data, { name, owner_name: owner, mobile, email });
     this._step = 2; this._renderStep(2);
   },
@@ -332,8 +379,11 @@ const Onboarding = {
   _next2() {
     const city    = document.getElementById('ob-city')?.value.trim();
     const address = document.getElementById('ob-address')?.value.trim();
-    if (!city)    { UI.toast('City is required'); return; }
-    if (!address) { UI.toast('Full address is required'); return; }
+    this._obClear('ob-err-city','ob-err-address');
+    let valid = true;
+    if (!city)    { this._obErr('ob-err-city', 'City is required.'); valid = false; }
+    if (!address) { this._obErr('ob-err-address', 'Full address is required.'); valid = false; }
+    if (!valid) return;
     Object.assign(this._data, { city, address });
     this._step = 3; this._renderStep(3);
   },
@@ -364,10 +414,17 @@ const Onboarding = {
     const account  = document.getElementById('ob-account')?.value.trim();
     const ifsc     = document.getElementById('ob-ifsc')?.value.trim();
 
+    this._obClear('ob-err-gstin', 'ob-err-ifsc');
+    let valid = true;
     if (gstin && !/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(gstin)) {
-      UI.toast('Enter a valid 15-character GSTIN or leave blank');
-      return;
+      this._obErr('ob-err-gstin', 'Enter a valid 15-character GSTIN (e.g. 22AAAAA0000A1Z5) or leave blank.');
+      valid = false;
     }
+    if (ifsc && !/^[A-Z]{4}0[A-Z0-9]{6}$/.test(ifsc)) {
+      this._obErr('ob-err-ifsc', 'Enter a valid 11-character IFSC code (e.g. HDFC0001234).');
+      valid = false;
+    }
+    if (!valid) return;
 
     Object.assign(this._data, { gstin, bank_name: bankname, account_name: acname, bank_account: account, ifsc });
 

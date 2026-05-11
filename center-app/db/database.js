@@ -329,6 +329,25 @@ if (pkgCount.n === 0) {
   for (const p of defaults) insPkg.run(...p);
 }
 
+// ── SEED demo applications for admin review (idempotent) ─────
+const _demoAppInsert = db.prepare(`
+  INSERT OR IGNORE INTO applications
+    (name, owner_name, mobile, email, city, address, gstin, wash_types, bank_account, ifsc, account_name, bank_name, status)
+  VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+`);
+[
+  ['AutoSpa Powai',    'Rohan Mehta',   '9888000101', 'autospa@gmail.com',   'Mumbai', 'Shop 3, Hiranandani Gardens, Powai',          '27AABCR1234A1Z5', 'water,dry,steam',  '00112233445566', 'HDFC0001234', 'Rohan Mehta', 'HDFC Bank',  'pending'],
+  ['CarCare Juhu',     'Meera Pillai',  '9888000102', 'carcare@gmail.com',   'Mumbai', 'Plot 7, Juhu Tara Road, Juhu',                null,               'water,dry',        null,             null,          null,          null,         'pending'],
+  ['WashPro Dadar',    'Sunil Kadam',   '9888000103', 'washpro@gmail.com',   'Mumbai', '14, Gokhale Road, Dadar West',                '27AABCS9876B2Z3', 'water,dry,steam,d2d', '00998877665544', 'ICIC0002345', 'Sunil Kadam', 'ICICI Bank', 'rejected'],
+].forEach(a => _demoAppInsert.run(...a));
+
+// ── SEED additional demo centers (idempotent) ─────────────────
+const _demoCenterInsert = db.prepare('INSERT OR IGNORE INTO centers (name, owner_name, mobile, email, address, city, wash_types) VALUES (?,?,?,?,?,?,?)');
+[
+  ['SparkWash Bandra', 'Kiran Nair',  '9876543211', 'bandra@sparkwash.in', 'Unit 12, Hill Road, Bandra West',   'Mumbai', 'water,dry,steam'],
+  ['QuickWash Thane',  'Deepak Rao',  '9876543212', 'thane@sparkwash.in',  'Plot 3, Pokhran Road, Thane West',  'Mumbai', 'water,dry,steam,d2d'],
+].forEach(c => _demoCenterInsert.run(...c));
+
 // ── PREPARED STATEMENTS ──────────────────────────────────────
 
 const centerByMobile = db.prepare('SELECT * FROM centers WHERE mobile = ?');

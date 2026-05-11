@@ -73,6 +73,9 @@ const Router = {
 
   _onEnter(screenId) {
     switch (screenId) {
+      case 'home':
+        if (typeof MapView !== 'undefined') MapView.init();
+        break;
       case 'bookings':
         if (typeof BookingScreen !== 'undefined') BookingScreen.renderBookings();
         break;

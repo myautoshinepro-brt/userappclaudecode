@@ -58,6 +58,14 @@ const deleteOldOtps  = db.prepare(
   "DELETE FROM otps WHERE identifier = ? AND (used = 1 OR expires_at <= datetime('now'))"
 );
 
+// ── SEED demo users (idempotent) ─────────────────────────────
+const _demoInsert = db.prepare('INSERT OR IGNORE INTO users (full_name, mobile, email) VALUES (?, ?, ?)');
+[
+  ['Ravi Teja',   '9999000001', 'demo1@sparkwash.in'],
+  ['Priya Singh', '9999000002', 'demo2@sparkwash.in'],
+  ['Amit Kumar',  '9999000003', 'demo3@sparkwash.in'],
+].forEach(u => _demoInsert.run(...u));
+
 module.exports = {
   findUserByMobile(mobile)     { return userByMobile.get(mobile); },
   findUserByEmail(email)       { return userByEmail.get(email.toLowerCase()); },

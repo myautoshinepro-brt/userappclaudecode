@@ -784,16 +784,60 @@
 
 /* Dev OTP hint */
 .auth-dev-hint {
-  font-size: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
   color: #7c3aed;
   background: #f5f3ff;
-  border: .5px solid #c4b5fd;
-  border-radius: 7px;
-  padding: 6px 10px;
+  border: 1px solid #c4b5fd;
+  border-radius: 8px;
+  padding: 8px 12px;
   margin-top: 8px;
-  text-align: center;
   font-weight: 600;
 }
+.auth-dev-fill-btn {
+  background: #7c3aed;
+  color: #fff;
+  border: none;
+  border-radius: 5px;
+  padding: 3px 9px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+/* Demo accounts box */
+.auth-demo-box {
+  margin-top: 16px;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+.auth-demo-label {
+  font-size: 11px;
+  color: #166534;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.auth-demo-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.auth-demo-chip {
+  background: #fff;
+  border: 1px solid #86efac;
+  border-radius: 20px;
+  padding: 4px 10px;
+  font-size: 11px;
+  color: #166534;
+  font-weight: 600;
+  cursor: pointer;
+}
+.auth-demo-chip:active { background: #dcfce7; }
 #sc-help .help-contact-card:active { background: var(--bg-secondary); }
 
 /* ── VEHICLE PICKER SHEET ── */
