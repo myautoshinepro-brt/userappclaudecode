@@ -8,8 +8,8 @@ function getTransporter() {
   // Fresh transporter each call — avoids stale cached connections after restarts.
   return nodemailer.createTransport({
     host,
-    port:       parseInt(process.env.SMTP_PORT || '587', 10),
-    secure:     process.env.SMTP_SECURE === 'true',
+    port:       parseInt(process.env.SMTP_PORT  || '587', 10),
+    secure:     process.env.SMTP_SECURE      === 'true',
     requireTLS: process.env.SMTP_REQUIRE_TLS === 'true',
     auth:       { user, pass },
   });
