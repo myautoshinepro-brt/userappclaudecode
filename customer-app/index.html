@@ -1,4 +1,5 @@
  <!DOCTYPE html>
+ 
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -1206,6 +1207,16 @@
   // Boot — check session before showing any screen
   document.addEventListener('DOMContentLoaded', async () => {
     Router.init();
+
+    // Load real centers from center-app (proxied via /api/centers).
+    try {
+      const r = await fetch('/api/centers');
+      const j = await r.json();
+      if (j && j.success && Array.isArray(j.data)) CENTERS = j.data;
+    } catch (e) {
+      console.warn('Could not load centers:', e);
+    }
+
     HomeScreen.init();
     ProfileScreen.init();
     SignupScreen.init();

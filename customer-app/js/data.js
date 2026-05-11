@@ -1,86 +1,10 @@
 // ============================================================
 // SparkWash — data.js
-// All static data: centers, packages, promo codes
+// Static data (packages, promos) + runtime-loaded centers
 // ============================================================
 
-const CENTERS = [
-  {
-    id: 'c1',
-    name: 'Shine Auto Wash',
-    area: 'Andheri West',
-    distance: 1.2,
-    rating: 4.8,
-    reviews: 210,
-    open: true,
-    openTill: '8 PM',
-    priceFrom: 149,
-    tags: ['water', 'dry', 'steam', 'd2d'],
-    hasD2D: true,
-    hasSteam: true,
-    lat: 19.1362, lng: 72.8296,
-  },
-  {
-    id: 'c2',
-    name: 'CleanDrive Express',
-    area: 'Bandra East',
-    distance: 2.4,
-    rating: 4.5,
-    reviews: 88,
-    open: true,
-    openTill: '9 PM',
-    priceFrom: 99,
-    tags: ['water', 'dry'],
-    hasD2D: false,
-    hasSteam: false,
-    lat: 19.0596, lng: 72.8656,
-  },
-  {
-    id: 'c3',
-    name: 'QuickShine D2D',
-    area: 'Andheri',
-    distance: 0,
-    rating: 4.7,
-    reviews: 312,
-    open: true,
-    openTill: 'Available now',
-    priceFrom: 199,
-    tags: ['d2d', 'water', 'dry'],
-    hasD2D: true,
-    hasSteam: false,
-    isD2DOnly: true,
-    lat: 19.1136, lng: 72.8697,
-  },
-  {
-    id: 'c4',
-    name: 'WashKing Versova',
-    area: 'Versova',
-    distance: 3.1,
-    rating: 4.4,
-    reviews: 54,
-    open: false,
-    openTill: '9 AM tomorrow',
-    priceFrom: 129,
-    tags: ['water', 'interior'],
-    hasD2D: false,
-    hasSteam: false,
-    lat: 19.1317, lng: 72.8154,
-  },
-  {
-    id: 'c5',
-    name: 'PureClean Juhu',
-    area: 'Juhu',
-    distance: 3.8,
-    rating: 4.6,
-    reviews: 140,
-    open: true,
-    openTill: '7 PM',
-    priceFrom: 179,
-    tags: ['water', 'steam', 'd2d'],
-    hasD2D: true,
-    hasSteam: true,
-    lat: 19.1053, lng: 72.8263,
-  },
-];
+// Loaded from GET /api/centers on boot (see index.html). Empty until then.
+let CENTERS = [];
 
 // Wash type priority order (LOCKED): Water → Dry → Steam → D2D
 const WASH_TYPES = [

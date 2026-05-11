@@ -137,6 +137,10 @@ try { db.exec("ALTER TABLE centers ADD COLUMN ifsc          TEXT"); } catch { /*
 try { db.exec("ALTER TABLE centers ADD COLUMN account_name  TEXT"); } catch { /* exists */ }
 try { db.exec("ALTER TABLE centers ADD COLUMN bank_name     TEXT"); } catch { /* exists */ }
 
+// ── Migration: center geo coordinates (used by customer-app map) ──
+try { db.exec("ALTER TABLE centers ADD COLUMN lat REAL"); } catch { /* exists */ }
+try { db.exec("ALTER TABLE centers ADD COLUMN lng REAL"); } catch { /* exists */ }
+
 // ── Migration: enhanced application fields ──
 try { db.exec("ALTER TABLE applications ADD COLUMN geo_lat       REAL"); } catch { /* exists */ }
 try { db.exec("ALTER TABLE applications ADD COLUMN geo_lng       REAL"); } catch { /* exists */ }
@@ -668,14 +672,15 @@ module.exports = {
     const app = db.prepare('SELECT * FROM applications WHERE id=?').get(id);
     if (!app) return null;
     const info = db.prepare(`
-      INSERT INTO centers (name, owner_name, mobile, email, address, city, gstin, wash_types, bank_account, ifsc, account_name, bank_name)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO centers (name, owner_name, mobile, email, address, city, gstin, wash_types, bank_account, ifsc, account_name, bank_name, lat, lng)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       app.name, app.owner_name, app.mobile, app.email,
       app.address, app.city, app.gstin || null,
       app.wash_types || 'water,dry',
       app.bank_account || null, app.ifsc || null,
-      app.account_name || null, app.bank_name || null
+      app.account_name || null, app.bank_name || null,
+      app.geo_lat || null, app.geo_lng || null
     );
     db.prepare(`UPDATE applications SET status='approved', notes='Documents verified', updated_at=datetime('now') WHERE id=?`).run(id);
     return { app, centerId: info.lastInsertRowid };
@@ -684,6 +689,10 @@ module.exports = {
     return db.prepare('SELECT * FROM applications ORDER BY created_at DESC').all();
   },
   getAllCenters() {
-    return db.prepare(`SELECT id, name, owner_name, mobile, email, address, city, gstin, wash_types, open_time, close_time, is_open, created_at FROM centers ORDER BY created_at DESC`).all();
+    return db.prepare(`SELECT id, name, owner_name, mobile, email, address, city, gstin, wash_types, open_time, close_time, is_open, lat, lng, created_at FROM centers ORDER BY created_at DESC`).all();
+  },
+  getMinPackagePrice(centerId) {
+    const row = db.prepare("SELECT MIN(price) AS p FROM packages WHERE center_id=? AND is_active=1").get(centerId);
+    return row && row.p != null ? row.p : null;
   },
 };
