@@ -5,14 +5,20 @@ function getTransporter() {
   const user = process.env.SMTP_USER;
   const pass = process.env.SMTP_PASS;
   if (!host || !user || !pass) return null;
-  // Create a fresh transporter each call so stale connections after Railway
-  // restarts or Gmail idle-timeouts don't cause silent send failures.
+  // Fresh transporter each call so stale connections after Railway restarts
+  // or Gmail idle-timeouts don't cause silent failures. Forces IPv4 because
+  // many cloud providers (incl. Railway) hang indefinitely on Gmail's IPv6
+  // SMTP route. Explicit timeouts prevent silent hangs.
   return nodemailer.createTransport({
     host,
     port:       parseInt(process.env.SMTP_PORT || '587', 10),
     secure:     process.env.SMTP_SECURE === 'true',
     requireTLS: process.env.SMTP_REQUIRE_TLS === 'true',
     auth:       { user, pass },
+    family: 4,
+    connectionTimeout: 10000,
+    greetingTimeout:   10000,
+    socketTimeout:     15000,
   });
 }
 

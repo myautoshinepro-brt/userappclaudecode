@@ -184,4 +184,63 @@ router.post('/logout', requireAuth, (_req, res) => {
   res.json({ success: true, message: 'Logged out.' });
 });
 
+/**
+ * GET /api/auth/email-diag?to=someone@example.com
+ * Diagnostic: connects to SMTP, verifies, sends a test email, and returns
+ * the full result (or error code/message) so we can see exactly what is
+ * failing on Railway. Uses the transporter directly to surface raw errors.
+ */
+router.get('/email-diag', async (req, res) => {
+  const nodemailer = require('nodemailer');
+  const to = (req.query.to || '').toString().trim();
+  if (!to) return res.status(400).json({ error: 'Missing ?to=email parameter' });
+
+  const env = {
+    host:    process.env.SMTP_HOST   || null,
+    port:    process.env.SMTP_PORT   || null,
+    user:    process.env.SMTP_USER   || null,
+    hasPass: !!process.env.SMTP_PASS,
+    passLen: (process.env.SMTP_PASS || '').length,
+  };
+
+  if (!env.host || !env.user || !env.hasPass) {
+    return res.status(500).json({ ok: false, stage: 'env', env, error: 'SMTP env vars missing' });
+  }
+
+  const t = nodemailer.createTransport({
+    host:   env.host,
+    port:   parseInt(env.port || '587', 10),
+    secure: process.env.SMTP_SECURE === 'true',
+    auth:   { user: env.user, pass: process.env.SMTP_PASS },
+    family: 4,
+    connectionTimeout: 10000,
+    greetingTimeout:   10000,
+    socketTimeout:     15000,
+    logger: false,
+  });
+
+  const started = Date.now();
+  try {
+    await t.verify();
+    const info = await t.sendMail({
+      from:    process.env.SMTP_FROM || `"SparkWash Diag" <${env.user}>`,
+      to,
+      subject: 'SparkWash diag — ' + new Date().toISOString(),
+      text:    'If you received this, SMTP from Railway is working.',
+    });
+    res.json({ ok: true, ms: Date.now() - started, env, messageId: info.messageId, accepted: info.accepted, rejected: info.rejected });
+  } catch (err) {
+    res.status(500).json({
+      ok: false,
+      ms: Date.now() - started,
+      env,
+      error:    err.message,
+      code:     err.code || null,
+      command:  err.command || null,
+      response: err.response || null,
+      stack:    (err.stack || '').split('\n').slice(0, 3).join(' | '),
+    });
+  }
+});
+
 module.exports = router;

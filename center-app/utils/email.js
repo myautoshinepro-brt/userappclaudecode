@@ -5,13 +5,19 @@ function getTransporter() {
   const user = process.env.SMTP_USER;
   const pass = process.env.SMTP_PASS;
   if (!host || !user || !pass) return null;
-  // Fresh transporter each call — avoids stale cached connections after restarts.
+  // Fresh transporter each call — avoids stale cached connections.
+  // family:4 forces IPv4 (Railway hangs on Gmail's IPv6 route).
+  // Timeouts prevent silent hangs.
   return nodemailer.createTransport({
     host,
     port:       parseInt(process.env.SMTP_PORT  || '587', 10),
     secure:     process.env.SMTP_SECURE      === 'true',
     requireTLS: process.env.SMTP_REQUIRE_TLS === 'true',
     auth:       { user, pass },
+    family: 4,
+    connectionTimeout: 10000,
+    greetingTimeout:   10000,
+    socketTimeout:     15000,
   });
 }
 
