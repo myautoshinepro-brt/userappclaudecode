@@ -9,9 +9,10 @@ function getTransporter() {
   // restarts or Gmail idle-timeouts don't cause silent send failures.
   return nodemailer.createTransport({
     host,
-    port:   parseInt(process.env.SMTP_PORT || '587', 10),
-    secure: process.env.SMTP_SECURE === 'true',
-    auth:   { user, pass },
+    port:       parseInt(process.env.SMTP_PORT || '587', 10),
+    secure:     process.env.SMTP_SECURE === 'true',
+    requireTLS: process.env.SMTP_REQUIRE_TLS === 'true',
+    auth:       { user, pass },
   });
 }
 
