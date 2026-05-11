@@ -17,6 +17,9 @@ app.use(express.static(path.join(__dirname)));
 // Auth routes
 app.use('/api/auth', require('./routes/auth'));
 
+// SMTP diagnostic route — remove once connection is confirmed working
+app.use('/api/test', require('./routes/test'));
+
 // Catch-all: always serve index.html for any non-API route
 app.get(/^(?!\/api).*$/, (_req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
