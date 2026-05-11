@@ -111,7 +111,9 @@ router.post('/send-otp', (req, res) => {
 
   // Send OTP via email when identifier is an email address
   if (parsed.type === 'email') {
-    sendOtpEmail(parsed.value, otp, user.full_name, OTP_MINUTES).catch(() => {});
+    sendOtpEmail(parsed.value, otp, user.full_name, OTP_MINUTES).catch(err => {
+      console.error(`📧 OTP email error for ${parsed.value}:`, err.message);
+    });
   }
 
   const responsePayload = {

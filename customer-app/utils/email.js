@@ -1,20 +1,18 @@
 const nodemailer = require('nodemailer');
 
-let _transporter = null;
-
 function getTransporter() {
-  if (_transporter) return _transporter;
   const host = process.env.SMTP_HOST;
   const user = process.env.SMTP_USER;
   const pass = process.env.SMTP_PASS;
   if (!host || !user || !pass) return null;
-  _transporter = nodemailer.createTransport({
+  // Create a fresh transporter each call so stale connections after Railway
+  // restarts or Gmail idle-timeouts don't cause silent send failures.
+  return nodemailer.createTransport({
     host,
     port:   parseInt(process.env.SMTP_PORT || '587', 10),
     secure: process.env.SMTP_SECURE === 'true',
     auth:   { user, pass },
   });
-  return _transporter;
 }
 
 async function sendOtpEmail(toEmail, otp, userName, expiresMinutes) {

@@ -1,25 +1,17 @@
 const nodemailer = require('nodemailer');
 
-// ── Transporter (lazy-initialised so server starts even without SMTP config) ──
-let _transporter = null;
-
 function getTransporter() {
-  if (_transporter) return _transporter;
-
   const host = process.env.SMTP_HOST;
   const user = process.env.SMTP_USER;
   const pass = process.env.SMTP_PASS;
-
   if (!host || !user || !pass) return null;
-
-  _transporter = nodemailer.createTransport({
+  // Fresh transporter each call — avoids stale cached connections after restarts.
+  return nodemailer.createTransport({
     host,
     port:   parseInt(process.env.SMTP_PORT  || '587', 10),
     secure: process.env.SMTP_SECURE === 'true',
     auth:   { user, pass },
   });
-
-  return _transporter;
 }
 
 // ── Wash-done order summary email ──────────────────────────────

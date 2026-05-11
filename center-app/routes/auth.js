@@ -53,7 +53,9 @@ router.post('/send-otp', (req, res) => {
 
   // Send OTP to center's registered email if available
   if (center.email) {
-    sendOtpEmail(center.email, otp, center.owner_name, OTP_MINUTES).catch(() => {});
+    sendOtpEmail(center.email, otp, center.owner_name, OTP_MINUTES).catch(err => {
+      console.error(`📧 OTP email error for ${center.email}:`, err.message);
+    });
   }
 
   const payload = {
