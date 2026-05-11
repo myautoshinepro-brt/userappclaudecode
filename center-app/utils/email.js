@@ -1,5 +1,27 @@
 const nodemailer = require('nodemailer');
 
+// ── Resend HTTPS API (preferred — works on Railway/cloud where SMTP is blocked) ──
+async function sendViaResend(to, subject, html) {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) return { skipped: true };
+
+  const from = process.env.RESEND_FROM || 'SparkWash Center <onboarding@resend.dev>';
+  const res  = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization:  `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ from, to: [to], subject, html }),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const msg = body.message || body.error || `HTTP ${res.status}`;
+    throw new Error(`Resend: ${msg}`);
+  }
+  return { id: body.id, sent: true };
+}
+
 function getTransporter() {
   const host = process.env.SMTP_HOST;
   const user = process.env.SMTP_USER;
@@ -232,15 +254,8 @@ async function sendApplicationStatusEmail(app, status) {
 
 // ── OTP email ─────────────────────────────────────────────────
 async function sendOtpEmail(toEmail, otp, name, expiresMinutes) {
-  const t = getTransporter();
-  if (!t) {
-    console.log('📧 OTP email skipped — SMTP not configured');
-    return false;
-  }
-
-  console.log(`📧 Attempting to send OTP to ${toEmail}...`);
-
-  const from = process.env.SMTP_FROM || `"SparkWash" <${process.env.SMTP_USER}>`;
+  const subject = `${otp} is your SparkWash Center OTP`;
+  const from    = process.env.SMTP_FROM || `"SparkWash" <${process.env.SMTP_USER}>`;
 
   const html = `
 <!DOCTYPE html><html>
@@ -273,9 +288,26 @@ async function sendOtpEmail(toEmail, otp, name, expiresMinutes) {
   </div>
 </body></html>`;
 
+  // 1. Try Resend HTTPS API first (cloud-friendly)
+  if (process.env.RESEND_API_KEY) {
+    try {
+      const r = await sendViaResend(toEmail, subject, html);
+      console.log(`📧 OTP email sent via Resend to ${toEmail} (id=${r.id})`);
+      return true;
+    } catch (err) {
+      console.error(`📧 Resend failed for ${toEmail}: ${err.message} — falling back to SMTP`);
+    }
+  }
+
+  // 2. Fall back to SMTP
+  const t = getTransporter();
+  if (!t) {
+    console.log('📧 OTP email skipped — neither RESEND_API_KEY nor SMTP configured');
+    return false;
+  }
   try {
-    await t.sendMail({ from, to: toEmail, subject: `${otp} is your SparkWash Center OTP`, html });
-    console.log(`📧 OTP email sent to ${toEmail}`);
+    await t.sendMail({ from, to: toEmail, subject, html });
+    console.log(`📧 OTP email sent via SMTP to ${toEmail}`);
     return true;
   } catch (err) {
     console.error(`📧 Failed to send OTP email to ${toEmail}:`, err.message);

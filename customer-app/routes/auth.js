@@ -191,54 +191,85 @@ router.post('/logout', requireAuth, (_req, res) => {
  * failing on Railway. Uses the transporter directly to surface raw errors.
  */
 router.get('/email-diag', async (req, res) => {
-  const nodemailer = require('nodemailer');
   const to = (req.query.to || '').toString().trim();
   if (!to) return res.status(400).json({ error: 'Missing ?to=email parameter' });
 
   const env = {
-    host:    process.env.SMTP_HOST   || null,
-    port:    process.env.SMTP_PORT   || null,
-    user:    process.env.SMTP_USER   || null,
-    hasPass: !!process.env.SMTP_PASS,
-    passLen: (process.env.SMTP_PASS || '').length,
+    resend: {
+      hasKey: !!process.env.RESEND_API_KEY,
+      from:   process.env.RESEND_FROM || 'SparkWash <onboarding@resend.dev>',
+    },
+    smtp: {
+      host:    process.env.SMTP_HOST   || null,
+      port:    process.env.SMTP_PORT   || null,
+      user:    process.env.SMTP_USER   || null,
+      hasPass: !!process.env.SMTP_PASS,
+      passLen: (process.env.SMTP_PASS || '').length,
+    },
   };
 
-  if (!env.host || !env.user || !env.hasPass) {
-    return res.status(500).json({ ok: false, stage: 'env', env, error: 'SMTP env vars missing' });
+  // Try Resend first if configured
+  if (process.env.RESEND_API_KEY) {
+    const started = Date.now();
+    try {
+      const from = env.resend.from;
+      const r = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          Authorization:  `Bearer ${process.env.RESEND_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          from,
+          to: [to],
+          subject: 'SparkWash diag (Resend) — ' + new Date().toISOString(),
+          html:    '<p>If you received this, Resend from Railway is working.</p>',
+        }),
+      });
+      const body = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        return res.status(500).json({ ok: false, via: 'resend', ms: Date.now() - started, env, status: r.status, body });
+      }
+      return res.json({ ok: true, via: 'resend', ms: Date.now() - started, env, id: body.id });
+    } catch (err) {
+      return res.status(500).json({ ok: false, via: 'resend', ms: Date.now() - started, env, error: err.message });
+    }
+  }
+
+  // Fall back to SMTP diagnostic
+  const nodemailer = require('nodemailer');
+  if (!env.smtp.host || !env.smtp.user || !env.smtp.hasPass) {
+    return res.status(500).json({ ok: false, via: 'none', env, error: 'No RESEND_API_KEY and SMTP env vars missing' });
   }
 
   const t = nodemailer.createTransport({
-    host:   env.host,
-    port:   parseInt(env.port || '587', 10),
+    host:   env.smtp.host,
+    port:   parseInt(env.smtp.port || '587', 10),
     secure: process.env.SMTP_SECURE === 'true',
-    auth:   { user: env.user, pass: process.env.SMTP_PASS },
+    auth:   { user: env.smtp.user, pass: process.env.SMTP_PASS },
     family: 4,
     connectionTimeout: 10000,
     greetingTimeout:   10000,
     socketTimeout:     15000,
-    logger: false,
   });
 
   const started = Date.now();
   try {
     await t.verify();
     const info = await t.sendMail({
-      from:    process.env.SMTP_FROM || `"SparkWash Diag" <${env.user}>`,
+      from:    process.env.SMTP_FROM || `"SparkWash Diag" <${env.smtp.user}>`,
       to,
-      subject: 'SparkWash diag — ' + new Date().toISOString(),
+      subject: 'SparkWash diag (SMTP) — ' + new Date().toISOString(),
       text:    'If you received this, SMTP from Railway is working.',
     });
-    res.json({ ok: true, ms: Date.now() - started, env, messageId: info.messageId, accepted: info.accepted, rejected: info.rejected });
+    res.json({ ok: true, via: 'smtp', ms: Date.now() - started, env, messageId: info.messageId });
   } catch (err) {
     res.status(500).json({
-      ok: false,
-      ms: Date.now() - started,
-      env,
-      error:    err.message,
-      code:     err.code || null,
-      command:  err.command || null,
+      ok: false, via: 'smtp', ms: Date.now() - started, env,
+      error:   err.message,
+      code:    err.code    || null,
+      command: err.command || null,
       response: err.response || null,
-      stack:    (err.stack || '').split('\n').slice(0, 3).join(' | '),
     });
   }
 });
