@@ -1249,7 +1249,7 @@ const SuperAdmin = {
       return;
     }
     this._renderSettlements();
-    this._renderApplications();
+    this._loadAndRenderApplications();
     this._renderRevenueRequests();
     this._renderReviews();
     this._renderCities();
@@ -1319,6 +1319,21 @@ const SuperAdmin = {
     this._renderSettlements();
   },
 
+  async _loadAndRenderApplications() {
+    try {
+      const res  = await fetch(`${CENTER_APP_URL}/api/admin/applications`, {
+        headers: { 'x-admin-key': ADMIN_API_KEY },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed');
+      APPLICATIONS = data.data;
+      ApplicationsScreen._loaded = true;
+    } catch (e) {
+      console.warn('SA: could not load applications —', e.message);
+    }
+    this._renderApplications();
+  },
+
   _renderApplications() {
     const pending = APPLICATIONS.filter(a => a.status === 'pending');
     setText('sa-apps-badge', pending.length ? `${pending.length} pending` : '');
@@ -1336,7 +1351,7 @@ const SuperAdmin = {
         <div style="padding:9px 13px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
           <div>
             <div style="font-weight:600;font-size:12px">${a.name}</div>
-            <div style="font-size:10px;color:var(--muted)">${a.ownerName} · ${a.city} · ${a.appliedAt}</div>
+            <div style="font-size:10px;color:var(--muted)">${a.owner_name} · ${a.city} · ${new Date(a.created_at).toLocaleDateString('en-IN', {day:'numeric', month:'short'})}</div>
           </div>
           <div style="display:flex;align-items:center;gap:6px">
             ${badge}
@@ -1346,9 +1361,9 @@ const SuperAdmin = {
     }).join(''));
   },
 
-  _quickApprove(id) {
-    ApplicationsScreen.approve(id);
-    this._renderApplications();
+  async _quickApprove(id) {
+    await ApplicationsScreen.approve(id);
+    this._loadAndRenderApplications();
   },
 
   _renderRevenueRequests() {
