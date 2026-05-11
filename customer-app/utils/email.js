@@ -23,6 +23,8 @@ async function sendOtpEmail(toEmail, otp, userName, expiresMinutes) {
     return false;
   }
 
+  console.log(`📧 Attempting to send OTP to ${toEmail}...`);
+
   const from = process.env.SMTP_FROM || `"SparkWash" <${process.env.SMTP_USER}>`;
 
   const html = `
