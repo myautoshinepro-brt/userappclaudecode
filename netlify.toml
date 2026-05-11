@@ -2,7 +2,7 @@
   base      = "admin-app"
   publish   = "."
   command   = ""
-  functions = ""
+  functions = "netlify/functions"
 
 [[redirects]]
   from   = "/*"
