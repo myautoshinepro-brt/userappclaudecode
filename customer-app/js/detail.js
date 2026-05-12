@@ -21,15 +21,28 @@ const DetailScreen = {
     this._resetBottomBar();
     this._renderDateChips();
 
-    // Show static packages immediately so the UI isn't blank, then swap in
-    // the center's real packages once fetched.
-    ACTIVE_PACKAGES = PACKAGES;
-    this.renderPackages('water');
+    // Clear ACTIVE_PACKAGES so we don't render the previous center's data first.
+    // Show a loading state while the API fetch is in flight — this avoids the
+    // flicker where static demo packages render then get replaced.
+    ACTIVE_PACKAGES = null;
+    this._renderLoading();
     if (typeof UserData !== 'undefined') {
-      UserData.loadCenterPackages(center.id).then(() => {
+      UserData.loadCenterPackages(center.id).then((loaded) => {
+        // If the API failed (loaded=false), fall back to the static set so the
+        // user can still see something instead of an empty screen.
+        if (!loaded) ACTIVE_PACKAGES = PACKAGES;
         this.renderPackages(AppState.booking.washType || 'water');
       });
+    } else {
+      // No UserData module — keep the static fallback as a last resort.
+      ACTIVE_PACKAGES = PACKAGES;
+      this.renderPackages('water');
     }
+  },
+
+  _renderLoading() {
+    const container = document.getElementById('package-list');
+    if (container) container.innerHTML = `<div style="padding:32px 16px;text-align:center;color:var(--text-tertiary);font-size:12px">Loading packages…</div>`;
   },
 
   _renderDateChips() {
@@ -57,9 +70,18 @@ const DetailScreen = {
   },
 
   renderPackages(type) {
-    const pkgs = (ACTIVE_PACKAGES && ACTIVE_PACKAGES[type]) || PACKAGES[type] || [];
     const container = document.getElementById('package-list');
     if (!container) return;
+    // While ACTIVE_PACKAGES is still null (fetch in flight), keep the loading
+    // state instead of falling back to the demo set — that's what caused the
+    // flicker on a center like Flight Wash that has fewer real packages.
+    if (ACTIVE_PACKAGES === null) { this._renderLoading(); return; }
+
+    const pkgs = (ACTIVE_PACKAGES && ACTIVE_PACKAGES[type]) || [];
+    if (!pkgs.length) {
+      container.innerHTML = `<div style="padding:32px 16px;text-align:center;color:var(--text-tertiary);font-size:12px">No ${type} packages available at this center yet.</div>`;
+      return;
+    }
 
     container.innerHTML = pkgs.map(p => {
       const sel = AppState.booking.packageId === p.id;

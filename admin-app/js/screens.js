@@ -262,8 +262,25 @@ const CenterDetail = {
     }</div>`);
   },
 
+  // Fetch real packages for this center from the admin API, write into CENTER_PACKAGES
+  // (used by render + handlers), and re-render. Idempotent — safe to call repeatedly.
+  async _loadPackages(c) {
+    try {
+      CENTER_PACKAGES[c.id] = await AdminData.fetchCenterPackages(c._dbId);
+      this.render();
+    } catch (e) {
+      console.warn('Could not load packages:', e.message);
+    }
+  },
+
   // ── PACKAGES TAB ──
   _renderPackages(c) {
+    // First-time entry: fetch real packages then re-render.
+    if (!CENTER_PACKAGES[c.id]) {
+      setHtml('cd-tab-packages', '<div style="padding:30px;text-align:center;color:var(--muted);font-size:12px">Loading packages…</div>');
+      this._loadPackages(c);
+      return;
+    }
     const pkgs       = CENTER_PACKAGES[c.id] || {};
     const availTypes = c.washTypes;
     if (!availTypes.includes(this.pkgType)) this.pkgType = availTypes[0] || 'water';
@@ -335,69 +352,69 @@ const CenterDetail = {
 
   setPkgType(t) { this.pkgType = t; this.render(); },
 
-  toggleWashType(centerId, type) {
+  async toggleWashType(centerId, type) {
     const c = CENTERS.find(x => x.id === centerId);
     if (!c) return;
     const idx = c.washTypes.indexOf(type);
+    let nextTypes;
     let detail;
     if (idx === -1) {
-      c.washTypes.push(type);
+      nextTypes = [...c.washTypes, type];
       detail = `${WASH_LABELS[type].label} enabled`;
     } else {
       if (c.washTypes.length === 1) { UI.toast('⚠️ At least one wash type must be active'); return; }
-      c.washTypes.splice(idx, 1);
+      nextTypes = c.washTypes.filter(t => t !== type);
       detail = `${WASH_LABELS[type].label} disabled`;
     }
-    logChange(centerId, 'Wash type updated', detail);
-    UI.toast(`✅ ${detail}`);
-    this.render();
+    try {
+      await AdminData.patchCenterInfo(c._dbId, { wash_types: nextTypes.join(',') });
+      c.washTypes = nextTypes;
+      logChange(centerId, 'Wash type updated', detail);
+      UI.toast(`✅ ${detail}`);
+      this.render();
+    } catch (e) {
+      UI.toast('❌ ' + e.message);
+    }
   },
 
-  togglePkg(centerId, pkgId) {
+  async togglePkg(centerId, pkgIdRaw) {
+    const c = CENTERS.find(x => x.id === centerId);
+    if (!c) return;
+    const pkgId = Number(pkgIdRaw);
     const pkgs = CENTER_PACKAGES[centerId];
     if (!pkgs) return;
     for (const type in pkgs) {
       const p = pkgs[type].find(x => x.id === pkgId);
-      if (p) {
-        p.active = !p.active;
-        const detail = `${WASH_LABELS[type].label} · ${p.name}: ${p.active ? 'Enabled' : 'Disabled'}`;
-        logChange(centerId, 'Package ' + (p.active ? 'enabled' : 'disabled'), detail);
-        UI.toast(p.active ? `✅ ${p.name} enabled` : `⛔ ${p.name} disabled`);
+      if (!p) continue;
+      try {
+        if (p.active) {
+          // Soft-delete (DB.deletePackage sets is_active=0).
+          await AdminData.deleteCenterPackage(c._dbId, pkgId);
+          p.active = false;
+          UI.toast(`⛔ ${p.name} disabled`);
+          logChange(centerId, 'Package disabled', `${WASH_LABELS[type].label} · ${p.name}`);
+        } else {
+          // Re-enable by patching is_active. (Backend supports updatePromo-style fields, but
+          // listActivePackages only returns is_active=1 rows — to flip back we recreate.)
+          // Simpler: PATCH is_active via the update endpoint if backend supports it. Today
+          // updatePackage doesn't reactivate, so we recreate with the same fields.
+          const recreated = await AdminData.createCenterPackage(c._dbId, {
+            wash_type:        type,
+            name:             p.name,
+            price:            p.price,
+            duration_minutes: p.duration_minutes,
+            tasks:            p.tasks,
+          });
+          // Reload to get clean state (old soft-deleted row is hidden, new active row appears).
+          await this._loadPackages(c);
+          UI.toast(`✅ ${recreated.name} enabled`);
+          logChange(centerId, 'Package enabled', `${WASH_LABELS[type].label} · ${p.name}`);
+        }
         this.render();
-        return;
+      } catch (e) {
+        UI.toast('❌ ' + e.message);
       }
-    }
-  },
-
-  updatePkgPrice(centerId, pkgId, newVal) {
-    const price = parseInt(newVal);
-    if (isNaN(price) || price < 1) return;
-    const pkgs = CENTER_PACKAGES[centerId];
-    for (const type in pkgs) {
-      const p = pkgs[type].find(x => x.id === pkgId);
-      if (p) {
-        const detail = `${WASH_LABELS[type].label} · ${p.name}: ₹${p.price} → ₹${price}`;
-        p.price = price;
-        logChange(centerId, 'Package price updated', detail);
-        UI.toast('✅ Price updated → ₹' + price);
-        return;
-      }
-    }
-  },
-
-  updatePkgDuration(centerId, pkgId, newVal) {
-    const dur = newVal.trim();
-    if (!dur) return;
-    const pkgs = CENTER_PACKAGES[centerId];
-    for (const type in pkgs) {
-      const p = pkgs[type].find(x => x.id === pkgId);
-      if (p) {
-        const detail = `${WASH_LABELS[type].label} · ${p.name}: ${p.duration} → ${dur}`;
-        p.duration = dur;
-        logChange(centerId, 'Package duration updated', detail);
-        UI.toast('✅ Duration updated');
-        return;
-      }
+      return;
     }
   },
 
@@ -474,25 +491,39 @@ const CenterDetail = {
     UI.openSheet('ovl-add-package');
   },
 
-  saveAddPackage() {
+  async saveAddPackage() {
     const centerId = AppState._addPkgCenter;
+    const c = CENTERS.find(x => x.id === centerId);
+    if (!c) return;
     const name  = $id('add-pkg-name')?.value.trim();
     const price = parseInt($id('add-pkg-price')?.value) || 0;
     const dur   = $id('add-pkg-dur')?.value.trim();
     const type  = $id('add-pkg-type')?.value || 'water';
     if (!name || !price) { UI.toast('⚠️ Name and price are required'); return; }
 
-    if (!CENTER_PACKAGES[centerId]) CENTER_PACKAGES[centerId] = {};
-    if (!CENTER_PACKAGES[centerId][type]) CENTER_PACKAGES[centerId][type] = [];
-    const newPkg = { id: centerId + type + Date.now(), name, price, duration: dur || '30–40 min', active: true, tasks: [...this._addTasks] };
-    CENTER_PACKAGES[centerId][type].push(newPkg);
-    logChange(centerId, 'Package added', `${WASH_LABELS[type].label} · ${name} at ₹${price}`);
-    UI.closeSheet('ovl-add-package');
-    UI.toast(`✅ ${name} added`);
-    this.render();
+    // Parse "30 min" / "30–40 min" / "30" → integer minutes (server stores int).
+    const durMatch = /(\d+)/.exec(dur);
+    const durMin   = durMatch ? parseInt(durMatch[1], 10) : 30;
+
+    try {
+      await AdminData.createCenterPackage(c._dbId, {
+        wash_type:        type,
+        name,
+        price,
+        duration_minutes: durMin,
+        tasks:            [...this._addTasks],
+      });
+      await this._loadPackages(c);
+      logChange(centerId, 'Package added', `${WASH_LABELS[type].label} · ${name} at ₹${price}`);
+      UI.closeSheet('ovl-add-package');
+      UI.toast(`✅ ${name} added`);
+    } catch (e) {
+      UI.toast('❌ ' + e.message);
+    }
   },
 
-  openEditPackage(centerId, pkgId) {
+  openEditPackage(centerId, pkgIdRaw) {
+    const pkgId = Number(pkgIdRaw);
     AppState._editPkgCenter = centerId;
     AppState._editPkgId     = pkgId;
     const pkgs = CENTER_PACKAGES[centerId] || {};
@@ -513,48 +544,55 @@ const CenterDetail = {
     UI.openSheet('ovl-edit-package');
   },
 
-  saveEditPackage() {
+  async saveEditPackage() {
     const centerId = AppState._editPkgCenter;
-    const pkgId    = AppState._editPkgId;
+    const pkgId    = Number(AppState._editPkgId);
+    const c        = CENTERS.find(x => x.id === centerId);
+    if (!c) return;
     const newName  = $id('edit-pkg-name')?.value.trim();
     const newPrice = parseInt($id('edit-pkg-price')?.value) || 0;
     const newDur   = $id('edit-pkg-dur')?.value.trim();
     if (!newName || !newPrice) { UI.toast('⚠️ Name and price are required'); return; }
 
-    const pkgs = CENTER_PACKAGES[centerId] || {};
-    for (const t in pkgs) {
-      const p = pkgs[t].find(x => x.id === pkgId);
-      if (p) {
-        const changes = [];
-        if (newName  !== p.name)            changes.push(`Name: "${p.name}" → "${newName}"`);
-        if (newPrice !== p.price)           changes.push(`Price: ₹${p.price} → ₹${newPrice}`);
-        if (newDur   && newDur !== p.duration) changes.push(`Duration: ${p.duration} → ${newDur}`);
-        p.name = newName; p.price = newPrice; if (newDur) p.duration = newDur;
-        p.tasks = [...this._editTasks];
-        if (changes.length) logChange(centerId, 'Package updated', `${WASH_LABELS[t].label} · ${changes.join(' · ')}`);
-        UI.closeSheet('ovl-edit-package');
-        UI.toast('✅ Package updated');
-        this.render();
-        return;
-      }
+    const durMatch = /(\d+)/.exec(newDur || '');
+    const durMin   = durMatch ? parseInt(durMatch[1], 10) : null;
+
+    try {
+      await AdminData.updateCenterPackage(c._dbId, pkgId, {
+        name:             newName,
+        price:            newPrice,
+        duration_minutes: durMin,   // null => server keeps current
+        tasks:            [...this._editTasks],
+      });
+      await this._loadPackages(c);
+      logChange(centerId, 'Package updated', `"${newName}" · ₹${newPrice}`);
+      UI.closeSheet('ovl-edit-package');
+      UI.toast('✅ Package updated');
+    } catch (e) {
+      UI.toast('❌ ' + e.message);
     }
   },
 
-  deletePackage() {
+  async deletePackage() {
     const centerId = AppState._editPkgCenter;
-    const pkgId    = AppState._editPkgId;
+    const pkgId    = Number(AppState._editPkgId);
+    const c        = CENTERS.find(x => x.id === centerId);
+    if (!c) return;
+    // Find the name for the changelog before we delete.
     const pkgs = CENTER_PACKAGES[centerId] || {};
+    let name = 'Package', wash = '';
     for (const t in pkgs) {
-      const idx = pkgs[t].findIndex(x => x.id === pkgId);
-      if (idx !== -1) {
-        const name = pkgs[t][idx].name;
-        pkgs[t].splice(idx, 1);
-        logChange(centerId, 'Package deleted', `${WASH_LABELS[t].label} · "${name}" removed`);
-        UI.closeSheet('ovl-edit-package');
-        UI.toast(`🗑️ "${name}" deleted`);
-        this.render();
-        return;
-      }
+      const found = pkgs[t].find(x => x.id === pkgId);
+      if (found) { name = found.name; wash = WASH_LABELS[t]?.label || t; break; }
+    }
+    try {
+      await AdminData.deleteCenterPackage(c._dbId, pkgId);
+      await this._loadPackages(c);
+      logChange(centerId, 'Package deleted', `${wash} · "${name}" removed`);
+      UI.closeSheet('ovl-edit-package');
+      UI.toast(`🗑️ "${name}" deleted`);
+    } catch (e) {
+      UI.toast('❌ ' + e.message);
     }
   },
 
@@ -1384,26 +1422,37 @@ const AdminReports = {
         </div>`;
     }).join(''));
 
-    // Weekly combined chart — SA only
+    // Weekly combined chart — SA only. Derived from real bookings (last 7 days).
     const chartSection = $id('rp-chart-section');
     if (chartSection) chartSection.style.display = isSA ? '' : 'none';
     if (isSA) {
-      const combinedWeek = WEEK_DAYS.map((day, i) =>
-        Object.values(WEEK_REVENUE).reduce((s, arr) => s + arr[i], 0)
-      );
-      const maxW = Math.max(...combinedWeek);
+      // Build last-7-days buckets [Mon..Sun] in calendar order from today minus 6 days.
+      const today   = new Date(); today.setHours(0, 0, 0, 0);
+      const buckets = Array.from({ length: 7 }, (_, i) => {
+        const d = new Date(today); d.setDate(today.getDate() - (6 - i));
+        return { date: d, iso: d.toISOString().slice(0, 10), revenue: 0 };
+      });
+      for (const b of allBk) {
+        if (b.status !== 'done') continue;
+        const idx = buckets.findIndex(x => x.iso === b.slotDate);
+        if (idx >= 0) buckets[idx].revenue += b.price || 0;
+      }
+      const dayLabels  = buckets.map(b => b.date.toLocaleDateString('en-IN', { weekday: 'short' }));
+      const revenues   = buckets.map(b => b.revenue);
+      const maxW       = Math.max(...revenues, 1);
+      const totalWeek  = revenues.reduce((s, v) => s + v, 0);
       setHtml('rp-week-chart', `
         <div style="display:flex;align-items:flex-end;gap:5px;height:70px">
-          ${combinedWeek.map((rev, i) => `
+          ${revenues.map((rev, i) => `
             <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px">
-              <div style="font-size:8px;color:var(--muted)">₹${Math.round(rev/1000)}k</div>
-              <div style="width:100%;background:${i===5||i===6?'var(--primary)':'#c4b5fd'};border-radius:4px 4px 0 0;height:${Math.round(rev/maxW*52)+4}px;transition:height .4s"></div>
-              <div style="font-size:9px;color:var(--muted)">${WEEK_DAYS[i]}</div>
+              <div style="font-size:8px;color:var(--muted)">${rev ? '₹' + Math.round(rev/1000) + 'k' : '—'}</div>
+              <div style="width:100%;background:${i>=5?'var(--primary)':'#c4b5fd'};border-radius:4px 4px 0 0;height:${Math.round(rev/maxW*52)+4}px;transition:height .4s"></div>
+              <div style="font-size:9px;color:var(--muted)">${dayLabels[i]}</div>
             </div>`).join('')}
         </div>
         <div class="flex-b" style="margin-top:6px">
-          <span class="text-xs text-muted">All centers · this week</span>
-          <span class="text-xs bold">${UI.formatPrice(combinedWeek.reduce((s,v)=>s+v,0))} total</span>
+          <span class="text-xs text-muted">All centers · last 7 days</span>
+          <span class="text-xs bold">${UI.formatPrice(totalWeek)} total</span>
         </div>`);
     }
 
@@ -1670,47 +1719,61 @@ const SuperAdmin = {
     this._renderReviews();
   },
 
+  // Cities are derived from the centers' actual `city` field — no separate table.
+  // A city is "active" if at least one of its centers is visible; toggling it
+  // flips visibility on every center in that city via the real admin API.
+  _cityRows() {
+    const map = {};
+    for (const c of CENTERS) {
+      const key = c.cityId || 'mumbai';
+      if (!map[key]) map[key] = { id: key, name: c.cityName || 'Mumbai', total: 0, visible: 0, centers: [] };
+      map[key].total += 1;
+      if (c.visible) map[key].visible += 1;
+      map[key].centers.push(c);
+    }
+    return Object.values(map).sort((a, b) => a.name.localeCompare(b.name));
+  },
+
   _renderCities() {
-    setHtml('sa-cities-list', CITIES.map(city => {
-      const cnt = CENTERS.filter(c => c.cityId === city.id).length;
+    const rows = this._cityRows();
+    setHtml('sa-cities-list', rows.map(city => {
+      const active = city.visible > 0;
       return `
         <div style="display:flex;align-items:center;gap:10px;padding:11px 12px;border-bottom:.5px solid var(--border)">
           <div style="flex:1;min-width:0">
             <div class="flex-c gap7">
               <div class="bold text-xs">${city.name}</div>
-              <span class="badge ${city.active?'b-open':'b-closed'}">${city.active?'🟢 Active':'🔴 Inactive'}</span>
+              <span class="badge ${active?'b-open':'b-closed'}">${active?'🟢 Active':'🔴 Inactive'}</span>
             </div>
-            <div style="font-size:10px;color:var(--muted);margin-top:2px">${city.state} · ${cnt} center${cnt!==1?'s':''}</div>
+            <div style="font-size:10px;color:var(--muted);margin-top:2px">${city.visible}/${city.total} center${city.total!==1?'s':''} visible</div>
           </div>
-          <div class="tog ${city.active?'on':''}" onclick="SuperAdmin.toggleCity('${city.id}')"></div>
+          <div class="tog ${active?'on':''}" onclick="SuperAdmin.toggleCity('${city.id}')"></div>
         </div>`;
-    }).join('')  || '<div style="padding:16px;font-size:12px;color:var(--muted)">No cities yet</div>');
+    }).join('') || '<div style="padding:16px;font-size:12px;color:var(--muted)">No cities yet — onboard a center to add one</div>');
   },
 
-  toggleCity(id) {
-    const city = CITIES.find(c => c.id === id);
+  async toggleCity(id) {
+    const city = this._cityRows().find(c => c.id === id);
     if (!city) return;
-    city.active = !city.active;
-    UI.toast(city.active ? `🟢 ${city.name} activated` : `🔴 ${city.name} deactivated`);
-    this._renderCities();
+    const turningOn = city.visible === 0;  // currently inactive → activate all
+    try {
+      await Promise.all(city.centers.map(c => AdminData.setVisibility(c._dbId, turningOn)));
+      city.centers.forEach(c => { c.visible = turningOn; });
+      UI.toast(turningOn ? `🟢 ${city.name} activated (${city.total} centers visible)` : `🔴 ${city.name} deactivated`);
+      this._renderCities();
+      Centers.render();
+    } catch (e) {
+      UI.toast('❌ ' + e.message);
+    }
   },
 
   openAddCity() {
-    $id('add-city-name')  && ($id('add-city-name').value  = '');
-    $id('add-city-state') && ($id('add-city-state').value = '');
-    UI.openSheet('ovl-add-city');
+    // Cities can't be added directly — they appear when a center in that city
+    // is onboarded via the application flow. This keeps city = real coverage.
+    UI.toast('ℹ️ A city appears once an onboarded center is in that city');
   },
 
-  saveAddCity() {
-    const name  = $id('add-city-name')?.value.trim();
-    const state = $id('add-city-state')?.value.trim();
-    if (!name) { UI.toast('⚠️ City name is required'); return; }
-    if (CITIES.find(c => c.name.toLowerCase() === name.toLowerCase())) { UI.toast('⚠️ City already exists'); return; }
-    CITIES.push({ id:'city'+(CITIES.length+1), name, state: state||'India', active:true });
-    UI.closeSheet('ovl-add-city');
-    UI.toast(`🏙️ ${name} added!`);
-    this._renderCities();
-  },
+  saveAddCity() { this.openAddCity(); },
 
   _renderCenters() {
     const sorted = [...CENTERS].sort((a, b) => (a.displayOrder || 99) - (b.displayOrder || 99));

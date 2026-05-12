@@ -33,7 +33,9 @@ const AdminData = (() => {
       todayRevenue:      0,    // filled in after bookings load
       visible:           c.visible == null ? true : !!c.visible,
       displayOrder:      c.display_order || (idx + 1),
-      cityId:            'city1',
+      // city is the raw text from the DB; cityId is a slug for filter matching.
+      cityId:            String(c.city || 'mumbai').toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+      cityName:          String(c.city || 'Mumbai'),
       pendingSettlement: 0,
       bankAccount:       c.bank_account || null,
       ifsc:              c.ifsc || null,
@@ -83,6 +85,77 @@ const AdminData = (() => {
 
   async function updatePromo(id, fields) {
     return _patch(`/api/admin/promos/${id}`, fields);
+  }
+
+  // ── CENTER PACKAGES ──
+  // DB row → admin-app's per-package shape used by CenterDetail.
+  function _mapPackage(p) {
+    let tasks = [];
+    try { tasks = JSON.parse(p.tasks || '[]'); } catch { /* malformed json */ }
+    return {
+      id:       p.id,
+      _dbId:    p.id,
+      name:     p.name,
+      price:    p.price,
+      duration: `${p.duration_minutes} min`,
+      duration_minutes: p.duration_minutes,
+      active:   !!p.is_active,
+      tasks,
+      wash_type: p.wash_type,
+      sort_order: p.sort_order,
+    };
+  }
+
+  function _groupPackages(rows) {
+    const g = { water: [], dry: [], steam: [], d2d: [] };
+    rows.forEach(p => {
+      const m = _mapPackage(p);
+      if (!g[m.wash_type]) g[m.wash_type] = [];
+      g[m.wash_type].push(m);
+    });
+    return g;
+  }
+
+  async function fetchCenterPackages(dbCenterId) {
+    const r = await fetch(`${CENTER_APP_URL}/api/admin/centers/${dbCenterId}/packages`, { headers: _headers() });
+    if (!r.ok) throw new Error('packages HTTP ' + r.status);
+    const j = await r.json();
+    return _groupPackages(j.data || []);
+  }
+
+  async function createCenterPackage(dbCenterId, data) {
+    const r = await fetch(`${CENTER_APP_URL}/api/admin/centers/${dbCenterId}/packages`, {
+      method:  'POST',
+      headers: { ..._headers(), 'Content-Type': 'application/json' },
+      body:    JSON.stringify(data),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.success) throw new Error(j.error || `HTTP ${r.status}`);
+    return _mapPackage(j.data);
+  }
+
+  async function updateCenterPackage(dbCenterId, pkgId, data) {
+    const r = await fetch(`${CENTER_APP_URL}/api/admin/centers/${dbCenterId}/packages/${pkgId}`, {
+      method:  'PATCH',
+      headers: { ..._headers(), 'Content-Type': 'application/json' },
+      body:    JSON.stringify(data),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.success) throw new Error(j.error || `HTTP ${r.status}`);
+    return _mapPackage(j.data);
+  }
+
+  async function deleteCenterPackage(dbCenterId, pkgId) {
+    const r = await fetch(`${CENTER_APP_URL}/api/admin/centers/${dbCenterId}/packages/${pkgId}`, {
+      method: 'DELETE', headers: _headers(),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.success) throw new Error(j.error || `HTTP ${r.status}`);
+    return true;
+  }
+
+  async function patchCenterInfo(dbCenterId, fields) {
+    return _patch(`/api/admin/centers/${dbCenterId}`, fields);
   }
 
   // ── CHAT ──
@@ -413,6 +486,8 @@ const AdminData = (() => {
     setVisibility, setDisplayOrder, swapDisplayOrder, setOpenStatus,
     createPromo, updatePromo,
     fetchChatThreads, fetchChatMessages, sendChatReply, markChatThreadRead,
+    fetchCenterPackages, createCenterPackage, updateCenterPackage, deleteCenterPackage,
+    patchCenterInfo,
   };
 
 })();

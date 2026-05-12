@@ -147,7 +147,10 @@ const UserData = (() => {
       if (!r.ok) throw new Error('HTTP ' + r.status);
       const j = await r.json();
       if (!j || !j.success) throw new Error('bad response');
-      // Augment each package with the includes-shape expected by detail.js + summary.js
+      // Augment each package with the includes-shape expected by detail.js + summary.js.
+      // Leave empty wash types empty — the UI shows a "no packages" message rather
+      // than mixing demo data into real centers (which causes invalid package_id
+      // booking errors and visual flicker).
       const augmented = {};
       ['water','dry','steam','d2d'].forEach(t => {
         augmented[t] = (j.data[t] || []).map(p => ({
@@ -159,10 +162,6 @@ const UserData = (() => {
           desc:     '',
           includes: (p.tasks || []).map(text => ({ icon: '✅', text })),
         }));
-      });
-      // If a wash type has no real packages, keep static fallback so the tab isn't empty.
-      ['water','dry','steam','d2d'].forEach(t => {
-        if (!augmented[t].length) augmented[t] = PACKAGES[t] || [];
       });
       CENTER_PACKAGES = augmented;
       ACTIVE_PACKAGES = augmented;

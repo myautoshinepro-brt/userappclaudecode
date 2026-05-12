@@ -108,6 +108,56 @@ router.patch('/bookings/:id', adminAuth, (req, res) => {
   res.json({ success: true });
 });
 
+// ── PACKAGES (super-admin override of the center-auth /api/packages flow) ──
+router.get('/centers/:id/packages', adminAuth, (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (!id) return res.status(400).json({ error: 'Invalid id' });
+  res.json({ success: true, data: db.listPackages(id) });
+});
+
+router.post('/centers/:id/packages', adminAuth, (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (!id) return res.status(400).json({ error: 'Invalid id' });
+  const b = req.body || {};
+  if (!b.wash_type || !b.name || b.price == null)
+    return res.status(400).json({ error: 'wash_type, name, price required' });
+  const pkg = db.createPackage(id, {
+    wash_type:        b.wash_type,
+    name:             String(b.name).trim(),
+    price:            parseInt(b.price, 10),
+    duration_minutes: parseInt(b.duration_minutes || 30, 10),
+    tasks:            Array.isArray(b.tasks) ? b.tasks : [],
+  });
+  res.status(201).json({ success: true, data: pkg });
+});
+
+router.patch('/centers/:id/packages/:pkgId', adminAuth, (req, res) => {
+  const id    = parseInt(req.params.id, 10);
+  const pkgId = parseInt(req.params.pkgId, 10);
+  if (!id || !pkgId) return res.status(400).json({ error: 'Invalid id' });
+  const cur = db.getPackage(pkgId);
+  if (!cur || cur.center_id !== id) return res.status(404).json({ error: 'Package not found' });
+  const b = req.body || {};
+  const merged = {
+    wash_type:        b.wash_type        ?? cur.wash_type,
+    name:             b.name             ?? cur.name,
+    price:            b.price            ?? cur.price,
+    duration_minutes: b.duration_minutes ?? cur.duration_minutes,
+    tasks:            b.tasks            ?? JSON.parse(cur.tasks || '[]'),
+    sort_order:       b.sort_order       ?? cur.sort_order,
+  };
+  const updated = db.updatePackage(pkgId, id, merged);
+  res.json({ success: true, data: updated });
+});
+
+router.delete('/centers/:id/packages/:pkgId', adminAuth, (req, res) => {
+  const id    = parseInt(req.params.id, 10);
+  const pkgId = parseInt(req.params.pkgId, 10);
+  if (!id || !pkgId) return res.status(400).json({ error: 'Invalid id' });
+  db.deletePackage(pkgId, id);
+  res.json({ success: true });
+});
+
 // PATCH /api/admin/centers/:id  Body: { name?, owner_name?, mobile?, email?, address?, gstin?, wash_types?, open_time?, close_time?, lat?, lng? }
 router.patch('/centers/:id', adminAuth, (req, res) => {
   const id = parseInt(req.params.id, 10);
