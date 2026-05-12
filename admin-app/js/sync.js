@@ -70,6 +70,21 @@ const AdminData = (() => {
     return _patch(`/api/admin/centers/${dbCenterId}/open-status`, { is_open: isOpen });
   }
 
+  async function createPromo(data) {
+    const r = await fetch(`${CENTER_APP_URL}/api/admin/promos`, {
+      method:  'POST',
+      headers: { ..._headers(), 'Content-Type': 'application/json' },
+      body:    JSON.stringify(data),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.success) throw new Error(j.error || `HTTP ${r.status}`);
+    return j.data;
+  }
+
+  async function updatePromo(id, fields) {
+    return _patch(`/api/admin/promos/${id}`, fields);
+  }
+
   // Format slot_date (YYYY-MM-DD) to 'Today' / 'Yesterday' / 'DD MMM'.
   function _formatDate(iso) {
     if (!iso) return '';
@@ -97,6 +112,7 @@ const AdminData = (() => {
   function _mapBooking(b) {
     return {
       id:            b.booking_ref,
+      _dbId:         b.id,
       centerId:      'c' + b.center_id,
       customer:      b.customer_name,
       phone:         b.customer_phone ? b.customer_phone.replace(/(\d{5})(\d{5})/, '$1 $2') : '',
@@ -131,6 +147,28 @@ const AdminData = (() => {
     if (!r.ok) throw new Error('bookings HTTP ' + r.status);
     const j = await r.json();
     return (j.data || []).map(_mapBooking);
+  }
+
+  function _mapPromo(p) {
+    return {
+      id:       'p' + p.id,
+      _dbId:    p.id,
+      code:     p.code,
+      type:     p.type,
+      value:    p.value,
+      minOrder: p.min_order,
+      maxUses:  p.max_uses,
+      used:     p.used_count || 0,
+      active:   !!p.active,
+      expiry:   p.expires_at,
+    };
+  }
+
+  async function _fetchPromos() {
+    const r = await fetch(`${CENTER_APP_URL}/api/admin/promos`, { headers: _headers() });
+    if (!r.ok) throw new Error('promos HTTP ' + r.status);
+    const j = await r.json();
+    return (j.data || []).map(_mapPromo);
   }
 
   // Roll up per-center counts from the bookings list. Mutates `centers` in place.
@@ -252,7 +290,11 @@ const AdminData = (() => {
   // Load both, replace the globals in place, and re-render the current screen.
   async function loadAll() {
     try {
-      const [centers, bookings] = await Promise.all([_fetchCenters(), _fetchBookings()]);
+      const [centers, bookings, promos] = await Promise.all([
+        _fetchCenters(),
+        _fetchBookings(),
+        _fetchPromos().catch(e => { console.warn('promos fetch failed:', e.message); return []; }),
+      ]);
       _hydrateCenterStats(centers, bookings);
 
       const reviews       = _deriveReviews(bookings);
@@ -271,6 +313,7 @@ const AdminData = (() => {
       NOTIFICATIONS.length  = 0; notifications.forEach(n => NOTIFICATIONS.push(n));
       // ACTIVITY_FEED is declared const in data.js but still an array — splice works.
       ACTIVITY_FEED.length  = 0; activity.forEach(a      => ACTIVITY_FEED.push(a));
+      PROMO_CODES.length    = 0; promos.forEach(p        => PROMO_CODES.push(p));
 
       console.log(
         `✅ AdminData loaded: ${centers.length} centers, ${bookings.length} bookings, ` +
@@ -305,6 +348,7 @@ const AdminData = (() => {
     loadAll,
     markNotificationRead,
     setVisibility, setDisplayOrder, swapDisplayOrder, setOpenStatus,
+    createPromo, updatePromo,
   };
 
 })();

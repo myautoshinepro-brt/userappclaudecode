@@ -69,6 +69,77 @@ router.get('/bookings', adminAuth, (req, res) => {
   res.json({ success: true, data: db.getAllBookings({ date, status, center_id: centerId }) });
 });
 
+// ── PROMOS ────────────────────────────────────────────────
+// GET /api/admin/promos
+router.get('/promos', adminAuth, (_req, res) => {
+  res.json({ success: true, data: db.listAllPromos() });
+});
+
+// POST /api/admin/promos  Body: { code, type, value, min_order, max_uses, description, expires_at }
+router.post('/promos', adminAuth, (req, res) => {
+  const b = req.body || {};
+  if (!b.code)               return res.status(400).json({ error: 'code required' });
+  if (b.value == null)       return res.status(400).json({ error: 'value required' });
+  if (!['percent','flat'].includes(b.type)) return res.status(400).json({ error: 'type must be percent or flat' });
+  try {
+    const promo = db.createPromo(b);
+    res.status(201).json({ success: true, data: promo });
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
+
+// PATCH /api/admin/promos/:id
+router.patch('/promos/:id', adminAuth, (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (!id) return res.status(400).json({ error: 'Invalid id' });
+  const ok = db.updatePromo(id, req.body || {});
+  if (!ok) return res.status(400).json({ error: 'No updatable fields supplied' });
+  res.json({ success: true });
+});
+
+// PATCH /api/admin/bookings/:id  Body: { status?, slot_date?, slot_time?, center_id?, package_price? }
+router.patch('/bookings/:id', adminAuth, (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (!id) return res.status(400).json({ error: 'Invalid id' });
+  const result = db.adminUpdateBooking(id, req.body || {});
+  if (!result.ok) return res.status(400).json({ error: result.error });
+  console.log(`🛠️  Admin updated booking #${id}:`, Object.keys(req.body || {}).join(', '));
+  res.json({ success: true });
+});
+
+// PATCH /api/admin/centers/:id  Body: { name?, owner_name?, mobile?, email?, address?, gstin?, wash_types?, open_time?, close_time?, lat?, lng? }
+router.patch('/centers/:id', adminAuth, (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (!id) return res.status(400).json({ error: 'Invalid id' });
+  const b = req.body || {};
+  // Use the existing updateCenterInfo path for the common fields; bank fields stay on a separate endpoint.
+  if (b.name || b.owner_name || b.email != null || b.address != null || b.gstin != null || b.wash_types != null || b.open_time != null || b.close_time != null) {
+    const cur = db.findCenterById(id);
+    if (!cur) return res.status(404).json({ error: 'Center not found' });
+    db.updateCenterInfo(id, {
+      name:       b.name        ?? cur.name,
+      owner_name: b.owner_name  ?? cur.owner_name,
+      email:      b.email       ?? cur.email,
+      address:    b.address     ?? cur.address,
+      gstin:      b.gstin       ?? cur.gstin,
+      wash_types: b.wash_types  ?? cur.wash_types,
+      open_time:  b.open_time   ?? cur.open_time,
+      close_time: b.close_time  ?? cur.close_time,
+    });
+  }
+  // Optional bank patch in the same call.
+  if (b.bank_account != null || b.ifsc != null || b.account_name != null || b.bank_name != null) {
+    db.updateBankDetails(id, {
+      bank_account: b.bank_account ?? null,
+      ifsc:         b.ifsc         ?? null,
+      account_name: b.account_name ?? null,
+      bank_name:    b.bank_name    ?? null,
+    });
+  }
+  res.json({ success: true, data: db.findCenterById(id) });
+});
+
 // PATCH /api/admin/centers/:id/visibility  Body: { visible: true | false }
 router.patch('/centers/:id/visibility', adminAuth, (req, res) => {
   const id = parseInt(req.params.id, 10);

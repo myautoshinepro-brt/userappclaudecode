@@ -1043,7 +1043,7 @@ const AdminBookings = {
     UI.openSheet('ovl-edit-booking');
   },
 
-  saveEdit() {
+  async saveEdit() {
     const b = ALL_BOOKINGS.find(x => x.id === AppState.selectedBookingId);
     if (!b) return;
 
@@ -1053,30 +1053,57 @@ const AdminBookings = {
     const newPkg   = $id('edit-pkg-inp')?.value?.trim();
     const newPrice = parseInt($id('edit-price-inp')?.value) || b.price;
 
-    if (newCtr)   b.centerId = newCtr;
-    if (newSlot)  b.slot     = newSlot;
-    if (newType)  b.type     = newType;
-    if (newPkg)   b.pkg      = newPkg;
-    b.price = newPrice;
-
+    // Build diff for changelog + the API patch body.
     const changes = [];
-    if (newCtr && newCtr !== b.centerId) { changes.push(`Center: ${CENTERS.find(c=>c.id===b.centerId)?.name} → ${CENTERS.find(c=>c.id===newCtr)?.name}`); }
-    if (newSlot && newSlot !== b.slot)   changes.push(`Slot: ${b.slot} → ${newSlot}`);
-    if (newType && newType !== b.type)   changes.push(`Type: ${WASH_LABELS[b.type].label} → ${WASH_LABELS[newType].label}`);
-    if (newPkg  && newPkg  !== b.pkg)    changes.push(`Package: ${b.pkg} → ${newPkg}`);
-    if (newPrice !== b.price)             changes.push(`Price: ₹${b.price} → ₹${newPrice}`);
+    const patch   = {};
+    if (newCtr && newCtr !== b.centerId) {
+      changes.push(`Center: ${CENTERS.find(c=>c.id===b.centerId)?.name} → ${CENTERS.find(c=>c.id===newCtr)?.name}`);
+      const dest = CENTERS.find(c => c.id === newCtr);
+      if (dest) patch.center_id = dest._dbId;
+    }
+    if (newSlot && newSlot !== b.slot)   { changes.push(`Slot: ${b.slot} → ${newSlot}`);   patch.slot_time = newSlot; }
+    if (newType && newType !== b.type)   { changes.push(`Type: ${WASH_LABELS[b.type].label} → ${WASH_LABELS[newType].label}`); }
+    if (newPkg  && newPkg  !== b.pkg)    { changes.push(`Package: ${b.pkg} → ${newPkg}`); }
+    if (newPrice !== b.price)            { changes.push(`Price: ₹${b.price} → ₹${newPrice}`); patch.package_price = newPrice; }
 
-    if (newCtr)   b.centerId = newCtr;
-    if (newSlot)  b.slot     = newSlot;
-    if (newType)  b.type     = newType;
-    if (newPkg)   b.pkg      = newPkg;
-    b.price = newPrice;
+    if (!Object.keys(patch).length) {
+      UI.toast('No changes to save');
+      UI.closeSheet('ovl-edit-booking');
+      return;
+    }
 
-    if (changes.length) logChange(b.centerId, 'Booking updated', `${b.id} · ${changes.join(' · ')}`);
+    // Look up the integer booking id by ref (we display the ref but the API needs the row id).
+    // We need a quick admin lookup — easiest is to find the row from /api/admin/bookings response
+    // we already cached on the booking object via createdAt/etc. The mapper kept booking_ref as id,
+    // so we have to ask the server to resolve it. Simpler: include the ref → id map at fetch time.
+    if (!b._dbId) {
+      UI.toast('❌ Cannot edit — booking id missing. Refresh.');
+      return;
+    }
 
-    UI.closeSheet('ovl-edit-booking');
-    UI.toast('✅ Booking updated successfully!');
-    this.render();
+    try {
+      const r = await fetch(`${CENTER_APP_URL}/api/admin/bookings/${b._dbId}`, {
+        method:  'PATCH',
+        headers: { 'x-admin-key': ADMIN_API_KEY, 'Content-Type': 'application/json' },
+        body:    JSON.stringify(patch),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || !j.success) throw new Error(j.error || 'Save failed');
+
+      // Apply locally for instant UI feedback.
+      if (newCtr)   b.centerId = newCtr;
+      if (newSlot)  b.slot     = newSlot;
+      if (newType)  b.type     = newType;
+      if (newPkg)   b.pkg      = newPkg;
+      b.price = newPrice;
+      if (changes.length) logChange(b.centerId, 'Booking updated', `${b.id} · ${changes.join(' · ')}`);
+
+      UI.closeSheet('ovl-edit-booking');
+      UI.toast('✅ Booking updated');
+      this.render();
+    } catch (e) {
+      UI.toast('❌ ' + e.message);
+    }
   },
 
   openChatWithCustomer(bookingId) {
@@ -1693,40 +1720,68 @@ const SuperAdmin = {
     this._renderAccounts();
   },
 
-  togglePromo(id) {
+  async togglePromo(id) {
     const p = PROMO_CODES.find(x => x.id === id);
     if (!p) return;
-    p.active = !p.active;
-    UI.toast(p.active ? `✅ ${p.code} activated` : `⛔ ${p.code} deactivated`);
-    this._renderPromos();
+    const next = !p.active;
+    try {
+      await AdminData.updatePromo(p._dbId || p.id, { active: next });
+      p.active = next;
+      UI.toast(next ? `✅ ${p.code} activated` : `⛔ ${p.code} deactivated`);
+      this._renderPromos();
+    } catch (e) {
+      UI.toast('❌ ' + e.message);
+    }
   },
 
+  _editingCenterId: null,
+
   openAddCenter() {
+    this._editingCenterId = null;
     $id('add-ctr-name')  && ($id('add-ctr-name').value  = '');
     $id('add-ctr-owner') && ($id('add-ctr-owner').value = '');
     $id('add-ctr-phone') && ($id('add-ctr-phone').value = '');
     $id('add-ctr-area')  && ($id('add-ctr-area').value  = '');
+    setText('ovl-add-ctr-title', 'Add Center');
     UI.openSheet('ovl-add-center');
   },
 
-  saveAddCenter() {
+  async saveAddCenter() {
     const name  = $id('add-ctr-name')?.value.trim();
     const owner = $id('add-ctr-owner')?.value.trim();
-    const phone = $id('add-ctr-phone')?.value.trim();
+    const phone = $id('add-ctr-phone')?.value.trim().replace(/^\+91\s*/, '').replace(/\s+/g, '');
     const area  = $id('add-ctr-area')?.value.trim();
     if (!name || !owner) { UI.toast('⚠️ Name and owner are required'); return; }
 
-    const newId = 'c' + (CENTERS.length + 1);
-    CENTERS.push({
-      id:newId, name, owner, phone, area, address:'', gstin:'',
-      rating:0, totalReviews:0, isOpen:true, washTypes:['water','dry'],
-      totalBookings:0, activeNow:0, todayRevenue:0,
-    });
+    // EDIT path — patch existing center via API.
+    if (this._editingCenterId) {
+      const c = CENTERS.find(x => x.id === this._editingCenterId);
+      if (!c) { UI.toast('Center not found'); return; }
+      try {
+        const r = await fetch(`${CENTER_APP_URL}/api/admin/centers/${c._dbId}`, {
+          method:  'PATCH',
+          headers: { 'x-admin-key': ADMIN_API_KEY, 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ name, owner_name: owner, address: area || c.address }),
+        });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok || !j.success) throw new Error(j.error || 'Save failed');
+        // Apply locally so the UI updates immediately.
+        c.name   = name;
+        c.owner  = owner;
+        c.area   = area || c.area;
+        logChange(c.id, 'Center updated', `${name} · ${owner}`);
+        UI.closeSheet('ovl-add-center');
+        UI.toast(`✅ ${name} updated`);
+        Centers.render();
+        AdminDashboard.render();
+      } catch (e) {
+        UI.toast('❌ ' + e.message);
+      }
+      return;
+    }
 
-    UI.closeSheet('ovl-add-center');
-    UI.toast(`✅ ${name} added as a new center!`);
-    Centers.render();
-    AdminDashboard.render();
+    // ADD path — new centers must go through the onboarding application flow.
+    UI.toast('ℹ️ New centers must apply via center-app onboarding for review');
   },
 
   openAddPromo() {
@@ -1737,26 +1792,46 @@ const SuperAdmin = {
     UI.openSheet('ovl-add-promo');
   },
 
-  saveAddPromo() {
+  async saveAddPromo() {
     const code   = $id('add-promo-code')?.value.trim().toUpperCase();
     const type   = $id('add-promo-type')?.value || 'percent';
     const value  = parseInt($id('add-promo-value')?.value) || 0;
     const min    = parseInt($id('add-promo-min')?.value)   || 0;
-    const max    = parseInt($id('add-promo-max')?.value)   || 100;
-    const expiry = $id('add-promo-expiry')?.value;
+    const max    = parseInt($id('add-promo-max')?.value)   || null;
+    const expiry = $id('add-promo-expiry')?.value || null;
 
     if (!code || !value) { UI.toast('⚠️ Code and value are required'); return; }
-    if (PROMO_CODES.find(p => p.code === code)) { UI.toast('⚠️ Code already exists'); return; }
 
-    PROMO_CODES.push({ id:'p'+(PROMO_CODES.length+1), code, type, value, minOrder:min, maxUses:max, used:0, active:true, expiry });
-    UI.closeSheet('ovl-add-promo');
-    UI.toast(`🎁 Promo ${code} created!`);
-    this._renderPromos();
+    try {
+      const created = await AdminData.createPromo({
+        code, type, value, min_order: min, max_uses: max,
+        expires_at: expiry,
+      });
+      // Server returns the row — splice into PROMO_CODES with admin-app's shape.
+      PROMO_CODES.unshift({
+        id:       'p' + created.id,
+        _dbId:    created.id,
+        code:     created.code,
+        type:     created.type,
+        value:    created.value,
+        minOrder: created.min_order,
+        maxUses:  created.max_uses,
+        used:     created.used_count || 0,
+        active:   !!created.active,
+        expiry:   created.expires_at,
+      });
+      UI.closeSheet('ovl-add-promo');
+      UI.toast(`🎁 Promo ${code} created!`);
+      this._renderPromos();
+    } catch (e) {
+      UI.toast('❌ ' + e.message);
+    }
   },
 
   openEditCenter(centerId) {
     const c = CENTERS.find(x => x.id === centerId);
     if (!c) return;
+    this._editingCenterId = centerId;
     $id('add-ctr-name').value  = c.name;
     $id('add-ctr-owner').value = c.owner;
     $id('add-ctr-phone').value = c.phone;

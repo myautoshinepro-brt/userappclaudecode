@@ -115,8 +115,28 @@ const UserData = (() => {
     } catch (e) { console.warn('loadBookings:', e.message); }
   }
 
+  async function loadPromos() {
+    try {
+      const r = await fetch('/api/promos');
+      const j = await r.json();
+      if (j && j.success && Array.isArray(j.data)) {
+        PROMO_CODES = j.data.map(p => ({
+          code:               p.code,
+          discount:           p.value,
+          type:               p.type,
+          title:              p.description || `${p.value}${p.type === 'percent' ? '%' : '₹'} off`,
+          desc:               p.min_order > 0 ? `Minimum order ₹${p.min_order}` : '',
+          applicable:         true,
+          reason:             '✓ Available',
+          notApplicableReason: null,
+          minOrder:           p.min_order || 0,
+        }));
+      }
+    } catch (e) { console.warn('loadPromos:', e.message); }
+  }
+
   async function loadAll() {
-    await Promise.all([loadVehicles(), loadAddresses(), loadBookings()]);
+    await Promise.all([loadVehicles(), loadAddresses(), loadBookings(), loadPromos()]);
   }
 
   // Fetch packages for a specific center; cached per-center on CENTER_PACKAGES.
@@ -155,6 +175,6 @@ const UserData = (() => {
     }
   }
 
-  return { loadAll, loadVehicles, loadAddresses, loadBookings, loadCenterPackages };
+  return { loadAll, loadVehicles, loadAddresses, loadBookings, loadPromos, loadCenterPackages };
 
 })();

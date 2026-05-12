@@ -44,6 +44,10 @@ app.get('/api/centers', (_req, res) =>
 app.get('/api/centers/:id/packages', (req, res) =>
   relayJson(res, `${CENTER_APP_URL}/api/public/centers/${encodeURIComponent(req.params.id)}/packages`));
 
+// Public: list active promos
+app.get('/api/promos', (_req, res) =>
+  relayJson(res, `${CENTER_APP_URL}/api/public/promos`));
+
 // Authed: create a booking. We inject customer_name/phone/email from the JWT user.
 app.post('/api/bookings', requireAuth, (req, res) => {
   const payload = {
@@ -68,6 +72,25 @@ app.post('/api/bookings/:ref/review', requireAuth, (req, res) => {
   const payload = { ...req.body, phone: req.user.mobile };
   relayJson(res, `${CENTER_APP_URL}/api/public/bookings/${encodeURIComponent(req.params.ref)}/review`, {
     method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify(payload),
+  });
+});
+
+// Authed: customer cancels their own booking.
+app.post('/api/bookings/:ref/cancel', requireAuth, (req, res) => {
+  relayJson(res, `${CENTER_APP_URL}/api/public/bookings/${encodeURIComponent(req.params.ref)}/cancel`, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ phone: req.user.mobile }),
+  });
+});
+
+// Authed: customer reschedules their own booking.
+app.patch('/api/bookings/:ref/reschedule', requireAuth, (req, res) => {
+  const payload = { ...req.body, phone: req.user.mobile };
+  relayJson(res, `${CENTER_APP_URL}/api/public/bookings/${encodeURIComponent(req.params.ref)}/reschedule`, {
+    method:  'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body:    JSON.stringify(payload),
   });

@@ -159,6 +159,33 @@ try { db.exec("ALTER TABLE applications ADD COLUMN certificates  TEXT"); } catch
 try { db.exec("ALTER TABLE applications ADD COLUMN wash_types    TEXT"); } catch { /* exists */ }
 try { db.exec("ALTER TABLE applications ADD COLUMN bank_name     TEXT"); } catch { /* exists */ }
 
+// ── Promo codes table ──
+db.exec(`
+  CREATE TABLE IF NOT EXISTS promos (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    code        TEXT    NOT NULL UNIQUE,
+    type        TEXT    NOT NULL,                  -- 'percent' | 'flat'
+    value       INTEGER NOT NULL,
+    min_order   INTEGER NOT NULL DEFAULT 0,
+    max_uses    INTEGER,
+    used_count  INTEGER NOT NULL DEFAULT 0,
+    active      INTEGER NOT NULL DEFAULT 1,
+    description TEXT,
+    expires_at  TEXT,
+    created_at  TEXT    NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_promos_code ON promos(code);
+`);
+
+// Seed a couple of demo promos if the table is empty so the customer app has
+// something to show on first launch.
+if (db.prepare('SELECT COUNT(*) as n FROM promos').get().n === 0) {
+  const ins = db.prepare(`INSERT INTO promos (code, type, value, min_order, max_uses, active, description, expires_at) VALUES (?,?,?,?,?,?,?,?)`);
+  ins.run('SPARKFIRST10', 'percent', 10, 0,    null, 1, '10% off your first wash',     null);
+  ins.run('MUMBAI30',     'flat',    30, 0,    null, 1, '₹30 off — Mumbai launch',     null);
+  ins.run('WASH20',       'percent', 20, 200,  null, 1, '20% off water wash',           null);
+}
+
 // ── Applications table for center onboarding ──
 db.exec(`
   CREATE TABLE IF NOT EXISTS applications (
@@ -816,6 +843,112 @@ module.exports = {
       WHERE b.customer_phone = ?
       ORDER BY b.slot_date DESC, b.slot_time DESC
     `).all(phone);
+  },
+
+  // Customer cancels their own booking. Only allowed for bookings that haven't started.
+  cancelCustomerBooking(bookingRef, phone) {
+    const b = db.prepare('SELECT id, customer_phone, status FROM bookings WHERE booking_ref=?').get(bookingRef);
+    if (!b)                              return { ok: false, error: 'Booking not found' };
+    if (b.customer_phone !== phone)      return { ok: false, error: 'Not your booking' };
+    if (['done', 'cancelled', 'washing', 'arrived'].includes(b.status))
+      return { ok: false, error: `Cannot cancel a ${b.status} booking` };
+    db.prepare("UPDATE bookings SET status='cancelled', updated_at=datetime('now') WHERE id=?").run(b.id);
+    return { ok: true };
+  },
+
+  // Customer reschedules their own booking. Same status guard.
+  rescheduleCustomerBooking(bookingRef, phone, slotDate, slotTime) {
+    if (!slotDate || !slotTime) return { ok: false, error: 'slot_date and slot_time required' };
+    const b = db.prepare('SELECT id, customer_phone, status FROM bookings WHERE booking_ref=?').get(bookingRef);
+    if (!b)                              return { ok: false, error: 'Booking not found' };
+    if (b.customer_phone !== phone)      return { ok: false, error: 'Not your booking' };
+    if (['done', 'cancelled', 'washing', 'arrived'].includes(b.status))
+      return { ok: false, error: `Cannot reschedule a ${b.status} booking` };
+    db.prepare("UPDATE bookings SET slot_date=?, slot_time=?, updated_at=datetime('now') WHERE id=?")
+      .run(slotDate, slotTime, b.id);
+    return { ok: true };
+  },
+
+  // ── PROMOS ──
+  listActivePromos() {
+    return db.prepare(`
+      SELECT * FROM promos
+      WHERE active = 1
+        AND (expires_at IS NULL OR expires_at > datetime('now'))
+        AND (max_uses  IS NULL OR used_count < max_uses)
+      ORDER BY id ASC
+    `).all();
+  },
+  listAllPromos() { return db.prepare('SELECT * FROM promos ORDER BY id DESC').all(); },
+  findPromoByCode(code) {
+    return db.prepare('SELECT * FROM promos WHERE upper(code) = upper(?)').get(String(code || '').trim());
+  },
+  createPromo(data) {
+    const info = db.prepare(`
+      INSERT INTO promos (code, type, value, min_order, max_uses, active, description, expires_at)
+      VALUES (?,?,?,?,?,?,?,?)
+    `).run(
+      String(data.code).trim().toUpperCase(),
+      data.type === 'flat' ? 'flat' : 'percent',
+      parseInt(data.value, 10),
+      parseInt(data.min_order || 0, 10),
+      data.max_uses ? parseInt(data.max_uses, 10) : null,
+      data.active === false ? 0 : 1,
+      data.description || null,
+      data.expires_at || null
+    );
+    return db.prepare('SELECT * FROM promos WHERE id=?').get(info.lastInsertRowid);
+  },
+  updatePromo(id, fields) {
+    const sets = [];
+    const args = [];
+    if (fields.active != null)       { sets.push('active=?');      args.push(fields.active ? 1 : 0); }
+    if (fields.value != null)        { sets.push('value=?');       args.push(parseInt(fields.value, 10)); }
+    if (fields.min_order != null)    { sets.push('min_order=?');   args.push(parseInt(fields.min_order, 10)); }
+    if (fields.max_uses !== undefined){ sets.push('max_uses=?');   args.push(fields.max_uses == null ? null : parseInt(fields.max_uses, 10)); }
+    if (fields.description != null)  { sets.push('description=?'); args.push(fields.description); }
+    if (fields.expires_at !== undefined){ sets.push('expires_at=?'); args.push(fields.expires_at || null); }
+    if (!sets.length) return false;
+    args.push(id);
+    db.prepare(`UPDATE promos SET ${sets.join(', ')} WHERE id=?`).run(...args);
+    return true;
+  },
+  incrementPromoUsage(id) {
+    db.prepare("UPDATE promos SET used_count = used_count + 1 WHERE id=?").run(id);
+  },
+  // Validate a promo code against a base price. Returns { ok, promo, discount } or { ok: false, error }.
+  validatePromo(code, basePrice) {
+    const p = this.findPromoByCode(code);
+    if (!p)                         return { ok: false, error: 'Promo not found' };
+    if (!p.active)                  return { ok: false, error: 'Promo not active' };
+    if (p.expires_at && new Date(p.expires_at) < new Date())
+                                    return { ok: false, error: 'Promo expired' };
+    if (p.max_uses != null && p.used_count >= p.max_uses)
+                                    return { ok: false, error: 'Promo fully used' };
+    if (p.min_order && basePrice < p.min_order)
+                                    return { ok: false, error: `Min order ₹${p.min_order} required` };
+    const discount = p.type === 'flat'
+      ? Math.min(p.value, basePrice)
+      : Math.round(basePrice * p.value / 100);
+    return { ok: true, promo: p, discount };
+  },
+
+  // Admin override: change booking status / slot / center without ownership check.
+  adminUpdateBooking(bookingId, fields = {}) {
+    const b = db.prepare('SELECT * FROM bookings WHERE id=?').get(bookingId);
+    if (!b) return { ok: false, error: 'Booking not found' };
+    const sets = [];
+    const args = [];
+    if (fields.status)    { sets.push('status=?');    args.push(fields.status); }
+    if (fields.slot_date) { sets.push('slot_date=?'); args.push(fields.slot_date); }
+    if (fields.slot_time) { sets.push('slot_time=?'); args.push(fields.slot_time); }
+    if (fields.center_id) { sets.push('center_id=?'); args.push(parseInt(fields.center_id, 10)); }
+    if (fields.package_price != null) { sets.push('package_price=?'); args.push(parseInt(fields.package_price, 10)); }
+    if (!sets.length) return { ok: false, error: 'No updatable fields supplied' };
+    sets.push("updated_at=datetime('now')");
+    args.push(bookingId);
+    db.prepare(`UPDATE bookings SET ${sets.join(', ')} WHERE id=?`).run(...args);
+    return { ok: true };
   },
 
   // Save a customer review on a booking. Idempotent — overwrites prior rating/comment.

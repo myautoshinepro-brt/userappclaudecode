@@ -241,6 +241,9 @@ const SummaryScreen = {
           slot_time:       b.slot,
           vehicle_plate:   v.plate,
           vehicle_model:   v.model,
+          // Send promo_code so server can validate + compute discount itself.
+          // app_discount/center_discount are kept as a fallback for when no code is sent.
+          promo_code:      b.promoCode || null,
           app_discount:    t.appDiscount,
           center_discount: t.centerDiscount,
         }),

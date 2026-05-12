@@ -105,6 +105,18 @@ router.post('/bookings', (req, res) => {
   if (!pkg || pkg.center_id !== centerId)
     return res.status(404).json({ error: 'Package not found for this center' });
 
+  // Promo code — validate server-side so client can't fake the discount.
+  // Falls back to the discount the client computed if no code was sent
+  // (lets existing flows keep working until the UI is fully promo-aware).
+  let appDiscount = Number(b.app_discount) || 0;
+  let promoUsed   = null;
+  if (b.promo_code) {
+    const result = db.validatePromo(String(b.promo_code).trim(), pkg.price);
+    if (!result.ok) return res.status(400).json({ error: result.error });
+    appDiscount = result.discount;
+    promoUsed   = result.promo;
+  }
+
   const booking = db.createCustomerBooking({
     center_id:        centerId,
     customer_name:    String(b.customer_name).trim(),
@@ -118,9 +130,10 @@ router.post('/bookings', (req, res) => {
     slot_date:        b.slot_date,
     slot_time:        b.slot_time,
     duration_minutes: pkg.duration_minutes,
-    app_discount:     Number(b.app_discount)    || 0,
+    app_discount:     appDiscount,
     center_discount:  Number(b.center_discount) || 0,
   });
+  if (promoUsed) db.incrementPromoUsage(promoUsed.id);
 
   console.log(`📥 Customer booking ${booking.booking_ref} for center #${centerId} (${center.name})`);
   res.status(201).json({ success: true, data: booking });
@@ -132,6 +145,25 @@ router.get('/bookings', (req, res) => {
   if (!/^[6-9]\d{9}$/.test(phone))
     return res.status(400).json({ error: 'valid 10-digit phone required' });
   res.json({ success: true, data: db.getCustomerBookings(phone) });
+});
+
+// POST /api/public/bookings/:ref/cancel  Body: { phone }
+router.post('/bookings/:ref/cancel', (req, res) => {
+  const phone = String((req.body || {}).phone || '').replace(/\s+/g, '');
+  if (!/^[6-9]\d{9}$/.test(phone)) return res.status(400).json({ error: 'valid phone required' });
+  const result = db.cancelCustomerBooking(req.params.ref, phone);
+  if (!result.ok) return res.status(400).json({ error: result.error });
+  res.json({ success: true });
+});
+
+// PATCH /api/public/bookings/:ref/reschedule  Body: { phone, slot_date, slot_time }
+router.patch('/bookings/:ref/reschedule', (req, res) => {
+  const b = req.body || {};
+  const phone = String(b.phone || '').replace(/\s+/g, '');
+  if (!/^[6-9]\d{9}$/.test(phone)) return res.status(400).json({ error: 'valid phone required' });
+  const result = db.rescheduleCustomerBooking(req.params.ref, phone, b.slot_date, b.slot_time);
+  if (!result.ok) return res.status(400).json({ error: result.error });
+  res.json({ success: true });
 });
 
 // POST /api/public/bookings/:ref/review  Body: { phone, rating, comment }
@@ -147,6 +179,11 @@ router.post('/bookings/:ref/review', (req, res) => {
   const result = db.saveCustomerReview(ref, phone, rating, comment);
   if (!result.ok) return res.status(400).json({ error: result.error });
   res.json({ success: true });
+});
+
+// GET /api/public/promos — customer-facing: only active, non-expired promos
+router.get('/promos', (_req, res) => {
+  res.json({ success: true, data: db.listActivePromos() });
 });
 
 module.exports = router;

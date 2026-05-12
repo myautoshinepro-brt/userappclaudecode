@@ -3,6 +3,23 @@
 // Confirmed screen, manage, modify, cancel, bookings list
 // ============================================================
 
+// Convert modify-modal date label ("Today, 13 May" | "13 May") to YYYY-MM-DD.
+// Mirrors the helper in summary.js but lives here so booking.js is self-contained.
+function _modifyDateToIso(label) {
+  if (!label) return new Date().toISOString().slice(0, 10);
+  const MONTHS = { Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11 };
+  const m = String(label).match(/(\d{1,2})\s+([A-Za-z]{3})/);
+  if (!m) return new Date().toISOString().slice(0, 10);
+  const day = parseInt(m[1], 10);
+  const mon = MONTHS[m[2]];
+  const now = new Date();
+  let   year = now.getFullYear();
+  if (mon < now.getMonth() || (mon === now.getMonth() && day < now.getDate() - 1)) year += 1;
+  const d = new Date(year, mon, day);
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
 const BookingScreen = {
 
   renderBookings() {
@@ -155,19 +172,51 @@ const BookingScreen = {
     AppState.ui.modifySlot = time;
   },
 
-  saveModify() {
-    AppState.confirmedBooking.date = AppState.ui.modifyDate;
-    AppState.confirmedBooking.slot = AppState.ui.modifySlot;
-    _setText('manage-date', AppState.ui.modifyDate);
-    _setText('manage-time', AppState.ui.modifySlot);
-    _setText('manage-slot-label', AppState.ui.modifySlot);
-    this.closeModify();
-    UI.toast('✅ Booking updated!');
+  async saveModify() {
+    const ref = AppState.confirmedBooking?.id;
+    if (!ref) { UI.toast('⚠️ No booking selected'); return; }
+
+    const iso = _modifyDateToIso(AppState.ui.modifyDate);
+    try {
+      const r = await fetch(`/api/bookings/${encodeURIComponent(ref)}/reschedule`, {
+        method:  'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (Auth.getToken() || '') },
+        body:    JSON.stringify({ slot_date: iso, slot_time: AppState.ui.modifySlot }),
+      });
+      const j = await r.json();
+      if (!r.ok || !j.success) throw new Error(j.error || 'Reschedule failed');
+
+      AppState.confirmedBooking.date = AppState.ui.modifyDate;
+      AppState.confirmedBooking.slot = AppState.ui.modifySlot;
+      _setText('manage-date', AppState.ui.modifyDate);
+      _setText('manage-time', AppState.ui.modifySlot);
+      _setText('manage-slot-label', AppState.ui.modifySlot);
+      this.closeModify();
+      UI.toast('✅ Booking updated!');
+      if (typeof UserData !== 'undefined') UserData.loadBookings();
+    } catch (e) {
+      UI.toast('❌ ' + e.message);
+    }
   },
 
-  cancelBooking() {
-    if (confirm('Cancel this booking?\nFull refund in 3–5 working days.')) {
+  async cancelBooking() {
+    const ref = AppState.confirmedBooking?.id;
+    if (!ref) { UI.toast('⚠️ No booking selected'); return; }
+    if (!confirm('Cancel this booking?\nFull refund in 3–5 working days.')) return;
+
+    try {
+      const r = await fetch(`/api/bookings/${encodeURIComponent(ref)}/cancel`, {
+        method:  'POST',
+        headers: { Authorization: 'Bearer ' + (Auth.getToken() || '') },
+      });
+      const j = await r.json();
+      if (!r.ok || !j.success) throw new Error(j.error || 'Cancel failed');
+      AppState.confirmedBooking = { id: null, status: 'cancelled' };
       UI.toast('❌ Booking cancelled. Refund initiated.');
+      if (typeof UserData !== 'undefined') await UserData.loadBookings();
+      this.renderBookings();
+    } catch (e) {
+      UI.toast('❌ ' + e.message);
     }
   },
 

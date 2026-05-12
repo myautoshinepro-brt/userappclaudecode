@@ -163,62 +163,10 @@ const PACKAGES = {
   ],
 };
 
-const PROMO_CODES = [
-  {
-    code: 'SPARKFIRST10',
-    discount: 10, type: 'percent',
-    title: '10% off your first wash',
-    desc: 'For first-time SparkWash users only.',
-    applicable: true,
-    reason: '✓ You are eligible',
-    notApplicableReason: null,
-  },
-  {
-    code: 'WASH20',
-    discount: 20, type: 'percent',
-    title: '20% off water wash',
-    desc: 'Valid on Water Wash packages only.',
-    applicable: true,
-    reason: '✓ Valid for your wash type',
-    notApplicableReason: null,
-  },
-  {
-    code: 'MUMBAI30',
-    discount: 30, type: 'flat',
-    title: '₹30 off — Mumbai launch offer',
-    desc: 'Special launch offer for all Mumbai users.',
-    applicable: true,
-    reason: '✓ You are in Mumbai',
-    notApplicableReason: null,
-  },
-  {
-    code: 'STEAM15',
-    discount: 15, type: 'percent',
-    title: '15% off steam wash',
-    desc: 'Valid on Steam Wash packages only.',
-    applicable: false,
-    reason: null,
-    notApplicableReason: '✗ Not valid for Water Wash',
-  },
-  {
-    code: 'WEEKEND50',
-    discount: 50, type: 'flat',
-    title: '₹50 off on weekends',
-    desc: 'Valid on Saturday & Sunday only.',
-    applicable: false,
-    reason: null,
-    notApplicableReason: '✗ Valid on weekends only',
-  },
-  {
-    code: 'NEWUSER100',
-    discount: 100, type: 'flat',
-    title: '₹100 off for new users',
-    desc: 'Minimum booking value ₹500 required.',
-    applicable: false,
-    reason: null,
-    notApplicableReason: '✗ Min booking ₹500 required',
-  },
-];
+// Loaded from GET /api/promos on boot (see UserData.loadPromos).
+// Server returns only currently-active, non-expired promos — they're all
+// flagged applicable: true here. Min-order check happens server-side on booking.
+let PROMO_CODES = [];
 
 // Loaded from GET /api/profile/addresses on login (see index.html).
 let SAVED_ADDRESSES = [];
