@@ -1760,13 +1760,17 @@ const NotificationsScreen = {
     const n = NOTIFICATIONS.find(x => x.id === id);
     if (!n) return;
     n.read = true;
+    if (typeof AdminData !== 'undefined') AdminData.markNotificationRead(id);
     AdminDashboard.render();
     if (n.action) Router.go(n.action);
     else this.render();
   },
 
   markAllRead() {
-    NOTIFICATIONS.forEach(n => n.read = true);
+    NOTIFICATIONS.forEach(n => {
+      n.read = true;
+      if (typeof AdminData !== 'undefined') AdminData.markNotificationRead(n.id);
+    });
     UI.toast('✅ All notifications marked as read');
     AdminDashboard.render();
     this.render();
