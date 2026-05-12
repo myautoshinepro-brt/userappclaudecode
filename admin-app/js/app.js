@@ -14,11 +14,20 @@ const AppState = {
 
 // ── ROUTER ──────────────────────────────────────────────────
 const Router = {
-  go(id) {
+  _history: [],
+
+  go(id, pushHistory = true) {
     // Stop background polling on screens that have it before we leave.
     const prev = AppState.screen;
     if (prev === 'chat'        && id !== 'chat'        && typeof Chat       !== 'undefined' && Chat.destroy)       Chat.destroy();
     if (prev === 'chat-detail' && id !== 'chat-detail' && typeof ChatDetail !== 'undefined' && ChatDetail.destroy) ChatDetail.destroy();
+
+    // Push the screen we're leaving so back() can return to it. Skip auth /
+    // identity screens and avoid pushing the same id twice in a row.
+    if (pushHistory && prev && prev !== id && prev !== 'login') {
+      this._history.push(prev);
+      if (this._history.length > 30) this._history.shift();
+    }
 
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('on'));
     const sc = document.getElementById('sc-' + id);
@@ -43,6 +52,18 @@ const Router = {
     if (id === 'settlements')     SettlementsScreen.render();
     if (id === 'applications')    ApplicationsScreen.render();
     if (id === 'booking-detail')  BookingDetail.render();
+  },
+
+  // Return to whichever screen we came from. Falls back to dashboard.
+  back() {
+    while (this._history.length) {
+      const prev = this._history.pop();
+      if (prev && prev !== AppState.screen) {
+        this.go(prev, false);
+        return;
+      }
+    }
+    this.go('dashboard', false);
   },
 
   _nav(id) {

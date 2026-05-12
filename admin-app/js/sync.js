@@ -387,6 +387,49 @@ const AdminData = (() => {
       });
   }
 
+  // Build the platform-wide History feed from real bookings. Each booking yields
+  // up to 3 entries: created, status change (if not still 'new'), and review.
+  // Capped server-side by ALL_BOOKINGS itself (500 rows).
+  function _derivePlatformHistory(bookings, centers) {
+    const centerName = id => (centers.find(c => c.id === id)?.name) || '';
+    const out = [];
+    for (const b of bookings) {
+      const ctr = centerName(b.centerId);
+      out.push({
+        id:      'created-' + b.id,
+        ts:      b.createdAt,
+        source:  'user',
+        actor:   b.customer,
+        centerId: b.centerId,
+        action:  'Booking created',
+        detail:  `${b.id} · ${ctr} · ${WASH_LABELS[b.type]?.label || b.type} · ₹${b.price} · ${b.slot}`,
+      });
+      if (b.status === 'done' || b.status === 'cancelled') {
+        out.push({
+          id:       'status-' + b.id + '-' + b.status,
+          ts:       b.updatedAt,
+          source:   b.status === 'cancelled' ? 'user' : 'center',
+          actor:    b.status === 'cancelled' ? b.customer : (ctr || 'Center'),
+          centerId: b.centerId,
+          action:   b.status === 'done' ? 'Booking completed' : 'Booking cancelled',
+          detail:   `${b.id} · ${b.customer} · ₹${b.price}`,
+        });
+      }
+      if (b.rating) {
+        out.push({
+          id:       'review-' + b.id,
+          ts:       b.updatedAt,
+          source:   'user',
+          actor:    b.customer,
+          centerId: b.centerId,
+          action:   'Rating submitted',
+          detail:   `${b.id} · ${b.rating}★${b.reviewComment ? ' — "' + b.reviewComment.slice(0, 80) + (b.reviewComment.length > 80 ? '…"' : '"') : ''}`,
+        });
+      }
+    }
+    return out.sort((a, b) => b.ts - a.ts);
+  }
+
   // Last 8 bookings, with read state persisted in localStorage.
   function _deriveNotifications(bookings, centers) {
     const READ_KEY = 'sw_notif_read';
@@ -437,6 +480,7 @@ const AdminData = (() => {
       const settlements   = _deriveSettlements(bookings, centers);
       const activity      = _deriveActivity(bookings, centers);
       const notifications = _deriveNotifications(bookings, centers);
+      const platformHist  = _derivePlatformHistory(bookings, centers);
 
       // Replace globals in place — they're declared with `let` / `const` in
       // data.js but the array references are shared, so we splice the new
@@ -450,6 +494,7 @@ const AdminData = (() => {
       // ACTIVITY_FEED is declared const in data.js but still an array — splice works.
       ACTIVITY_FEED.length  = 0; activity.forEach(a      => ACTIVITY_FEED.push(a));
       PROMO_CODES.length    = 0; promos.forEach(p        => PROMO_CODES.push(p));
+      PLATFORM_HISTORY.length = 0; platformHist.forEach(h => PLATFORM_HISTORY.push(h));
 
       console.log(
         `✅ AdminData loaded: ${centers.length} centers, ${bookings.length} bookings, ` +
@@ -466,6 +511,10 @@ const AdminData = (() => {
       else if (s === 'settlements')      SettlementsScreen.render();
       else if (s === 'notifications')    NotificationsScreen.render();
       else if (s === 'super')            SuperAdmin.render();
+      else if (s === 'history' && typeof HistoryScreen !== 'undefined') {
+        HistoryScreen._bust && HistoryScreen._bust();
+        HistoryScreen.render();
+      }
     } catch (e) {
       console.error('AdminData.loadAll failed:', e);
       UI?.toast?.('⚠️ Could not load live data — showing demo');

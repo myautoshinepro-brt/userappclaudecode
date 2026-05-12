@@ -193,7 +193,7 @@
 <div class="screen" id="sc-center-detail">
   <div class="cd-header">
     <div class="flex-b" style="margin-bottom:8px">
-      <button class="topbar-back" onclick="Router.go('centers')">← Back</button>
+      <button class="topbar-back" onclick="Router.back()">← Back</button>
       <div></div>
     </div>
     <div class="bold" style="font-size:17px;color:#fff" id="cd-name"></div>
@@ -229,7 +229,7 @@
 ═══════════════════════════════════════════ -->
 <div class="screen" id="sc-history">
   <div class="topbar" style="background:var(--navy)">
-    <button class="topbar-back" onclick="Router.go('dashboard')">← Back</button>
+    <button class="topbar-back" onclick="Router.back()">← Back</button>
     <div>
       <div class="topbar-title">📜 Platform History</div>
       <div class="topbar-sub" id="hist-count"></div>
@@ -307,7 +307,7 @@
 ═══════════════════════════════════════════ -->
 <div class="screen" id="sc-booking-detail">
   <div class="topbar">
-    <button class="topbar-icon" onclick="Router.go('bookings')">←</button>
+    <button class="topbar-icon" onclick="Router.back()">←</button>
     <div style="flex:1">
       <div class="topbar-title" id="bd-title">Booking</div>
       <div class="topbar-sub"   id="bd-sub"></div>
@@ -356,7 +356,7 @@
 <div class="screen" id="sc-chat-detail">
   <div class="topbar">
     <div>
-      <button class="topbar-back" onclick="Router.go('chat')">← Back</button>
+      <button class="topbar-back" onclick="Router.back()">← Back</button>
       <div class="topbar-title" id="cd-thread-name"></div>
       <div class="topbar-sub" id="cd-thread-sub"></div>
     </div>
@@ -376,7 +376,7 @@
 ═══════════════════════════════════════════ -->
 <div class="screen" id="sc-reports">
   <div class="topbar">
-    <button class="topbar-back" onclick="Router.go('dashboard')">← Back</button>
+    <button class="topbar-back" onclick="Router.back()">← Back</button>
     <div class="topbar-title">📊 Reports</div>
     <button class="btn btn-sm btn-ghost" style="font-size:10px;padding:4px 9px" onclick="AdminReports.exportCSV()">📥 CSV</button>
   </div>
@@ -470,7 +470,7 @@
 ═══════════════════════════════════════════ -->
 <div class="screen" id="sc-notifications">
   <div class="topbar">
-    <button class="topbar-back" onclick="Router.go('dashboard')">← Back</button>
+    <button class="topbar-back" onclick="Router.back()">← Back</button>
     <div>
       <div class="topbar-title">🔔 Notifications</div>
       <div class="topbar-sub" id="notif-sub"></div>
@@ -495,7 +495,7 @@
 ═══════════════════════════════════════════ -->
 <div class="screen" id="sc-profile">
   <div class="topbar">
-    <button class="topbar-back" onclick="Router.go('dashboard')">← Back</button>
+    <button class="topbar-back" onclick="Router.back()">← Back</button>
     <div class="topbar-title">👤 My Profile</div>
     <div></div>
   </div>
@@ -543,7 +543,7 @@
 ═══════════════════════════════════════════ -->
 <div class="screen" id="sc-customers">
   <div class="topbar">
-    <button class="topbar-back" onclick="Router.go('bookings')">← Back</button>
+    <button class="topbar-back" onclick="Router.back()">← Back</button>
     <div>
       <div class="topbar-title">👥 Customers</div>
       <div class="topbar-sub" id="cust-count"></div>
@@ -570,7 +570,7 @@
 <div class="screen" id="sc-customer-detail">
   <div class="cd-header">
     <div style="margin-bottom:10px">
-      <button class="topbar-back" onclick="Router.go('customers')">← Back</button>
+      <button class="topbar-back" onclick="Router.back()">← Back</button>
     </div>
     <div style="display:flex;align-items:center;gap:12px">
       <div id="custd-avatar" style="width:52px;height:52px;border-radius:50%;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:#fff;flex-shrink:0;border:2px solid rgba(255,255,255,.3)"></div>
@@ -603,7 +603,7 @@
 ═══════════════════════════════════════════ -->
 <div class="screen" id="sc-settlements">
   <div class="topbar" style="background:linear-gradient(135deg,#0369a1,#0284c7)">
-    <button class="topbar-back" onclick="Router.go('super')">← Back</button>
+    <button class="topbar-back" onclick="Router.back()">← Back</button>
     <div>
       <div class="topbar-title">💸 Settlements</div>
       <div class="topbar-sub" id="settle-sub">SparkWash promo payouts to centers</div>
@@ -628,7 +628,7 @@
 ═══════════════════════════════════════════ -->
 <div class="screen" id="sc-applications">
   <div class="topbar" style="background:linear-gradient(135deg,#065f46,#059669)">
-    <button class="topbar-back" onclick="Router.go('super')">← Back</button>
+    <button class="topbar-back" onclick="Router.back()">← Back</button>
     <div>
       <div class="topbar-title">🏪 Center Applications</div>
       <div class="topbar-sub" id="apps-sub">New onboarding requests</div>

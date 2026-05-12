@@ -154,68 +154,20 @@ let CENTER_BLOCKED_SLOTS = {
   c4: { water:[], dry:[], steam:[], d2d:[] },
 };
 
-// ── SEEDED AUDIT LOG (pre-existing history) ──────────────────
-// Live entries are stored in localStorage (key: sw_audit_log).
-// This seed is merged in on first load.
-const AUDIT_SEED = [
-  { id:'seed1', centerId:'c1', centerName:'Shine Auto Wash',  actor:'admin',  actorName:'Rajiv Sharma',    actorRole:'Admin',        action:'Package price updated',  detail:'💧 Exterior Wash: ₹179 → ₹199',                 ts: Date.now() - 7200000 },
-  { id:'seed2', centerId:'c1', centerName:'Shine Auto Wash',  actor:'center', actorName:'Ramesh Patil',    actorRole:'Center Admin',  action:'Booking status updated', detail:'#SW20509 marked Completed',                      ts: Date.now() - 5400000 },
-  { id:'seed3', centerId:'c2', centerName:'SparkWash Bandra', actor:'admin',  actorName:'Rajiv Sharma',    actorRole:'Admin',        action:'Slot blocked',           detail:'💧 Water Wash · 2:00 PM and 2:30 PM',            ts: Date.now() - 4800000 },
-  { id:'seed4', centerId:'c3', centerName:'CleanRide Powai',  actor:'center', actorName:'Sunita Joshi',    actorRole:'Center Admin',  action:'Center closed',          detail:'Center marked Closed by owner',                  ts: Date.now() - 3600000 },
-  { id:'seed5', centerId:'c4', centerName:'QuickWash Thane',  actor:'admin',  actorName:'Rajiv Sharma',    actorRole:'Admin',        action:'Package enabled',        detail:'💨 Steam + Polish & Wax: Enabled',               ts: Date.now() - 2700000 },
-  { id:'seed6', centerId:'c1', centerName:'Shine Auto Wash',  actor:'center', actorName:'Ramesh Patil',    actorRole:'Center Admin',  action:'Slot blocked',           detail:'🧴 Dry Wash · 3:00 PM blocked',                  ts: Date.now() - 1800000 },
-  { id:'seed7', centerId:'c2', centerName:'SparkWash Bandra', actor:'admin',  actorName:'Arjun Mehta',     actorRole:'Super Admin',   action:'Package price updated',  detail:'💨 Full Steam Wash: ₹549 → ₹599',               ts: Date.now() - 1200000 },
-  { id:'seed8', centerId:'c4', centerName:'QuickWash Thane',  actor:'center', actorName:'Deepak Rao',      actorRole:'Center Admin',  action:'Booking status updated', detail:'#SW20803 Arrived → In Progress (Wash started)',  ts: Date.now() - 600000  },
-];
+// AUDIT_SEED was a demo array of fake admin actions. The real audit log lives
+// in localStorage (key: sw_audit_log) and is appended to by logChange() as the
+// admin performs real actions. Keeping the seed empty means the History page
+// shows only real activity.
+const AUDIT_SEED = [];
 
 // Loaded by AdminData.loadAll() on login.
 const ACTIVITY_FEED = [];
 
-// ── PLATFORM-WIDE HISTORY (all apps) ────────────────────────
-// source: 'user' | 'center' | 'admin' | 'superadmin'
-const _h = 3600000, _d = 86400000, _now = Date.now();
-const PLATFORM_HISTORY = [
-  { id:'ph1',  ts:_now- 5*60000,    source:'user',       actor:'Divya Singh',     centerId:'c4', action:'Booking created',          detail:'#SW20810 · QuickWash Thane · Dry Wash · ₹249 · 10:30 AM' },
-  { id:'ph2',  ts:_now-18*60000,    source:'user',       actor:'Vishal Tiwari',   centerId:'c4', action:'Rating submitted',          detail:'#SW20809 · 5★ — "Excellent service, very fast!"' },
-  { id:'ph3',  ts:_now-42*60000,    source:'center',     actor:'QuickWash Thane', centerId:'c4', action:'Booking status updated',    detail:'#SW20808 → In Progress · Kiran Mehta · Steam Wash' },
-  { id:'ph4',  ts:_now- 1.2*_h,    source:'user',       actor:'Rahul Kumar',     centerId:'c2', action:'Booking cancelled',         detail:'#SW20807 · SparkWash Bandra · Water Wash · ₹199' },
-  { id:'ph5',  ts:_now- 1.8*_h,    source:'center',     actor:'Shine Auto Wash', centerId:'c1', action:'Package price updated',     detail:'💧 Water Wash · Premium Wash: ₹349 → ₹299' },
-  { id:'ph6',  ts:_now- 2.5*_h,    source:'admin',      actor:'Rajiv Sharma',    centerId:'c1', action:'Booking rescheduled',       detail:'#SW20805 · Slot: 11:00 AM → 12:30 PM · Admin override' },
-  { id:'ph7',  ts:_now- 3.1*_h,    source:'user',       actor:'Meera Pillai',    centerId:'c4', action:'Booking created',          detail:'#SW20806 · QuickWash Thane · Steam Wash · ₹549 · 2:00 PM' },
-  { id:'ph8',  ts:_now- 4.0*_h,    source:'superadmin', actor:'Arjun Mehta',     centerId:'c3', action:'Center visibility changed', detail:'CleanRide Powai hidden from customer app' },
-  { id:'ph9',  ts:_now- 4.5*_h,    source:'center',     actor:'SparkWash Bandra',centerId:'c2', action:'Slot blocked',             detail:'💧 Water Wash · 3:00 PM blocked for maintenance' },
-  { id:'ph10', ts:_now- 5.2*_h,    source:'user',       actor:'Ritu Sharma',     centerId:'c1', action:'Profile updated',          detail:'Phone number updated to +91 98100 55123' },
-  { id:'ph11', ts:_now- 6.0*_h,    source:'center',     actor:'CleanRide Powai', centerId:'c3', action:'Center closed',            detail:'Marked closed at 6:00 PM · Owner: Sunita Joshi' },
-  { id:'ph12', ts:_now- 7.5*_h,    source:'superadmin', actor:'Arjun Mehta',     centerId:null, action:'Promo code created',       detail:'MONSOON30 · 30% off · Min ₹299 · Expires 30 Jun' },
-  { id:'ph13', ts:_now- 8.0*_h,    source:'admin',      actor:'Sneha Kulkarni',  centerId:'c3', action:'Package added',            detail:'🧴 Dry Wash · Interior Vacuum added at ₹199' },
-  { id:'ph14', ts:_now- 9.0*_h,    source:'user',       actor:'Kavya Menon',     centerId:'c2', action:'Rating submitted',         detail:'#SW20801 · 4★ — "Good but took longer than expected"' },
-  { id:'ph15', ts:_now-10.0*_h,    source:'center',     actor:'QuickWash Thane', centerId:'c4', action:'Wash type enabled',        detail:'🚗 Door-to-Door service activated' },
-  { id:'ph16', ts:_now-12.0*_h,    source:'user',       actor:'Ankit Desai',     centerId:'c1', action:'Booking created',         detail:'#SW20800 · Shine Auto Wash · Steam Wash · ₹699 · 9:00 AM' },
-  { id:'ph17', ts:_now-14.0*_h,    source:'admin',      actor:'Rajiv Sharma',    centerId:'c2', action:'Center open/close',        detail:'SparkWash Bandra marked Open · Admin override' },
-  { id:'ph18', ts:_now-16.0*_h,    source:'superadmin', actor:'Arjun Mehta',     centerId:'c1', action:'Display order changed',    detail:'Shine Auto Wash moved to position #1 in customer app' },
-  { id:'ph19', ts:_now- 1*_d,      source:'user',       actor:'Pooja Rao',       centerId:'c4', action:'Booking created',         detail:'#SW20799 · QuickWash Thane · Water Wash · ₹199 · 11:00 AM' },
-  { id:'ph20', ts:_now- 1*_d- 2*_h,source:'center',     actor:'Shine Auto Wash', centerId:'c1', action:'Slot unblocked',          detail:'💧 Water Wash · 1:00 PM slot unblocked' },
-  { id:'ph21', ts:_now- 1*_d- 4*_h,source:'user',       actor:'Suresh Nair',     centerId:'c1', action:'Booking cancelled',       detail:'#SW20798 · Shine Auto Wash · Dry Wash · ₹349' },
-  { id:'ph22', ts:_now- 1*_d- 5*_h,source:'admin',      actor:'Sneha Kulkarni',  centerId:'c4', action:'Wash type updated',       detail:'🚗 Door-to-Door enabled for QuickWash Thane' },
-  { id:'ph23', ts:_now- 2*_d,      source:'user',       actor:'Farida Sheikh',   centerId:'c2', action:'Booking created',         detail:'#SW20797 · SparkWash Bandra · Steam Wash · ₹499 · 3:30 PM' },
-  { id:'ph24', ts:_now- 2*_d- 1*_h,source:'center',     actor:'SparkWash Bandra',centerId:'c2', action:'Booking status updated',  detail:'#SW20797 → Completed · Farida Sheikh · ₹499 collected' },
-  { id:'ph25', ts:_now- 2*_d- 3*_h,source:'superadmin', actor:'Arjun Mehta',     centerId:null, action:'Promo deactivated',       detail:'LAUNCH50 deactivated · 89/100 uses reached' },
-  { id:'ph26', ts:_now- 2*_d- 6*_h,source:'user',       actor:'Nikhil Gupta',    centerId:'c3', action:'Rating submitted',        detail:'#SW20796 · 3★ — "Center was closed when I arrived"' },
-  { id:'ph27', ts:_now- 3*_d,      source:'center',     actor:'CleanRide Powai', centerId:'c3', action:'Package price updated',   detail:'💧 Water Wash · Basic Wash: ₹149 → ₹179' },
-  { id:'ph28', ts:_now- 3*_d- 2*_h,source:'admin',      actor:'Rajiv Sharma',    centerId:'c1', action:'Package updated',         detail:'💧 Exterior Wash: duration 25–30 min → 20–25 min' },
-  { id:'ph29', ts:_now- 3*_d- 4*_h,source:'user',       actor:'Priya Sharma',    centerId:'c1', action:'Booking created',         detail:'#SW20795 · Shine Auto Wash · Water Wash · ₹199 · 10:00 AM' },
-  { id:'ph30', ts:_now- 4*_d,      source:'superadmin', actor:'Arjun Mehta',     centerId:null, action:'Admin account updated',   detail:'Sneha Kulkarni assigned to centers c3, c4' },
-  { id:'ph31', ts:_now- 4*_d- 3*_h,source:'center',     actor:'QuickWash Thane', centerId:'c4', action:'Center opened',           detail:'Marked open at 8:30 AM · Owner: Deepak Rao' },
-  { id:'ph32', ts:_now- 4*_d- 5*_h,source:'user',       actor:'Amit Joshi',      centerId:'c4', action:'Booking created',        detail:'#SW20793 · QuickWash Thane · Door-to-Door · ₹799 · 11:30 AM' },
-  { id:'ph33', ts:_now- 5*_d,      source:'admin',      actor:'Sneha Kulkarni',  centerId:'c3', action:'Booking reassigned',      detail:'#SW20791 · Center: CleanRide Powai → SparkWash Bandra' },
-  { id:'ph34', ts:_now- 5*_d- 2*_h,source:'superadmin', actor:'Arjun Mehta',     centerId:null, action:'City activated',          detail:'Thane city activated · Service expanded to Thane West' },
-  { id:'ph35', ts:_now- 5*_d- 4*_h,source:'user',       actor:'Lakshmi Iyer',    centerId:'c2', action:'Rating submitted',        detail:'#SW20790 · 5★ — "Best car wash in Bandra, highly recommend!"' },
-  { id:'ph36', ts:_now- 6*_d,      source:'center',     actor:'Shine Auto Wash', centerId:'c1', action:'Wash type enabled',       detail:'🚗 Door-to-Door service activated · New service area' },
-  { id:'ph37', ts:_now- 6*_d- 3*_h,source:'user',       actor:'Rajan Verma',     centerId:'c1', action:'Booking created',        detail:'#SW20788 · Shine Auto Wash · Door-to-Door · ₹999 · 2:00 PM' },
-  { id:'ph38', ts:_now- 6*_d- 5*_h,source:'admin',      actor:'Rajiv Sharma',    centerId:'c2', action:'Booking updated',        detail:'#SW20787 · Price: ₹499 → ₹449 · Admin discount applied' },
-  { id:'ph39', ts:_now- 7*_d,      source:'superadmin', actor:'Arjun Mehta',     centerId:null, action:'Platform launched',       detail:'SparkWash Admin v1.0 live · All 4 centers onboarded' },
-  { id:'ph40', ts:_now- 7*_d- 1*_h,source:'center',     actor:'QuickWash Thane', centerId:'c4', action:'Center registered',      detail:'Onboarding complete · 4 wash types enabled · 12 slots live' },
-];
+// ── PLATFORM-WIDE HISTORY ───────────────────────────────────
+// Populated by AdminData.loadAll() from real bookings' creation + status
+// changes. Local admin actions from this session are merged in via
+// getAuditLog() (see HistoryScreen). source: 'user' | 'center' | 'admin' | 'superadmin'.
+let PLATFORM_HISTORY = [];
 
 // Revenue access requests: { id, adminId, adminName, centerId, centerName, status, requestedAt }
 let REVENUE_REQUESTS = [];

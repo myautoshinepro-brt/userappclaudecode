@@ -239,11 +239,11 @@ const CenterDetail = {
         const sm = STATUS_META[b.status];
         const wl = WASH_LABELS[b.type];
         return `
-          <div class="bk-card">
+          <div class="bk-card" style="cursor:pointer" onclick="AdminBookings.openDetail('${b.id}')">
             <div class="flex-b" style="margin-bottom:5px">
               <div>
-                <div class="bold text-xs">${b.customer} <span class="text-muted">${b.id}</span></div>
-                <div style="font-size:10px;color:var(--muted)">${b.vehicle} · ${b.model}</div>
+                <div class="bold text-xs">${b.customer} <span class="text-muted" style="color:var(--primary);text-decoration:underline">${b.id}</span></div>
+                <div style="font-size:10px;color:var(--muted)">${Privacy.phone(b.phone, 'cd-' + b.id)} · ${b.vehicle} · ${b.model}</div>
               </div>
               <span class="badge ${sm.cls}">${sm.icon} ${sm.label}</span>
             </div>
@@ -252,7 +252,7 @@ const CenterDetail = {
               <span class="text-xs text-muted">🕐 ${b.slot}</span>
               <span class="text-xs bold text-primary">₹${b.price}</span>
             </div>
-            <div style="display:flex;gap:6px">
+            <div style="display:flex;gap:6px" onclick="event.stopPropagation()">
               <button class="btn btn-sm btn-primary" style="flex:1" onclick="AdminBookings.openEdit('${b.id}')">✏️ Edit</button>
               <button class="btn btn-sm btn-ghost" onclick="openCall('${b.customer}','${b.phone}','${b.id}')">📞</button>
               <button class="btn btn-sm btn-ghost" onclick="AdminBookings.openChatWithCustomer('${b.id}')">💬</button>
