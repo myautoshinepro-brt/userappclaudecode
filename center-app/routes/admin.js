@@ -61,4 +61,12 @@ router.get('/centers', adminAuth, (req, res) => {
   res.json({ success: true, data: db.getAllCenters() });
 });
 
+// GET /api/admin/bookings?date=YYYY-MM-DD&status=&center_id=
+router.get('/bookings', adminAuth, (req, res) => {
+  const date      = req.query.date      || null;
+  const status    = req.query.status    || null;
+  const centerId  = req.query.center_id ? parseInt(req.query.center_id, 10) : null;
+  res.json({ success: true, data: db.getAllBookings({ date, status, center_id: centerId }) });
+});
+
 module.exports = router;

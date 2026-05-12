@@ -719,6 +719,24 @@ module.exports = {
   getAllCenters() {
     return db.prepare(`SELECT id, name, owner_name, mobile, email, address, city, gstin, wash_types, open_time, close_time, is_open, lat, lng, created_at FROM centers ORDER BY created_at DESC`).all();
   },
+  // Admin: all bookings across all centers, joined with the center name.
+  // Optional filters: date (YYYY-MM-DD), status, center_id.
+  getAllBookings({ date, status, center_id } = {}) {
+    const where = [];
+    const args  = [];
+    if (date)      { where.push('b.slot_date = ?'); args.push(date); }
+    if (status)    { where.push('b.status = ?');    args.push(status); }
+    if (center_id) { where.push('b.center_id = ?'); args.push(center_id); }
+    const sql = `
+      SELECT b.*, c.name AS center_name
+      FROM bookings b
+      JOIN centers c ON c.id = b.center_id
+      ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
+      ORDER BY b.slot_date DESC, b.slot_time DESC
+      LIMIT 500
+    `;
+    return db.prepare(sql).all(...args);
+  },
   getMinPackagePrice(centerId) {
     const row = db.prepare("SELECT MIN(price) AS p FROM packages WHERE center_id=? AND is_active=1").get(centerId);
     return row && row.p != null ? row.p : null;

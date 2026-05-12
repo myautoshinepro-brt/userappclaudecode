@@ -110,6 +110,10 @@ function login(role) {
   _seedAuditLog();
   _loadRevenueRequests();
   Router.go('dashboard');
+
+  // Pull real centers + bookings from center-app (replaces demo arrays in place).
+  // Runs async — the dashboard will re-render once data lands.
+  if (typeof AdminData !== 'undefined') AdminData.loadAll();
 }
 
 // ── AUDIT LOG ────────────────────────────────────────────────
