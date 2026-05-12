@@ -158,6 +158,62 @@ const AdminData = (() => {
     return _patch(`/api/admin/centers/${dbCenterId}`, fields);
   }
 
+  // ── SETTLEMENTS ──
+  function _mapSettlement(s) {
+    return {
+      id:           's' + s.id,
+      _dbId:        s.id,
+      bookingId:    s.booking_id,
+      bookingRef:   s.booking_ref,
+      centerId:     'c' + s.center_id,
+      _dbCenterId:  s.center_id,
+      centerName:   s.center_name,
+      customer:     s.customer_name,
+      washType:     s.wash_type,
+      packageName:  s.package_name,
+      packagePrice: s.package_price,
+      appDiscount:  s.amount,
+      washDate:     s.slot_date,
+      status:       s.status,
+      settledAt:    s.settled_at ? Date.parse(String(s.settled_at).replace(' ', 'T') + 'Z') : null,
+      creditedOn:   s.credited_on || null,
+    };
+  }
+  async function fetchSettlements() {
+    const r = await fetch(`${CENTER_APP_URL}/api/admin/settlements`, { headers: _headers() });
+    if (!r.ok) throw new Error('settlements HTTP ' + r.status);
+    const j = await r.json();
+    return (j.data || []).map(_mapSettlement);
+  }
+  async function settleCenter(dbCenterId, creditedOn) {
+    const r = await fetch(`${CENTER_APP_URL}/api/admin/settlements/${dbCenterId}/settle`, {
+      method:  'POST',
+      headers: { ..._headers(), 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ credited_on: creditedOn }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.success) throw new Error(j.error || `HTTP ${r.status}`);
+    return j;
+  }
+
+  // ── AUDIT LOG ──
+  async function postAudit(entry) {
+    try {
+      await fetch(`${CENTER_APP_URL}/api/admin/audit`, {
+        method:  'POST',
+        headers: { ..._headers(), 'Content-Type': 'application/json' },
+        body:    JSON.stringify(entry),
+      });
+    } catch (e) { console.warn('audit post failed:', e.message); }
+  }
+  async function fetchAuditLog(params = {}) {
+    const q = new URLSearchParams(params).toString();
+    const r = await fetch(`${CENTER_APP_URL}/api/admin/audit${q ? '?' + q : ''}`, { headers: _headers() });
+    if (!r.ok) throw new Error('audit HTTP ' + r.status);
+    const j = await r.json();
+    return j.data || [];
+  }
+
   // ── CHAT ──
   // Map DB shape → admin-app shape. The dashboard reads `unread` (not `unread_admin`)
   // so we alias it here. We also keep the raw fields available.
@@ -468,16 +524,22 @@ const AdminData = (() => {
   // Load both, replace the globals in place, and re-render the current screen.
   async function loadAll() {
     try {
-      const [centers, bookings, promos, _chat] = await Promise.all([
+      const [centers, bookings, promos, _chat, settlementsLive] = await Promise.all([
         _fetchCenters(),
         _fetchBookings(),
         _fetchPromos().catch(e => { console.warn('promos fetch failed:', e.message); return []; }),
         fetchChatThreads().catch(e => { console.warn('chat fetch failed:', e.message); return []; }),
+        fetchSettlements().catch(e => { console.warn('settlements fetch failed:', e.message); return []; }),
       ]);
       _hydrateCenterStats(centers, bookings);
 
       const reviews       = _deriveReviews(bookings);
-      const settlements   = _deriveSettlements(bookings, centers);
+      // Prefer the live settlements table from the server. Fall back to the
+      // derive-from-bookings path for older deploys where settlements have
+      // not yet been generated.
+      const settlements   = settlementsLive.length
+        ? settlementsLive
+        : _deriveSettlements(bookings, centers);
       const activity      = _deriveActivity(bookings, centers);
       const notifications = _deriveNotifications(bookings, centers);
       const platformHist  = _derivePlatformHistory(bookings, centers);
@@ -537,6 +599,8 @@ const AdminData = (() => {
     fetchChatThreads, fetchChatMessages, sendChatReply, markChatThreadRead,
     fetchCenterPackages, createCenterPackage, updateCenterPackage, deleteCenterPackage,
     patchCenterInfo,
+    fetchSettlements, settleCenter,
+    postAudit, fetchAuditLog,
   };
 
 })();

@@ -1602,25 +1602,32 @@ const SuperAdmin = {
     setHtml('sa-settlements', (centerSummary || '<div style="padding:12px 13px;font-size:12px;color:var(--green)">✅ All settlements up to date</div>') + (histRows ? `<div style="padding:7px 13px 5px;font-size:10px;color:var(--muted);font-weight:700">Recent settlements</div>${histRows}` : ''));
   },
 
-  markSettled(centerId) {
+  async markSettled(centerId) {
     const pending = SETTLEMENTS.filter(s => s.centerId === centerId && s.status === 'pending');
     if (!pending.length) return;
     const c = CENTERS.find(x => x.id === centerId);
+    if (!c) return;
     const total = pending.reduce((s, x) => s + x.appDiscount, 0);
     const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
+    const creditIso  = tomorrow.toISOString().slice(0, 10);
     const creditDate = tomorrow.toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' });
-    const bankLine = c?.bankAccount
+    const bankLine = c.bankAccount
       ? `Account: ····${c.bankAccount.slice(-4)}  |  IFSC: ${c.ifsc}\nHolder: ${c.accountName || c.owner}`
       : '⚠️ No bank account on file';
-    const confirmed = confirm(
-      `Confirm settlement for ${c?.name || centerId}?\n\nAmount: ${UI.formatPrice(total)}\n${bankLine}\n\nCredit by ${creditDate}.`
-    );
-    if (!confirmed) return;
-    pending.forEach(s => { s.status = 'settled'; s.settledAt = Date.now(); s.creditedOn = creditDate; });
-    if (c) c.pendingSettlement = 0;
-    logChange(centerId, 'Settlement marked', `${UI.formatPrice(total)} — credit by ${creditDate}`);
-    UI.toast(`✅ ${UI.formatPrice(total)} marked settled · credit by ${creditDate}`);
-    this._renderSettlements();
+    if (!confirm(`Confirm settlement for ${c.name}?\n\nAmount: ${UI.formatPrice(total)}\n${bankLine}\n\nCredit by ${creditDate}.`)) return;
+
+    try {
+      await AdminData.settleCenter(c._dbId, creditIso);
+      // Refresh the live settlements list from the server.
+      const fresh = await AdminData.fetchSettlements();
+      SETTLEMENTS.length = 0; fresh.forEach(s => SETTLEMENTS.push(s));
+      if (c) c.pendingSettlement = 0;
+      logChange(centerId, 'Settlement marked', `${UI.formatPrice(total)} — credit by ${creditDate}`);
+      UI.toast(`✅ ${UI.formatPrice(total)} marked settled · credit by ${creditDate}`);
+      this._renderSettlements();
+    } catch (e) {
+      UI.toast('❌ ' + e.message);
+    }
   },
 
   async _loadAndRenderApplications() {
@@ -2448,33 +2455,33 @@ const SettlementsScreen = {
     setHtml('settle-centers', html);
   },
 
-  markSettled(centerId) {
+  async markSettled(centerId) {
     const pending = SETTLEMENTS.filter(s => s.centerId === centerId && s.status === 'pending');
     if (!pending.length) return;
     const c = CENTERS.find(x => x.id === centerId);
+    if (!c) return;
     const total = pending.reduce((s, x) => s + x.appDiscount, 0);
     const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
+    const creditIso  = tomorrow.toISOString().slice(0, 10);
     const creditDate = tomorrow.toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' });
 
-    const bankLine = c?.bankAccount
+    const bankLine = c.bankAccount
       ? `Account: ····${c.bankAccount.slice(-4)}  |  IFSC: ${c.ifsc}\nHolder: ${c.accountName || c.owner}\nBank: ${c.bankName || '—'}`
       : '⚠️ No bank account on file';
-    const confirmed = confirm(
-      `Confirm settlement for ${c?.name || centerId}?\n\n` +
-      `Amount: ${UI.formatPrice(total)}\n` +
-      `${bankLine}\n\n` +
-      `Amount will be credited by ${creditDate}.`
-    );
-    if (!confirmed) return;
+    if (!confirm(`Confirm settlement for ${c.name}?\n\nAmount: ${UI.formatPrice(total)}\n${bankLine}\n\nAmount will be credited by ${creditDate}.`)) return;
 
-    pending.forEach(s => { s.status = 'settled'; s.settledAt = Date.now(); s.creditedOn = creditDate; });
-    if (c) c.pendingSettlement = 0;
-    logChange(centerId, 'Settlement marked', `${UI.formatPrice(total)} — credit by ${creditDate} to ${c?.bankAccount ? '····' + c.bankAccount.slice(-4) : 'no bank'}`);
-    UI.toast(`✅ ${UI.formatPrice(total)} marked settled · credit by ${creditDate}`);
-    this.render();
-    // Refresh SA panel if visible
-    if (AppState.screen === 'settlements') return;
-    SuperAdmin._renderSettlements?.();
+    try {
+      await AdminData.settleCenter(c._dbId, creditIso);
+      const fresh = await AdminData.fetchSettlements();
+      SETTLEMENTS.length = 0; fresh.forEach(s => SETTLEMENTS.push(s));
+      c.pendingSettlement = 0;
+      logChange(centerId, 'Settlement marked', `${UI.formatPrice(total)} — credit by ${creditDate} to ${c.bankAccount ? '····' + c.bankAccount.slice(-4) : 'no bank'}`);
+      UI.toast(`✅ ${UI.formatPrice(total)} marked settled · credit by ${creditDate}`);
+      this.render();
+      if (AppState.screen !== 'settlements') SuperAdmin._renderSettlements?.();
+    } catch (e) {
+      UI.toast('❌ ' + e.message);
+    }
   },
 };
 

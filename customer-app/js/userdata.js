@@ -52,6 +52,12 @@ const UserData = (() => {
     return `${d.getDate()} ${MONTHS[d.getMonth()]}`;
   }
 
+  function _toEpoch(sqlTs) {
+    if (!sqlTs) return Date.now();
+    const t = Date.parse(String(sqlTs).replace(' ', 'T') + 'Z');
+    return isNaN(t) ? Date.now() : t;
+  }
+
   function _mapBooking(b) {
     const isCancelled = b.status === 'cancelled';
     const isDone      = b.status === 'done';
@@ -74,6 +80,8 @@ const UserData = (() => {
       totalPaid:    isDone ? (b.package_price - (b.app_discount || 0) - (b.center_discount || 0)) : 0,
       rating:       b.rating || null,
       reviewComment: b.review_comment || null,
+      // Real timestamps used by the notifications inbox + booking history.
+      _ts:          _toEpoch(b.updated_at || b.created_at),
     };
   }
 
@@ -111,6 +119,13 @@ const UserData = (() => {
           collectAmount: upcoming.totalPaid,
           status:       upcoming.rawStatus,
         };
+      }
+      // Rebuild the notifications inbox from the fresh booking data.
+      if (typeof NotifState !== 'undefined' && NotifState.rebuildFromData) {
+        NotifState.rebuildFromData();
+        if (typeof NotificationScreen !== 'undefined' && NotificationScreen._updateBadge) {
+          NotificationScreen._updateBadge();
+        }
       }
     } catch (e) { console.warn('loadBookings:', e.message); }
   }

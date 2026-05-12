@@ -193,6 +193,40 @@ db.exec(`
 try { db.exec("ALTER TABLE chat_threads ADD COLUMN admin_last_read_message_id    INTEGER NOT NULL DEFAULT 0"); } catch { /* exists */ }
 try { db.exec("ALTER TABLE chat_threads ADD COLUMN customer_last_read_message_id INTEGER NOT NULL DEFAULT 0"); } catch { /* exists */ }
 
+// ── Settlements ──
+// One row per booking-and-discount that SparkWash owes the center. Pending
+// until super admin marks it settled.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS settlements (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    booking_id    INTEGER NOT NULL REFERENCES bookings(id),
+    center_id     INTEGER NOT NULL REFERENCES centers(id),
+    amount        INTEGER NOT NULL,
+    status        TEXT    NOT NULL DEFAULT 'pending',   -- 'pending' | 'settled'
+    settled_at    TEXT,
+    credited_on   TEXT,                                  -- yyyy-mm-dd
+    notes         TEXT,
+    created_at    TEXT    NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_settlements_status ON settlements(status);
+  CREATE INDEX IF NOT EXISTS idx_settlements_center ON settlements(center_id, status);
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_settlements_booking ON settlements(booking_id);
+`);
+
+// ── Audit log (admin actions across the platform) ──
+db.exec(`
+  CREATE TABLE IF NOT EXISTS audit_log (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    source     TEXT    NOT NULL,        -- 'admin' | 'superadmin' | 'center' | 'customer' | 'system'
+    actor      TEXT,                    -- name / email of who acted
+    center_id  INTEGER,                 -- nullable: not all actions are center-scoped
+    action     TEXT    NOT NULL,
+    detail     TEXT,
+    created_at TEXT    NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_audit_log_ts ON audit_log(id DESC);
+`);
+
 // ── Booking status history ──
 db.exec(`
   CREATE TABLE IF NOT EXISTS booking_status_log (
@@ -643,6 +677,16 @@ module.exports = {
         notes: 'Status changed by center',
       });
     }
+    // When a booking is marked 'done' AND has an app_discount, create a
+    // pending settlement row so super admin can mark it settled later.
+    if (status === 'done' && prev && prev.app_discount > 0) {
+      try {
+        db.prepare(`
+          INSERT OR IGNORE INTO settlements (booking_id, center_id, amount, status)
+          VALUES (?, ?, ?, 'pending')
+        `).run(id, centerId, prev.app_discount);
+      } catch (e) { console.error('settlement insert:', e.message); }
+    }
     return r;
   },
   rejectBooking(id, centerId) {
@@ -848,6 +892,67 @@ module.exports = {
     t();
     return true;
   },
+  // ── SETTLEMENTS ──
+  listSettlements({ status, center_id } = {}) {
+    const where = [];
+    const args  = [];
+    if (status)    { where.push('s.status = ?');    args.push(status); }
+    if (center_id) { where.push('s.center_id = ?'); args.push(center_id); }
+    return db.prepare(`
+      SELECT s.*, b.booking_ref, b.customer_name, b.wash_type, b.package_name,
+             b.package_price, b.slot_date,
+             c.name AS center_name, c.bank_account, c.ifsc, c.account_name, c.bank_name
+      FROM settlements s
+      JOIN bookings b ON b.id = s.booking_id
+      JOIN centers  c ON c.id = s.center_id
+      ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
+      ORDER BY s.id DESC
+      LIMIT 500
+    `).all(...args);
+  },
+  markSettlementsSettled(centerId, creditedOn) {
+    const t = db.transaction(() => {
+      db.prepare(`
+        UPDATE settlements
+        SET status = 'settled',
+            settled_at = datetime('now'),
+            credited_on = ?
+        WHERE center_id = ? AND status = 'pending'
+      `).run(creditedOn || null, centerId);
+    });
+    t();
+    return db.prepare(
+      "SELECT COUNT(*) AS n, COALESCE(SUM(amount),0) AS total FROM settlements WHERE center_id=? AND status='settled' AND credited_on=?"
+    ).get(centerId, creditedOn || null);
+  },
+
+  // ── AUDIT LOG ──
+  appendAuditLog(entry) {
+    db.prepare(`
+      INSERT INTO audit_log (source, actor, center_id, action, detail)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(
+      entry.source || 'admin',
+      entry.actor  || null,
+      entry.center_id || null,
+      entry.action || 'Action',
+      entry.detail || null
+    );
+  },
+  listAuditLog({ source, center_id, limit = 200 } = {}) {
+    const where = [];
+    const args  = [];
+    if (source)    { where.push('source=?');    args.push(source); }
+    if (center_id) { where.push('center_id=?'); args.push(center_id); }
+    return db.prepare(`
+      SELECT id, source, actor, center_id, action, detail, created_at
+      FROM audit_log
+      ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
+      ORDER BY id DESC
+      LIMIT ?
+    `).all(...args, parseInt(limit, 10));
+  },
+
   // Admin: all bookings across all centers, joined with the center name.
   // Optional filters: date (YYYY-MM-DD), status, center_id.
   getAllBookings({ date, status, center_id } = {}) {

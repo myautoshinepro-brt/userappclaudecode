@@ -276,4 +276,43 @@ router.post('/chat/threads/:id/read', adminAuth, (req, res) => {
   res.json({ success: true });
 });
 
+// ── SETTLEMENTS ────────────────────────────────────────────
+// GET /api/admin/settlements?status=pending|settled&center_id=
+router.get('/settlements', adminAuth, (req, res) => {
+  const status   = req.query.status   || null;
+  const centerId = req.query.center_id ? parseInt(req.query.center_id, 10) : null;
+  res.json({ success: true, data: db.listSettlements({ status, center_id: centerId }) });
+});
+
+// POST /api/admin/settlements/:center_id/settle  Body: { credited_on }
+router.post('/settlements/:center_id/settle', adminAuth, (req, res) => {
+  const cid = parseInt(req.params.center_id, 10);
+  if (!cid) return res.status(400).json({ error: 'Invalid center id' });
+  const creditedOn = (req.body || {}).credited_on || new Date().toISOString().slice(0, 10);
+  const summary    = db.markSettlementsSettled(cid, creditedOn);
+  console.log(`💸 Settled ${summary.n} item(s) for center #${cid} (₹${summary.total})`);
+  db.appendAuditLog({
+    source: 'superadmin', actor: 'Super Admin', center_id: cid,
+    action: 'Settlements marked settled',
+    detail: `${summary.n} settlement(s) · ₹${summary.total} · credited on ${creditedOn}`,
+  });
+  res.json({ success: true, settled: summary.n, total: summary.total, credited_on: creditedOn });
+});
+
+// ── AUDIT LOG ──────────────────────────────────────────────
+// GET /api/admin/audit?source=&center_id=&limit=
+router.get('/audit', adminAuth, (req, res) => {
+  res.json({ success: true, data: db.listAuditLog({
+    source: req.query.source, center_id: req.query.center_id, limit: req.query.limit,
+  })});
+});
+
+// POST /api/admin/audit  Body: { source, actor, center_id, action, detail }
+router.post('/audit', adminAuth, (req, res) => {
+  const b = req.body || {};
+  if (!b.action) return res.status(400).json({ error: 'action required' });
+  db.appendAuditLog(b);
+  res.status(201).json({ success: true });
+});
+
 module.exports = router;

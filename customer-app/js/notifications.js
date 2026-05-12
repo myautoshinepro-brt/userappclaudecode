@@ -88,12 +88,55 @@ const NotifState = {
 
   _cloneDefaults() { return JSON.parse(JSON.stringify(NOTIF_SETTINGS_DEFAULT)); },
 
-  _seededInbox() {
-    const now  = Date.now();
-    const seed = JSON.parse(JSON.stringify(NOTIF_INBOX_SEED));
-    const offsets = [2, 8, 60, 180, 26 * 60, 28 * 60]; // minutes ago
-    seed.forEach((n, i) => { n.timestamp = now - offsets[i] * 60 * 1000; });
-    return seed;
+  _seededInbox() { return []; },
+
+  // Rebuild the inbox from real data: each past/upcoming booking yields a
+  // status-appropriate notification, plus one entry per unread chat thread.
+  // Read state is preserved across rebuilds by id.
+  rebuildFromData() {
+    const readIds = new Set(this._inbox.filter(n => n.read).map(n => n.id));
+    const next = [];
+
+    const PAST = (typeof PAST_BOOKINGS !== 'undefined' ? PAST_BOOKINGS : []);
+    for (const b of PAST) {
+      let icon = '✅', iconBg = '#dcfce7', title, body, type = 'booking';
+      if (b.rawStatus === 'done') {
+        icon = '✨'; iconBg = '#fef9c3';
+        title = 'Wash completed';
+        body  = `${b.packageName} at ${b.centerName} · ${b.date}`;
+      } else if (b.rawStatus === 'cancelled') {
+        icon = '❌'; iconBg = '#fee2e2';
+        title = 'Booking cancelled';
+        body  = `${b.id} · ${b.centerName} · refund in 3-5 working days`;
+      } else continue;
+      const id = 'bk-' + b.id;
+      next.push({
+        id, type, icon, iconBg,
+        title, body,
+        timestamp: b._ts || Date.now(),
+        relTime:   '',  // filled by _relTime on render
+        read:      readIds.has(id),
+      });
+    }
+
+    // Upcoming booking — single entry from confirmedBooking when present.
+    const cb = (typeof AppState !== 'undefined') && AppState.confirmedBooking;
+    if (cb && cb.id && cb.status && !['done', 'cancelled'].includes(cb.status)) {
+      const id = 'bk-upcoming-' + cb.id;
+      next.push({
+        id, type: 'booking',
+        icon: '🚗', iconBg: '#dbeafe',
+        title: 'Upcoming wash',
+        body:  `${cb.packageName} at ${cb.centerName} · ${cb.date} · ${cb.slot}`,
+        timestamp: Date.now() + 60 * 60 * 1000,   // sort to top
+        relTime:   '',
+        read:      readIds.has(id),
+      });
+    }
+
+    next.sort((a, b) => b.timestamp - a.timestamp);
+    this._inbox = next.slice(0, 30);
+    this.save();
   },
 
   save() {

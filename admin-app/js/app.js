@@ -170,9 +170,20 @@ function logChange(centerId, action, detail) {
     detail,
     ts:         Date.now(),
   };
+  // Keep a local copy so the user sees their action in History immediately.
   const existing = JSON.parse(localStorage.getItem(AUDIT_KEY) || '[]');
   existing.unshift(entry);
   localStorage.setItem(AUDIT_KEY, JSON.stringify(existing.slice(0, 500)));
+  // Persist to the server so other admins / devices see the same trail.
+  if (typeof AdminData !== 'undefined' && AdminData.postAudit) {
+    AdminData.postAudit({
+      source:    AppState.role === 'superadmin' ? 'superadmin' : 'admin',
+      actor:     admin?.name || 'Admin',
+      center_id: c?._dbId || null,
+      action,
+      detail,
+    });
+  }
   return entry;
 }
 
