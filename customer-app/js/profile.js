@@ -155,7 +155,12 @@ const ProfileScreen = {
         if (inp) inp.value = '';
       });
       UI.toast('✅ Address saved!');
-      setTimeout(() => Router.go('addresses'), 800);
+      // If user came from summary (booking flow), bounce them straight back there.
+      // Otherwise route to the addresses list as before.
+      const cameFromSummary = Router.history.includes('summary');
+      setTimeout(() => {
+        if (cameFromSummary) Router.back(); else Router.go('addresses');
+      }, 800);
     } catch (e) {
       UI.toast('❌ ' + e.message);
     }
@@ -206,6 +211,10 @@ const ProfileScreen = {
         if (inp) inp.value = '';
       });
       UI.toast('✅ Vehicle added: ' + plate);
+      // If user came from summary mid-booking, bounce back so they can keep going.
+      if (Router.history.includes('summary')) {
+        setTimeout(() => Router.back(), 600);
+      }
     } catch (e) {
       UI.toast('❌ ' + e.message);
     }

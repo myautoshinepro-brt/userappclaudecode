@@ -281,7 +281,7 @@
     ══════════════════════════════════════ -->
     <div data-screen="detail" id="sc-detail">
       <div class="header-sub" id="detail-header" style="background:var(--blue)">
-        <button class="header-back" onclick="Router.go('home')">← Back</button>
+        <button class="header-back" onclick="Router.back()">← Back</button>
         <div class="header-title" id="detail-center-name">Shine Auto Wash</div>
         <div class="header-subtitle" id="detail-center-sub">⭐ 4.8 · 1.2 km · Andheri West</div>
       </div>
@@ -539,7 +539,7 @@
       </div>
 
       <div class="header-sub" style="background:var(--blue)">
-        <button class="header-back" onclick="Router.go('confirmed')">← Back</button>
+        <button class="header-back" onclick="Router.back()">← Back</button>
         <div class="header-title">Manage booking</div>
         <div class="header-subtitle">#SW20490 · Shine Auto Wash</div>
       </div>
@@ -598,7 +598,7 @@
     ══════════════════════════════════════ -->
     <div data-screen="bookings" id="sc-bookings">
       <div class="header-sub" style="background:var(--blue)">
-        <button class="header-back" onclick="Router.go('home')">← Back</button>
+        <button class="header-back" onclick="Router.back()">← Back</button>
         <div class="header-title">My bookings</div>
       </div>
       <div class="scroll-area">
@@ -652,7 +652,7 @@
 
     <!-- ══ EDIT PROFILE ══ -->
     <div data-screen="edit-profile" id="sc-edit-profile">
-      <div class="header-sub" style="background:var(--blue)"><button class="header-back" onclick="Router.go('profile')">← Back</button><div class="header-title">Edit profile</div><div class="header-subtitle">Update your name & phone number</div></div>
+      <div class="header-sub" style="background:var(--blue)"><button class="header-back" onclick="Router.back()">← Back</button><div class="header-title">Edit profile</div><div class="header-subtitle">Update your name & phone number</div></div>
       <div class="scroll-area"><div style="padding:16px 14px 0">
         <div style="text-align:center;margin-bottom:20px">
           <div style="width:72px;height:72px;border-radius:50%;background:linear-gradient(135deg,var(--blue),var(--navy));margin:0 auto 10px;display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:700;color:#fff;position:relative;cursor:pointer" onclick="UI.toast('📷 Opening camera...')">
@@ -675,7 +675,7 @@
 
     <!-- ══ CHANGE PHONE ══ -->
     <div data-screen="change-phone" id="sc-change-phone">
-      <div class="header-sub" style="background:var(--blue)"><button class="header-back" onclick="Router.go('edit-profile')">← Back</button><div class="header-title">Change phone number</div><div class="header-subtitle">OTP via WhatsApp & SMS</div></div>
+      <div class="header-sub" style="background:var(--blue)"><button class="header-back" onclick="Router.back()">← Back</button><div class="header-title">Change phone number</div><div class="header-subtitle">OTP via WhatsApp & SMS</div></div>
       <div class="scroll-area"><div style="padding:16px 14px 0">
         <div style="text-align:center;margin-bottom:18px"><div style="font-size:36px;margin-bottom:8px">📱</div><div style="font-size:13px;font-weight:700;color:var(--text-primary)">Enter new phone number</div><div style="font-size:11px;color:var(--text-secondary);margin-top:4px">We'll verify with OTP</div></div>
         <label class="form-label">New phone number</label>
@@ -701,7 +701,7 @@
 
     <!-- ══ REVIEWS ══ -->
     <div data-screen="reviews" id="sc-reviews">
-      <div class="header-sub" style="background:var(--blue)"><button class="header-back" onclick="Router.go('profile')">← Back</button><div class="header-title">My reviews</div><div class="header-subtitle">Your ratings & feedback</div></div>
+      <div class="header-sub" style="background:var(--blue)"><button class="header-back" onclick="Router.back()">← Back</button><div class="header-title">My reviews</div><div class="header-subtitle">Your ratings & feedback</div></div>
       <div class="scroll-area"><div style="padding:12px 13px 0">
         <div class="review-card"><div style="display:flex;justify-content:space-between;align-items:flex-start"><div style="font-size:12px;font-weight:700;color:var(--text-primary)">Shine Auto Wash</div><div class="review-stars">★★★★★</div></div><div style="font-size:10px;color:var(--text-secondary);margin-top:1px">20 Apr · Full Steam Wash</div><div style="font-size:11px;color:var(--text-secondary);margin-top:6px;line-height:1.5">"Excellent service! Thorough and professional. Will come again."</div></div>
         <div class="review-card"><div style="display:flex;justify-content:space-between;align-items:flex-start"><div style="font-size:12px;font-weight:700;color:var(--text-primary)">PureClean Juhu</div><div class="review-stars">★★★★<span style="color:var(--text-tertiary)">★</span></div></div><div style="font-size:10px;color:var(--text-secondary);margin-top:1px">12 Apr · Exterior + Vacuum</div><div style="font-size:11px;color:var(--text-secondary);margin-top:6px;line-height:1.5">"Good wash overall. Took a bit longer but quality was good."</div></div>
@@ -712,7 +712,7 @@
 
     <!-- ══ PROMO CODES ══ -->
     <div data-screen="promos" id="sc-promos">
-      <div class="header-sub" style="background:var(--blue)"><button class="header-back" onclick="Router.go('profile')">← Back</button><div class="header-title">Promo codes</div><div class="header-subtitle">Your offers & referral codes</div></div>
+      <div class="header-sub" style="background:var(--blue)"><button class="header-back" onclick="Router.back()">← Back</button><div class="header-title">Promo codes</div><div class="header-subtitle">Your offers & referral codes</div></div>
       <div class="scroll-area"><div style="padding:12px 13px 0">
         <div class="section-label">Enter a code</div>
         <div style="display:flex;gap:8px;margin-bottom:14px">
@@ -739,7 +739,7 @@
 
     <!-- ══ ADDRESSES ══ -->
     <div data-screen="addresses" id="sc-addresses">
-      <div class="header-sub" style="background:var(--blue)"><button class="header-back" onclick="Router.go('profile')">← Back</button><div class="header-title">Saved addresses</div><div class="header-subtitle">Tap any to set as default</div></div>
+      <div class="header-sub" style="background:var(--blue)"><button class="header-back" onclick="Router.back()">← Back</button><div class="header-title">Saved addresses</div><div class="header-subtitle">Tap any to set as default</div></div>
       <div class="scroll-area"><div style="padding:12px 13px 0">
         <div class="section-label">Your addresses</div>
         <div id="addr-list"></div>
@@ -750,7 +750,7 @@
 
     <!-- ══ ADD ADDRESS ══ -->
     <div data-screen="add-address" id="sc-add-address">
-      <div class="header-sub" style="background:var(--blue)"><button class="header-back" onclick="Router.go('addresses')">← Back</button><div class="header-title">Add new address</div></div>
+      <div class="header-sub" style="background:var(--blue)"><button class="header-back" onclick="Router.back()">← Back</button><div class="header-title">Add new address</div></div>
       <div class="scroll-area"><div style="padding:14px 13px 0">
         <label class="form-label">Label</label>
         <div style="display:flex;gap:8px;margin-bottom:12px">
@@ -769,7 +769,7 @@
 
     <!-- ══ VEHICLES ══ -->
     <div data-screen="vehicles" id="sc-vehicles">
-      <div class="header-sub" style="background:var(--blue)"><button class="header-back" onclick="Router.go('profile')">← Back</button><div class="header-title">My vehicles</div></div>
+      <div class="header-sub" style="background:var(--blue)"><button class="header-back" onclick="Router.back()">← Back</button><div class="header-title">My vehicles</div></div>
       <div class="scroll-area"><div style="padding:12px 13px 0">
         <div class="section-label">Saved vehicles</div>
         <div id="veh-list"></div>
@@ -784,7 +784,7 @@
 
     <!-- ══ PAYMENTS ══ -->
     <div data-screen="payments" id="sc-payments">
-      <div class="header-sub" style="background:var(--blue)"><button class="header-back" onclick="Router.go('profile')">← Back</button><div class="header-title">Payment methods</div></div>
+      <div class="header-sub" style="background:var(--blue)"><button class="header-back" onclick="Router.back()">← Back</button><div class="header-title">Payment methods</div></div>
       <div class="scroll-area"><div style="padding:12px 13px 0">
         <div class="section-label">Saved UPI</div>
         <div class="payment-saved-card default"><div style="width:36px;height:36px;border-radius:9px;background:#e8f5e9;display:flex;align-items:center;justify-content:center;font-size:18px">📱</div><div style="flex:1"><div style="font-size:12px;font-weight:700;color:var(--text-primary)">rahul.kumar@oksbi</div><div style="font-size:10px;color:var(--text-secondary);margin-top:1px">SBI UPI</div></div><div class="badge badge-default">Default</div></div>
@@ -799,7 +799,7 @@
     <!-- ══ NOTIFICATIONS ══ -->
     <div data-screen="notifications" id="sc-notifications">
       <div class="header-sub" style="background:var(--blue)">
-        <button class="header-back" onclick="Router.go('profile')">← Back</button>
+        <button class="header-back" onclick="Router.back()">← Back</button>
         <div class="header-title">Notifications</div>
         <button id="notif-mark-all-btn" class="notif-header-action" onclick="NotificationScreen.markAllRead()">Mark all read</button>
       </div>
@@ -827,7 +827,7 @@
 
     <!-- ══ LANGUAGE ══ -->
     <div data-screen="language" id="sc-language">
-      <div class="header-sub" style="background:var(--blue)"><button class="header-back" onclick="Router.go('profile')">← Back</button><div class="header-title">Language</div></div>
+      <div class="header-sub" style="background:var(--blue)"><button class="header-back" onclick="Router.back()">← Back</button><div class="header-title">Language</div></div>
       <div class="scroll-area"><div style="padding:14px 13px 0">
         <div class="section-label">App language</div>
         <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">
@@ -842,7 +842,7 @@
     <!-- ══ HELP ══ -->
     <div data-screen="help" id="sc-help">
       <div class="header-sub" style="background:var(--blue)">
-        <button class="header-back" onclick="Router.go('profile')">← Back</button>
+        <button class="header-back" onclick="Router.back()">← Back</button>
         <div class="header-title">Help & support</div>
       </div>
       <div class="scroll-area"><div style="padding:12px 13px 0">

@@ -312,25 +312,51 @@ if (centerCount.n === 0) {
   ].forEach(([ref, comment]) => _sc.run(comment, ref));
 }
 
-// ── SEED default packages if none exist ─────────────────────────
-const pkgCount = db.prepare('SELECT COUNT(*) as n FROM packages').get();
-if (pkgCount.n === 0) {
-  const insPkg = db.prepare(`
+// ── Default package template + helper ─────────────────────────
+// Used by initial seed, application-approval flow, and a startup backfill
+// that gives any center with zero packages a sensible starting catalogue.
+const DEFAULT_PACKAGE_TEMPLATE = [
+  // [washType, name, price, durMin, tasks, sort]
+  ['water', 'Exterior Wash',     199, 30, ['Foam wash', 'Rinse', 'Tyre dressing'],                                         1],
+  ['water', 'Full Body Wash',    299, 60, ['Foam wash', 'Rinse', 'Microfibre dry', 'Tyre dressing', 'Dashboard wipe'],     2],
+  ['dry',   'Dry Clean Basic',   199, 30, ['Vacuum', 'Dashboard wipe', 'Door panels'],                                     3],
+  ['dry',   'Dry Clean Premium', 349, 60, ['Vacuum', 'Steam interior', 'Leather conditioner', 'Window polish'],            4],
+  ['steam', 'Steam Interior',    499, 45, ['Steam seats', 'Steam carpet', 'AC vent clean'],                                5],
+  ['steam', 'Steam Full Body',   699, 75, ['Steam interior', 'Engine bay', 'Underbody', 'Wheel arches'],                   6],
+  ['d2d',   'D2D Standard',      399, 60, ['Travel to location', 'Foam wash', 'Microfibre dry'],                           7],
+  ['d2d',   'D2D Premium',       599, 90, ['Travel to location', 'Foam wash', 'Interior vacuum', 'Polish', 'Tyre shine'],  8],
+];
+function _seedDefaultPackages(centerId) {
+  const ins = db.prepare(`
     INSERT INTO packages (center_id, wash_type, name, price, duration_minutes, tasks, sort_order)
     VALUES (?,?,?,?,?,?,?)
   `);
-  // [centerId, washType, name, price, durMin, tasks(JSON), sort]
-  const defaults = [
-    [1, 'water', 'Exterior Wash',     199, 30, JSON.stringify(['Foam wash', 'Rinse', 'Tyre dressing']),                              1],
-    [1, 'water', 'Full Body Wash',    299, 60, JSON.stringify(['Foam wash', 'Rinse', 'Microfibre dry', 'Tyre dressing', 'Dashboard wipe']), 2],
-    [1, 'dry',   'Dry Clean Basic',   199, 30, JSON.stringify(['Vacuum', 'Dashboard wipe', 'Door panels']),                            3],
-    [1, 'dry',   'Dry Clean Premium', 349, 60, JSON.stringify(['Vacuum', 'Steam interior', 'Leather conditioner', 'Window polish']),   4],
-    [1, 'steam', 'Steam Interior',    499, 45, JSON.stringify(['Steam seats', 'Steam carpet', 'AC vent clean']),                       5],
-    [1, 'steam', 'Steam Full Body',   699, 75, JSON.stringify(['Steam interior', 'Engine bay', 'Underbody', 'Wheel arches']),          6],
-    [1, 'd2d',   'D2D Standard',      399, 60, JSON.stringify(['Travel to location', 'Foam wash', 'Microfibre dry']),                  7],
-    [1, 'd2d',   'D2D Premium',       599, 90, JSON.stringify(['Travel to location', 'Foam wash', 'Interior vacuum', 'Polish', 'Tyre shine'])  , 8],
-  ];
-  for (const p of defaults) insPkg.run(...p);
+  for (const [washType, name, price, dur, tasks, sort] of DEFAULT_PACKAGE_TEMPLATE) {
+    ins.run(centerId, washType, name, price, dur, JSON.stringify(tasks), sort);
+  }
+}
+
+// Initial demo seed for center 1.
+if (db.prepare('SELECT COUNT(*) as n FROM packages').get().n === 0) {
+  _seedDefaultPackages(1);
+}
+
+// Backfill: every center should have at least the default catalogue so the
+// customer app can render real (integer-id) packages. Without this, newly
+// approved centers like Flight wash had zero packages and the customer-app
+// fell back to demo string-ids, breaking the booking POST.
+{
+  const emptyCenters = db.prepare(`
+    SELECT c.id
+    FROM centers c
+    LEFT JOIN packages p ON p.center_id = c.id AND p.is_active = 1
+    WHERE p.id IS NULL
+    GROUP BY c.id
+  `).all();
+  for (const row of emptyCenters) {
+    _seedDefaultPackages(row.id);
+    console.log(`📦 Seeded default packages for center #${row.id}`);
+  }
 }
 
 // ── SEED demo applications for admin review (idempotent) ─────
@@ -683,6 +709,8 @@ module.exports = {
       app.geo_lat || null, app.geo_lng || null
     );
     db.prepare(`UPDATE applications SET status='approved', notes='Documents verified', updated_at=datetime('now') WHERE id=?`).run(id);
+    // Give the new center a default package catalogue so customers can book immediately.
+    try { _seedDefaultPackages(info.lastInsertRowid); } catch (e) { console.error('seedDefaultPackages:', e.message); }
     return { app, centerId: info.lastInsertRowid };
   },
   getAllApplications() {

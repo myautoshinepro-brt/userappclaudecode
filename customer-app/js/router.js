@@ -68,7 +68,10 @@ const Router = {
     if (this.history.length > 0) {
       const prev = this.history.pop();
       this.go(prev, false);
+      return;
     }
+    // No history (e.g. deep link or first navigation) — safe default.
+    this.go('home', false);
   },
 
   _onEnter(screenId) {
