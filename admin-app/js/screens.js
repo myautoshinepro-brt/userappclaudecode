@@ -1245,6 +1245,11 @@ const ChatDetail = {
 
     // Mark read on entry; ignore failure (next poll will retry).
     AdminData.markChatThreadRead(t.id).catch(() => {});
+    // Locally zero this thread's admin unread + bump the dashboard badge immediately
+    // so the user doesn't see the old count on their way back.
+    const cached = CHAT_THREADS.find(x => x.id === t.id);
+    if (cached) cached.unread = cached.unread_admin = 0;
+    if (typeof AdminDashboard !== 'undefined') AdminDashboard.render();
 
     this._renderMessages();
     clearInterval(this._pollHandle);
@@ -1269,6 +1274,9 @@ const ChatDetail = {
         fresh.forEach(m => this._appendBubble(m));
         this._scrollBottom();
         AdminData.markChatThreadRead(this._thread.id).catch(() => {});
+        // Reset the local unread for this thread (admin is actively reading).
+        const cached = CHAT_THREADS.find(x => x.id === this._thread.id);
+        if (cached) cached.unread = cached.unread_admin = 0;
       }
     } catch { /* silent */ }
   },

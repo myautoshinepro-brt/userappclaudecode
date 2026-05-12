@@ -160,6 +160,8 @@ const ChatScreen = {
     });
     const j = await r.json();
     if (!r.ok || !j.success) return;
+    // Refresh thread metadata too — gives us latest admin_last_read_message_id for read receipts.
+    if (j.thread) this._thread = j.thread;
     this._messages = j.data;
     this._lastMessageId = this._messages.length ? this._messages[this._messages.length - 1].id : 0;
     this._renderMessages(this._messages);
@@ -193,9 +195,25 @@ const ChatScreen = {
       });
       const j = await r.json();
       if (!r.ok || !j.success) return;
+
+      // Refresh thread metadata (incl. admin_last_read_message_id) on every poll
+      // so existing customer message ticks can flip from gray → blue when admin reads.
+      const prevReadCursor = this._thread.admin_last_read_message_id || 0;
+      if (j.thread) this._thread = j.thread;
+      const newReadCursor = this._thread.admin_last_read_message_id || 0;
+      if (newReadCursor > prevReadCursor) {
+        // Re-render existing customer bubbles to flip tick colors.
+        this._messages.forEach(m => {
+          if (m.sender === 'customer' && m.id <= newReadCursor) {
+            const ticks = document.querySelector(`[data-msg-id="${m.id}"] .chat-ticks`);
+            if (ticks) { ticks.textContent = '✓✓'; ticks.style.color = '#3b82f6'; }
+          }
+        });
+      }
+
       const fresh = j.data.filter(m => m.id > this._lastMessageId);
       if (fresh.length) {
-        fresh.forEach(m => this._appendBubble(m));
+        fresh.forEach(m => { this._messages.push(m); this._appendBubble(m); });
         this._lastMessageId = fresh[fresh.length - 1].id;
         this._scrollBottom();
         this._markRead();
@@ -264,13 +282,17 @@ const ChatScreen = {
     if (m.sender === 'system') {
       return `<div style="text-align:center;font-size:10px;color:var(--text-tertiary);margin:8px 0">${this._escHTML(m.text)}</div>`;
     }
-    const isUser = m.sender === 'customer';
+    const isUser   = m.sender === 'customer';
+    const readBy   = (this._thread && this._thread.admin_last_read_message_id) || 0;
+    const readByAdmin = isUser && m.id && m.id <= readBy;
+    // Sent + delivered = gray ✓✓; read by admin = blue ✓✓ (WhatsApp-style).
+    const tickColor = readByAdmin ? '#3b82f6' : '#9ca3af';
     return `
-      <div class="chat-row ${isUser ? 'chat-row-user' : 'chat-row-admin'}">
+      <div class="chat-row ${isUser ? 'chat-row-user' : 'chat-row-admin'}" data-msg-id="${m.id || ''}">
         ${!isUser ? `<div class="chat-avatar-sm">SW</div>` : ''}
         <div class="chat-bubble ${isUser ? 'chat-bubble-user' : 'chat-bubble-admin'}">
           <div class="chat-bubble-text">${this._escHTML(m.text)}</div>
-          <div class="chat-bubble-meta">${this._formatTime(m.created_at)}${isUser ? ' <span class="chat-ticks">✓✓</span>' : ''}</div>
+          <div class="chat-bubble-meta">${this._formatTime(m.created_at)}${isUser ? ` <span class="chat-ticks" style="color:${tickColor}">✓✓</span>` : ''}</div>
         </div>
       </div>`;
   },

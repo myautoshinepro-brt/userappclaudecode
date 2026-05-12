@@ -86,11 +86,45 @@ const AdminData = (() => {
   }
 
   // ── CHAT ──
+  // Map DB shape → admin-app shape. The dashboard reads `unread` (not `unread_admin`)
+  // so we alias it here. We also keep the raw fields available.
+  function _mapChatThread(t) {
+    return {
+      id:              t.id,
+      customer_phone:  t.customer_phone,
+      customer_name:   t.customer_name,
+      booking_ref:     t.booking_ref,
+      subject:         t.subject,
+      status:          t.status,
+      last_message_at: t.last_message_at,
+      last_message_preview: t.last_message_preview,
+      last_message_sender:  t.last_message_sender,
+      unread_admin:    t.unread_admin || 0,
+      unread_customer: t.unread_customer || 0,
+      admin_last_read_message_id:    t.admin_last_read_message_id || 0,
+      customer_last_read_message_id: t.customer_last_read_message_id || 0,
+      // Admin-app legacy shape — used by dashboard badge reducer and old code paths.
+      unread:          t.unread_admin || 0,
+    };
+  }
+
+  function _storeChatThreads(threads) {
+    if (typeof CHAT_THREADS === 'undefined') return;
+    CHAT_THREADS.length = 0;
+    threads.forEach(t => CHAT_THREADS.push(t));
+    // Bump the dashboard badge if it's visible.
+    if (typeof AdminDashboard !== 'undefined' && AppState?.screen === 'dashboard') {
+      AdminDashboard.render();
+    }
+  }
+
   async function fetchChatThreads() {
     const r = await fetch(`${CENTER_APP_URL}/api/admin/chat/threads`, { headers: _headers() });
     if (!r.ok) throw new Error('chat threads HTTP ' + r.status);
     const j = await r.json();
-    return (j.data || []);
+    const mapped = (j.data || []).map(_mapChatThread);
+    _storeChatThreads(mapped);
+    return mapped;
   }
   async function fetchChatMessages(threadId) {
     const r = await fetch(`${CENTER_APP_URL}/api/admin/chat/threads/${threadId}/messages`, { headers: _headers() });
@@ -318,10 +352,11 @@ const AdminData = (() => {
   // Load both, replace the globals in place, and re-render the current screen.
   async function loadAll() {
     try {
-      const [centers, bookings, promos] = await Promise.all([
+      const [centers, bookings, promos, _chat] = await Promise.all([
         _fetchCenters(),
         _fetchBookings(),
         _fetchPromos().catch(e => { console.warn('promos fetch failed:', e.message); return []; }),
+        fetchChatThreads().catch(e => { console.warn('chat fetch failed:', e.message); return []; }),
       ]);
       _hydrateCenterStats(centers, bookings);
 

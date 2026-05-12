@@ -188,6 +188,11 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_chat_messages_thread ON chat_messages(thread_id, id);
 `);
 
+// Migration: read-receipt cursor — highest message id each side has read.
+// Customer-side ticks turn blue when admin_last_read_message_id >= message id.
+try { db.exec("ALTER TABLE chat_threads ADD COLUMN admin_last_read_message_id    INTEGER NOT NULL DEFAULT 0"); } catch { /* exists */ }
+try { db.exec("ALTER TABLE chat_threads ADD COLUMN customer_last_read_message_id INTEGER NOT NULL DEFAULT 0"); } catch { /* exists */ }
+
 // ── Promo codes table ──
 db.exec(`
   CREATE TABLE IF NOT EXISTS promos (
@@ -1000,8 +1005,12 @@ module.exports = {
     return db.prepare("SELECT * FROM chat_messages WHERE id = last_insert_rowid()").get();
   },
   markChatThreadRead(threadId, side /* 'customer' | 'admin' */) {
-    const col = side === 'admin' ? 'unread_admin' : 'unread_customer';
-    db.prepare(`UPDATE chat_threads SET ${col} = 0 WHERE id = ?`).run(threadId);
+    const isAdmin   = side === 'admin';
+    const unreadCol = isAdmin ? 'unread_admin' : 'unread_customer';
+    const readCol   = isAdmin ? 'admin_last_read_message_id' : 'customer_last_read_message_id';
+    const maxRow = db.prepare("SELECT COALESCE(MAX(id), 0) AS m FROM chat_messages WHERE thread_id=?").get(threadId);
+    db.prepare(`UPDATE chat_threads SET ${unreadCol} = 0, ${readCol} = ? WHERE id = ?`)
+      .run(maxRow.m, threadId);
     return true;
   },
 

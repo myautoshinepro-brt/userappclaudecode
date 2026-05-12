@@ -225,7 +225,9 @@ router.get('/chat/threads/:id/messages', (req, res) => {
   const thread = db.getChatThread(parseInt(req.params.id, 10));
   const own = _ownThreadOr403(thread, phone);
   if (own) return res.status(own.err).json({ error: own.msg });
-  res.json({ success: true, data: db.listChatMessages(thread.id) });
+  // Include the thread row so the customer can render read receipts
+  // (admin_last_read_message_id) and any other thread metadata.
+  res.json({ success: true, thread, data: db.listChatMessages(thread.id) });
 });
 
 // POST /api/public/chat/threads/:id/messages  Body: { phone, customer_name, text }
