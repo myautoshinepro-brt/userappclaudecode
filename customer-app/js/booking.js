@@ -83,7 +83,12 @@ const BookingScreen = {
   },
 
   renderConfirmed() {
-    const confirmed = AppState.confirmBooking();
+    // confirmedBooking is set by SummaryScreen.confirmAndPay() after the API
+    // returns a real booking_ref. Only fall back to generating one if we got
+    // here without going through that flow (e.g. demo / repeat-old).
+    const confirmed = AppState.confirmedBooking && AppState.confirmedBooking.id
+      ? AppState.confirmedBooking
+      : AppState.confirmBooking();
     const v = AppState.getSelectedVehicle();
     const vehicleStr = v ? `${v.plate} · ${v.model}` : '—';
     const collectAmt = confirmed.collectAmount ?? confirmed.totalPaid;
@@ -168,16 +173,35 @@ const BookingScreen = {
 
   // ── STAR RATING ──
 
-  rateBooking(n) {
+  // Animates the inline star widget (if present) and persists the rating via API.
+  // Called as rateBooking(stars, bookingRef). bookingRef may be omitted only when
+  // there is exactly one completed booking — we'll pick the most recent then.
+  async rateBooking(n, bookingRef) {
     for (let i = 1; i <= 5; i++) {
       const el = document.getElementById('star-' + i);
       if (el) { el.textContent = i <= n ? '★' : '☆'; el.style.color = i <= n ? '#f9a825' : ''; }
     }
-    if (n >= 4) {
-      setTimeout(() => {
-        const row = document.getElementById('star-1')?.parentElement;
-        if (row) row.innerHTML = '<span style="font-size:11px;color:#2e7d32">✅ Thanks for rating!</span>';
-      }, 400);
+
+    const ref = bookingRef
+      || (PAST_BOOKINGS.find(b => b.status === 'completed' && !b.rating) || {}).ref;
+    if (!ref) { UI.toast('⚠️ No booking to rate'); return; }
+
+    try {
+      const r = await fetch(`/api/bookings/${encodeURIComponent(ref)}/review`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer ' + (Auth.getToken() || ''),
+        },
+        body: JSON.stringify({ rating: n }),
+      });
+      const j = await r.json();
+      if (!r.ok || !j.success) throw new Error(j.error || 'Save failed');
+      UI.toast('✅ Thanks for rating!');
+      if (typeof UserData !== 'undefined') await UserData.loadBookings();
+      this.renderBookings();
+    } catch (e) {
+      UI.toast('❌ ' + e.message);
     }
   },
 };

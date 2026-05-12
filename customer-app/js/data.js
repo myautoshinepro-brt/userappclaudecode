@@ -220,38 +220,8 @@ const PROMO_CODES = [
   },
 ];
 
-const SAVED_ADDRESSES = [
-  {
-    key: 'home',
-    label: 'Home',
-    icon: '🏠',
-    address: 'Flat 402, Sunshine Apt, Andheri West',
-    pincode: '400053',
-    distance: '0.2 km',
-    isDefault: true,
-    color: '#dbeafe',
-  },
-  {
-    key: 'office',
-    label: 'Office',
-    icon: '🏢',
-    address: 'WeWork, BKC, Bandra East',
-    pincode: '400051',
-    distance: '8.4 km',
-    isDefault: false,
-    color: '#dcfce7',
-  },
-  {
-    key: 'parents',
-    label: 'Parents home',
-    icon: '👨‍👩‍👦',
-    address: '12B, Sai Nagar, Borivali West',
-    pincode: '400092',
-    distance: '18.1 km',
-    isDefault: false,
-    color: '#fef9c3',
-  },
-];
+// Loaded from GET /api/profile/addresses on login (see index.html).
+let SAVED_ADDRESSES = [];
 
 const MUMBAI_AREAS = [
   'Andheri West', 'Andheri East', 'Bandra West', 'Bandra East',
@@ -268,32 +238,11 @@ const PAYMENT_METHODS = [
   { key: 'later',  icon: '💵', label: 'Pay later', sub: 'Pay after service', isDefault: false },
 ];
 
-const SAVED_VEHICLES = [
-  {
-    id: 'v1',
-    plate: 'MH-01-AB-1234',
-    model: 'Maruti Alto 800',
-    colour: 'White',
-    icon: '🚗',
-    isPrimary: true,
-    color: '#dbeafe',
-  },
-  {
-    id: 'v2',
-    plate: 'MH-01-CD-5678',
-    model: 'Honda Activa',
-    colour: 'Black',
-    icon: '🏍️',
-    isPrimary: false,
-    color: '#dcfce7',
-  },
-];
+// Loaded from GET /api/profile/vehicles on login (see index.html).
+let SAVED_VEHICLES = [];
 
-// Past completed/cancelled bookings — used by My Bookings screen
-const PAST_BOOKINGS = [
-  { id:'#SW20104', centerId:'c1', centerName:'Shine Auto Wash',   washType:'steam', packageId:'s2', packageName:'Full Steam Wash',      vehicleId:'v1', vehiclePlate:'MH-01-AB-1234', vehicleModel:'Maruti Alto 800', date:'20 Apr', slot:'9:30 AM',  status:'completed', totalPaid:648,  rating:4 },
-  { id:'#SW19876', centerId:'c1', centerName:'Shine Auto Wash',   washType:'water', packageId:'w2', packageName:'Exterior + Vacuum',    vehicleId:'v1', vehiclePlate:'MH-01-AB-1234', vehicleModel:'Maruti Alto 800', date:'14 Apr', slot:'11:00 AM', status:'completed', totalPaid:422,  rating:5 },
-  { id:'#SW19501', centerId:'c2', centerName:'SparkWash Bandra',  washType:'dry',   packageId:'d2', packageName:'Standard Dry Wash',    vehicleId:'v1', vehiclePlate:'MH-01-AB-1234', vehicleModel:'Maruti Alto 800', date:'7 Apr',  slot:'10:00 AM', status:'completed', totalPaid:303,  rating:4 },
-  { id:'#SW18933', centerId:'c1', centerName:'Shine Auto Wash',   washType:'water', packageId:'w3', packageName:'Full Body Detailing',  vehicleId:'v1', vehiclePlate:'MH-01-AB-1234', vehicleModel:'Maruti Alto 800', date:'28 Mar', slot:'12:00 PM', status:'completed', totalPaid:657,  rating:5 },
-  { id:'#SW18201', centerId:'c3', centerName:'CleanRide Powai',   washType:'steam', packageId:'s1', packageName:'Steam Exterior',       vehicleId:'v1', vehiclePlate:'MH-01-AB-1234', vehicleModel:'Maruti Alto 800', date:'15 Mar', slot:'3:00 PM',  status:'cancelled', totalPaid:0,    rating:null },
-];
+// Loaded from GET /api/bookings on login (see index.html).
+let PAST_BOOKINGS    = [];
+let CENTER_PACKAGES  = null;  // { water: [...], dry: [...], steam: [...], d2d: [...] } per center
+// Default per-wash-type fallback used while a center's packages haven't loaded yet.
+let ACTIVE_PACKAGES  = PACKAGES;  // points to whichever object renderPackages() reads from

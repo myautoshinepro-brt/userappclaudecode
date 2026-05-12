@@ -7,7 +7,8 @@ const SummaryScreen = {
 
   render() {
     const b = AppState.booking;
-    const pkg = PACKAGES[b.washType]?.find(p => p.id === b.packageId);
+    const source = (typeof ACTIVE_PACKAGES !== 'undefined' && ACTIVE_PACKAGES) || PACKAGES;
+    const pkg = (source[b.washType] || []).find(p => p.id === b.packageId);
     if (!pkg) return;
 
     // Ensure a vehicle is selected (init if needed)
@@ -76,8 +77,9 @@ const SummaryScreen = {
 
     if (sub) sub.textContent = hasVehicles ? `(${SAVED_VEHICLES.length} saved)` : '';
 
-    if (!hasVehicles) {
-      // Empty state
+    if (!hasVehicles || !selected) {
+      // Empty state — also catches the case where vehicleId references a
+      // vehicle that's since been removed.
       section.innerHTML = `
         <div class="veh-empty-card" onclick="Router.go('vehicles')">
           <div class="veh-empty-icon">🚗</div>
@@ -215,10 +217,81 @@ const SummaryScreen = {
     document.getElementById('pay-' + method)?.classList.add('active');
   },
 
-  confirmAndPay() {
-    Router.go('confirmed');
+  async confirmAndPay() {
+    const b = AppState.booking;
+    const v = AppState.getSelectedVehicle();
+    if (!v) { UI.toast('⚠️ Please select a vehicle'); return; }
+    if (!b.centerId || !b.packageId) { UI.toast('⚠️ Missing booking details'); return; }
+
+    const t = AppState.calcTotal();
+    const btn = document.getElementById('confirm-pay-btn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Booking…'; }
+
+    try {
+      const r = await fetch('/api/bookings', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer ' + (Auth.getToken() || ''),
+        },
+        body: JSON.stringify({
+          center_id:       b.centerId,
+          package_id:      b.packageId,
+          slot_date:       _toIsoDate(b.date),
+          slot_time:       b.slot,
+          vehicle_plate:   v.plate,
+          vehicle_model:   v.model,
+          app_discount:    t.appDiscount,
+          center_discount: t.centerDiscount,
+        }),
+      });
+      const j = await r.json();
+      if (!r.ok || !j.success) throw new Error(j.error || 'Booking failed');
+
+      // Sync confirmed state from server response so My Bookings + center-app stay in sync.
+      AppState.confirmedBooking = {
+        id:            j.data.booking_ref,
+        centerId:      b.centerId,
+        centerName:    b.centerName,
+        packageName:   j.data.package_name,
+        date:          b.date,
+        slot:          j.data.slot_time,
+        duration:      (j.data.duration_minutes || 30) + ' min',
+        basePrice:     t.base,
+        appDiscount:   t.appDiscount,
+        centerDiscount: t.centerDiscount,
+        collectAmount: t.collectAmount,
+        totalPaid:     t.collectAmount,
+        status:        'confirmed',
+      };
+      // Refresh history in the background so the new booking shows up there too.
+      if (typeof UserData !== 'undefined') UserData.loadBookings();
+      Router.go('confirmed');
+    } catch (e) {
+      console.error('Booking error:', e);
+      UI.toast('❌ ' + (e.message || 'Could not place booking'));
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = '✅ Confirm Booking →'; }
+    }
   },
 };
+
+// Convert frontend date strings ("Today, 12 May", "13 May") to YYYY-MM-DD.
+function _toIsoDate(label) {
+  if (!label) return new Date().toISOString().slice(0, 10);
+  const MONTHS = { Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11 };
+  const m = String(label).match(/(\d{1,2})\s+([A-Za-z]{3})/);
+  if (!m) return new Date().toISOString().slice(0, 10);
+  const day  = parseInt(m[1], 10);
+  const mon  = MONTHS[m[2]];
+  const now  = new Date();
+  let   year = now.getFullYear();
+  // If the parsed month is earlier than this month, assume next year.
+  if (mon < now.getMonth() || (mon === now.getMonth() && day < now.getDate() - 1)) year += 1;
+  const d = new Date(year, mon, day);
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
 
 // ============================================================
 // VehiclePicker — bottom-sheet vehicle selector

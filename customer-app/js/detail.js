@@ -19,8 +19,17 @@ const DetailScreen = {
     document.querySelector('.wash-tab[data-type="water"]')?.classList.add('active');
     document.getElementById('slot-section')?.classList.remove('show');
     this._resetBottomBar();
-    this.renderPackages('water');
     this._renderDateChips();
+
+    // Show static packages immediately so the UI isn't blank, then swap in
+    // the center's real packages once fetched.
+    ACTIVE_PACKAGES = PACKAGES;
+    this.renderPackages('water');
+    if (typeof UserData !== 'undefined') {
+      UserData.loadCenterPackages(center.id).then(() => {
+        this.renderPackages(AppState.booking.washType || 'water');
+      });
+    }
   },
 
   _renderDateChips() {
@@ -48,7 +57,7 @@ const DetailScreen = {
   },
 
   renderPackages(type) {
-    const pkgs = PACKAGES[type] || [];
+    const pkgs = (ACTIVE_PACKAGES && ACTIVE_PACKAGES[type]) || PACKAGES[type] || [];
     const container = document.getElementById('package-list');
     if (!container) return;
 
@@ -103,7 +112,8 @@ const DetailScreen = {
   },
 
   _updateBottomBar() {
-    const pkg = PACKAGES[AppState.booking.washType]?.find(p => p.id === AppState.booking.packageId);
+    const list = (ACTIVE_PACKAGES && ACTIVE_PACKAGES[AppState.booking.washType]) || PACKAGES[AppState.booking.washType] || [];
+    const pkg = list.find(p => p.id === AppState.booking.packageId);
     if (!pkg) return;
     const sum = document.getElementById('booking-summary-bar');
     if (sum) {

@@ -91,6 +91,12 @@ const Router = {
       case 'chat':
         if (typeof ChatScreen !== 'undefined') ChatScreen.init();
         break;
+      case 'vehicles':
+        if (typeof ProfileScreen !== 'undefined' && ProfileScreen.renderVehicles) ProfileScreen.renderVehicles();
+        break;
+      case 'addresses':
+        if (typeof ProfileScreen !== 'undefined' && ProfileScreen.renderAddresses) ProfileScreen.renderAddresses();
+        break;
       default:
         break;
     }

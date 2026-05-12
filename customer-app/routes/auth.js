@@ -275,3 +275,4 @@ router.get('/email-diag', async (req, res) => {
 });
 
 module.exports = router;
+module.exports.requireAuth = requireAuth;

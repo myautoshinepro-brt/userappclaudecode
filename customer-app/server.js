@@ -15,20 +15,62 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.static(path.join(__dirname)));
 
 // Auth routes
-app.use('/api/auth', require('./routes/auth'));
+const authRoutes = require('./routes/auth');
+app.use('/api/auth', authRoutes);
+const { requireAuth } = authRoutes;
 
-// Centers — proxied from center-app so the frontend stays same-origin.
+// Profile routes (vehicles, addresses) — stored locally in customer-app DB.
+app.use('/api/profile', require('./routes/profile'));
+
+// ── Centers / packages / bookings — proxied to center-app ─────────────
 // Set CENTER_APP_URL on the customer-app Railway service to the center-app's URL.
 const CENTER_APP_URL = (process.env.CENTER_APP_URL || 'http://localhost:3001').replace(/\/$/, '');
-app.get('/api/centers', async (_req, res) => {
+
+async function relayJson(res, url, init = {}) {
   try {
-    const r = await fetch(`${CENTER_APP_URL}/api/public/centers`);
-    if (!r.ok) throw new Error(`center-app returned ${r.status}`);
-    res.json(await r.json());
+    const r = await fetch(url, init);
+    const body = await r.json().catch(() => ({}));
+    res.status(r.status).json(body);
   } catch (e) {
-    console.error('GET /api/centers proxy error:', e.message);
-    res.status(502).json({ success: false, error: 'Could not fetch centers' });
+    console.error('Proxy error →', url, e.message);
+    res.status(502).json({ success: false, error: 'Upstream center-app unavailable' });
   }
+}
+
+// Public: list & lookup centers
+app.get('/api/centers', (_req, res) =>
+  relayJson(res, `${CENTER_APP_URL}/api/public/centers`));
+
+app.get('/api/centers/:id/packages', (req, res) =>
+  relayJson(res, `${CENTER_APP_URL}/api/public/centers/${encodeURIComponent(req.params.id)}/packages`));
+
+// Authed: create a booking. We inject customer_name/phone/email from the JWT user.
+app.post('/api/bookings', requireAuth, (req, res) => {
+  const payload = {
+    ...req.body,
+    customer_name:  req.user.full_name,
+    customer_phone: req.user.mobile,
+    customer_email: req.user.email,
+  };
+  relayJson(res, `${CENTER_APP_URL}/api/public/bookings`, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify(payload),
+  });
+});
+
+// Authed: customer's own booking history.
+app.get('/api/bookings', requireAuth, (req, res) =>
+  relayJson(res, `${CENTER_APP_URL}/api/public/bookings?phone=${encodeURIComponent(req.user.mobile)}`));
+
+// Authed: submit a rating + comment on a completed booking.
+app.post('/api/bookings/:ref/review', requireAuth, (req, res) => {
+  const payload = { ...req.body, phone: req.user.mobile };
+  relayJson(res, `${CENTER_APP_URL}/api/public/bookings/${encodeURIComponent(req.params.ref)}/review`, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify(payload),
+  });
 });
 
 // Catch-all: always serve index.html for any non-API route

@@ -1,0 +1,160 @@
+// ============================================================
+// SparkWash — userdata.js
+// Loads vehicles, addresses, bookings from server after login.
+// Maps DB snake_case → camelCase that the UI screens expect.
+// ============================================================
+
+const UserData = (() => {
+
+  const VEHICLE_BG = ['#dbeafe', '#dcfce7', '#fef9c3', '#fee2e2', '#ede9fe', '#fff7ed'];
+
+  function _authHeaders() {
+    const token = (typeof Auth !== 'undefined' && Auth.getToken) ? Auth.getToken() : null;
+    return token ? { Authorization: 'Bearer ' + token } : {};
+  }
+
+  async function _getJson(url) {
+    const r = await fetch(url, { headers: _authHeaders() });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return r.json();
+  }
+
+  function _mapVehicle(v, idx) {
+    return {
+      id:        v.id,
+      plate:     v.plate,
+      model:     v.model || '',
+      colour:    v.colour || '',
+      icon:      v.icon || '🚗',
+      isPrimary: !!v.is_primary,
+      color:     VEHICLE_BG[idx % VEHICLE_BG.length],
+    };
+  }
+
+  function _mapAddress(a) {
+    return {
+      id:        a.id,
+      label:     a.label,
+      icon:      a.icon || '📍',
+      address:   a.address,
+      pincode:   a.pincode || '',
+      isDefault: !!a.is_default,
+      color:     '#dbeafe',
+    };
+  }
+
+  // Center-app slot_date format is YYYY-MM-DD. Render as "12 May".
+  function _formatDate(iso) {
+    if (!iso) return '';
+    const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const d = new Date(iso);
+    if (isNaN(d)) return iso;
+    return `${d.getDate()} ${MONTHS[d.getMonth()]}`;
+  }
+
+  function _mapBooking(b) {
+    const isCancelled = b.status === 'cancelled';
+    const isDone      = b.status === 'done';
+    return {
+      id:           b.booking_ref,
+      ref:          b.booking_ref,
+      centerId:     'c' + b.center_id,
+      centerName:   b.center_name || '—',
+      washType:     b.wash_type,
+      packageId:    null,
+      packageName:  b.package_name,
+      vehicleId:    null,
+      vehiclePlate: b.vehicle_plate,
+      vehicleModel: b.vehicle_model || '',
+      date:         _formatDate(b.slot_date),
+      slotDate:     b.slot_date,
+      slot:         b.slot_time,
+      status:       isDone ? 'completed' : isCancelled ? 'cancelled' : b.status,
+      rawStatus:    b.status,
+      totalPaid:    isDone ? (b.package_price - (b.app_discount || 0) - (b.center_discount || 0)) : 0,
+      rating:       b.rating || null,
+      reviewComment: b.review_comment || null,
+    };
+  }
+
+  async function loadVehicles() {
+    try {
+      const j = await _getJson('/api/profile/vehicles');
+      if (j && j.success) SAVED_VEHICLES = (j.data || []).map(_mapVehicle);
+    } catch (e) { console.warn('loadVehicles:', e.message); }
+  }
+
+  async function loadAddresses() {
+    try {
+      const j = await _getJson('/api/profile/addresses');
+      if (j && j.success) SAVED_ADDRESSES = (j.data || []).map(_mapAddress);
+    } catch (e) { console.warn('loadAddresses:', e.message); }
+  }
+
+  async function loadBookings() {
+    try {
+      const j = await _getJson('/api/bookings');
+      if (!j || !j.success) return;
+      const all = (j.data || []).map(_mapBooking);
+      PAST_BOOKINGS = all.filter(b => b.rawStatus === 'done' || b.rawStatus === 'cancelled');
+      const upcoming = all.find(b => !['done','cancelled'].includes(b.rawStatus));
+      if (upcoming) {
+        AppState.confirmedBooking = {
+          id:           upcoming.ref,
+          centerId:     upcoming.centerId,
+          centerName:   upcoming.centerName,
+          packageName:  upcoming.packageName,
+          date:         upcoming.date,
+          slot:         upcoming.slot,
+          duration:     null,
+          totalPaid:    upcoming.totalPaid,
+          collectAmount: upcoming.totalPaid,
+          status:       upcoming.rawStatus,
+        };
+      }
+    } catch (e) { console.warn('loadBookings:', e.message); }
+  }
+
+  async function loadAll() {
+    await Promise.all([loadVehicles(), loadAddresses(), loadBookings()]);
+  }
+
+  // Fetch packages for a specific center; cached per-center on CENTER_PACKAGES.
+  // Returns true if real packages were loaded, false if we fell back to defaults.
+  async function loadCenterPackages(centerId) {
+    try {
+      const r = await fetch('/api/centers/' + encodeURIComponent(centerId) + '/packages');
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const j = await r.json();
+      if (!j || !j.success) throw new Error('bad response');
+      // Augment each package with the includes-shape expected by detail.js + summary.js
+      const augmented = {};
+      ['water','dry','steam','d2d'].forEach(t => {
+        augmented[t] = (j.data[t] || []).map(p => ({
+          id:       String(p.id),
+          name:     p.name,
+          price:    p.price,
+          duration: `${p.duration} min`,
+          popular:  false,
+          desc:     '',
+          includes: (p.tasks || []).map(text => ({ icon: '✅', text })),
+        }));
+      });
+      // If a wash type has no real packages, keep static fallback so the tab isn't empty.
+      ['water','dry','steam','d2d'].forEach(t => {
+        if (!augmented[t].length) augmented[t] = PACKAGES[t] || [];
+      });
+      CENTER_PACKAGES = augmented;
+      ACTIVE_PACKAGES = augmented;
+      return true;
+    } catch (e) {
+      console.warn('loadCenterPackages:', e.message);
+      CENTER_PACKAGES = null;
+      ACTIVE_PACKAGES = PACKAGES;
+      return false;
+    }
+  }
+
+  return { loadAll, loadVehicles, loadAddresses, loadBookings, loadCenterPackages };
+
+})();

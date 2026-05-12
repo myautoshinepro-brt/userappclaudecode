@@ -31,9 +31,33 @@ db.exec(`
     created_at TEXT    NOT NULL DEFAULT (datetime('now'))
   );
 
-  CREATE INDEX IF NOT EXISTS idx_otps_identifier ON otps(identifier);
-  CREATE INDEX IF NOT EXISTS idx_users_mobile    ON users(mobile);
-  CREATE INDEX IF NOT EXISTS idx_users_email     ON users(email);
+  CREATE TABLE IF NOT EXISTS vehicles (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    plate      TEXT    NOT NULL,
+    model      TEXT,
+    colour     TEXT,
+    icon       TEXT    DEFAULT '🚗',
+    is_primary INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT    NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS addresses (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    label      TEXT    NOT NULL,
+    icon       TEXT    DEFAULT '📍',
+    address    TEXT    NOT NULL,
+    pincode    TEXT,
+    is_default INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT    NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_otps_identifier  ON otps(identifier);
+  CREATE INDEX IF NOT EXISTS idx_users_mobile     ON users(mobile);
+  CREATE INDEX IF NOT EXISTS idx_users_email      ON users(email);
+  CREATE INDEX IF NOT EXISTS idx_vehicles_user    ON vehicles(user_id);
+  CREATE INDEX IF NOT EXISTS idx_addresses_user   ON addresses(user_id);
 `);
 
 // ── HELPERS ─────────────────────────────────────────────────
@@ -90,5 +114,61 @@ module.exports = {
     if (!row || row.otp !== otp) return false;
     markOtpUsed.run(row.id);
     return true;
+  },
+
+  // ── VEHICLES ──
+  listVehicles(userId) {
+    return db.prepare("SELECT * FROM vehicles WHERE user_id=? ORDER BY is_primary DESC, id ASC").all(userId);
+  },
+  addVehicle(userId, { plate, model, colour, icon }) {
+    const norm = String(plate || '').trim().toUpperCase();
+    if (!norm) throw new Error('Plate is required');
+    const existingPrimary = db.prepare("SELECT id FROM vehicles WHERE user_id=? AND is_primary=1").get(userId);
+    const isPrimary = existingPrimary ? 0 : 1;  // first vehicle becomes primary
+    const info = db.prepare(`
+      INSERT INTO vehicles (user_id, plate, model, colour, icon, is_primary)
+      VALUES (?,?,?,?,?,?)
+    `).run(userId, norm, (model || '').trim() || null, (colour || '').trim() || null, icon || '🚗', isPrimary);
+    return db.prepare("SELECT * FROM vehicles WHERE id=?").get(info.lastInsertRowid);
+  },
+  removeVehicle(userId, vehicleId) {
+    const info = db.prepare("DELETE FROM vehicles WHERE id=? AND user_id=?").run(vehicleId, userId);
+    return info.changes > 0;
+  },
+  setPrimaryVehicle(userId, vehicleId) {
+    const t = db.transaction(() => {
+      db.prepare("UPDATE vehicles SET is_primary=0 WHERE user_id=?").run(userId);
+      db.prepare("UPDATE vehicles SET is_primary=1 WHERE id=? AND user_id=?").run(vehicleId, userId);
+    });
+    t();
+    return db.prepare("SELECT * FROM vehicles WHERE id=? AND user_id=?").get(vehicleId, userId);
+  },
+
+  // ── ADDRESSES ──
+  listAddresses(userId) {
+    return db.prepare("SELECT * FROM addresses WHERE user_id=? ORDER BY is_default DESC, id ASC").all(userId);
+  },
+  addAddress(userId, { label, icon, address, pincode }) {
+    if (!label?.trim())   throw new Error('Label is required');
+    if (!address?.trim()) throw new Error('Address is required');
+    const existingDefault = db.prepare("SELECT id FROM addresses WHERE user_id=? AND is_default=1").get(userId);
+    const isDefault = existingDefault ? 0 : 1;
+    const info = db.prepare(`
+      INSERT INTO addresses (user_id, label, icon, address, pincode, is_default)
+      VALUES (?,?,?,?,?,?)
+    `).run(userId, label.trim(), icon || '📍', address.trim(), (pincode || '').trim() || null, isDefault);
+    return db.prepare("SELECT * FROM addresses WHERE id=?").get(info.lastInsertRowid);
+  },
+  removeAddress(userId, addrId) {
+    const info = db.prepare("DELETE FROM addresses WHERE id=? AND user_id=?").run(addrId, userId);
+    return info.changes > 0;
+  },
+  setDefaultAddress(userId, addrId) {
+    const t = db.transaction(() => {
+      db.prepare("UPDATE addresses SET is_default=0 WHERE user_id=?").run(userId);
+      db.prepare("UPDATE addresses SET is_default=1 WHERE id=? AND user_id=?").run(addrId, userId);
+    });
+    t();
+    return db.prepare("SELECT * FROM addresses WHERE id=? AND user_id=?").get(addrId, userId);
   },
 };

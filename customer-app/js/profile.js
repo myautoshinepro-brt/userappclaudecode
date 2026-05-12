@@ -61,27 +61,62 @@ const ProfileScreen = {
 
   // ── ADDRESSES ──
 
-  setDefaultAddress(key) {
-    document.querySelectorAll('.addr-card-saved').forEach(c => {
-      c.classList.remove('selected');
-      c.style.borderColor = '';
-      c.style.background = '';
-      const badge = c.querySelector('.badge-default');
-      if (badge) badge.style.display = 'none';
-    });
-    const card = document.getElementById('addr-' + key);
-    if (card) {
-      card.classList.add('selected');
-      card.style.borderColor = 'var(--blue)';
-      card.style.background = '#f0f7ff';
-      const badge = card.querySelector('.badge-default');
-      if (badge) badge.style.display = 'inline-block';
+  renderAddresses() {
+    const list = document.getElementById('addr-list');
+    if (!list) return;
+    if (!SAVED_ADDRESSES.length) {
+      list.innerHTML = `<div style="padding:14px 12px;font-size:11px;color:var(--text-secondary);text-align:center">No saved addresses yet.</div>`;
+      return;
     }
-    const names = { home: 'Home', office: 'Office', parents: 'Parents home' };
-    UI.toast('✅ ' + (names[key] || key) + ' set as default');
+    list.innerHTML = SAVED_ADDRESSES.map(a => `
+      <div class="addr-card-saved ${a.isDefault ? 'selected' : ''}" id="addr-${a.id}"
+           onclick="ProfileScreen.setDefaultAddress(${a.id})"
+           style="display:flex;align-items:center;gap:9px;padding:10px 12px;border:${a.isDefault ? '1.5px solid var(--blue)' : '.5px solid var(--border-light)'};border-radius:12px;margin-bottom:7px;cursor:pointer;background:${a.isDefault ? '#f0f7ff' : 'var(--bg-primary)'}">
+        <div style="width:34px;height:34px;border-radius:9px;background:${a.color};display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0">${a.icon}</div>
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:center;gap:6px">
+            <div style="font-size:12px;font-weight:700;color:var(--text-primary)">${a.label}</div>
+            ${a.isDefault ? '<div class="badge badge-default">Default</div>' : ''}
+          </div>
+          <div style="font-size:10px;color:var(--text-secondary);margin-top:1px">${a.address}${a.pincode ? ' · ' + a.pincode : ''}</div>
+        </div>
+        <span onclick="event.stopPropagation();ProfileScreen.removeAddress(${a.id})" style="font-size:14px;color:var(--red);cursor:pointer;padding:0 6px">🗑️</span>
+      </div>
+    `).join('');
   },
 
-  addrLabelActive: 'home',
+  async setDefaultAddress(id) {
+    try {
+      const r = await fetch(`/api/profile/addresses/${id}/default`, {
+        method: 'PATCH',
+        headers: { Authorization: 'Bearer ' + (Auth.getToken() || '') },
+      });
+      if (!r.ok) throw new Error('Save failed');
+      await UserData.loadAddresses();
+      this.renderAddresses();
+      UI.toast('✅ Set as default');
+    } catch (e) {
+      UI.toast('❌ ' + e.message);
+    }
+  },
+
+  async removeAddress(id) {
+    if (!confirm('Remove this address?')) return;
+    try {
+      const r = await fetch(`/api/profile/addresses/${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: 'Bearer ' + (Auth.getToken() || '') },
+      });
+      if (!r.ok) throw new Error('Delete failed');
+      await UserData.loadAddresses();
+      this.renderAddresses();
+      UI.toast('🗑️ Address removed');
+    } catch (e) {
+      UI.toast('❌ ' + e.message);
+    }
+  },
+
+  addrLabelActive: 'home2',
 
   pickAddressLabel(label) {
     this.addrLabelActive = label;
@@ -95,24 +130,116 @@ const ProfileScreen = {
     });
   },
 
-  saveAddress() {
-    const area = document.getElementById('addr-area')?.value.trim();
+  async saveAddress() {
+    const area     = document.getElementById('addr-area')?.value.trim();
+    const flat     = document.getElementById('addr-flat')?.value.trim();
+    const landmark = document.getElementById('addr-landmark')?.value.trim();
+    const pincode  = document.getElementById('addr-pincode')?.value.trim();
     if (!area) { UI.toast('⚠️ Please enter area / locality'); return; }
-    UI.toast('✅ Address saved!');
-    setTimeout(() => Router.go('addresses'), 1200);
+
+    const LABELS = { home2: { label: 'Home', icon: '🏠' }, work: { label: 'Office', icon: '🏢' }, other: { label: 'Other', icon: '📍' } };
+    const choice = LABELS[this.addrLabelActive] || LABELS.other;
+    const fullAddress = [flat, area, landmark].filter(Boolean).join(', ');
+
+    try {
+      const r = await fetch('/api/profile/addresses', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (Auth.getToken() || '') },
+        body: JSON.stringify({ label: choice.label, icon: choice.icon, address: fullAddress, pincode }),
+      });
+      const j = await r.json();
+      if (!r.ok || !j.success) throw new Error(j.error || 'Save failed');
+      await UserData.loadAddresses();
+      ['addr-area','addr-flat','addr-landmark','addr-pincode'].forEach(id => {
+        const inp = document.getElementById(id);
+        if (inp) inp.value = '';
+      });
+      UI.toast('✅ Address saved!');
+      setTimeout(() => Router.go('addresses'), 800);
+    } catch (e) {
+      UI.toast('❌ ' + e.message);
+    }
   },
 
   // ── VEHICLES ──
 
-  addVehicle() {
-    const reg = document.getElementById('inp-vreg')?.value.trim();
-    if (!reg) { UI.toast('⚠️ Enter registration number'); return; }
-    UI.toast('✅ Vehicle added: ' + reg);
-    if (document.getElementById('inp-vreg')) document.getElementById('inp-vreg').value = '';
+  renderVehicles() {
+    const list = document.getElementById('veh-list');
+    if (!list) return;
+    if (!SAVED_VEHICLES.length) {
+      list.innerHTML = `<div style="padding:14px 12px;font-size:11px;color:var(--text-secondary);text-align:center">No saved vehicles yet.</div>`;
+      return;
+    }
+    list.innerHTML = SAVED_VEHICLES.map(v => `
+      <div class="vehicle-card">
+        <div style="width:38px;height:38px;border-radius:9px;background:${v.color};display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">${v.icon}</div>
+        <div style="flex:1">
+          <div class="vehicle-plate">${v.plate}</div>
+          <div class="vehicle-model">${v.model || ''}${v.colour ? ' · ' + v.colour : ''}</div>
+          ${v.isPrimary
+            ? '<div style="font-size:9px;background:#e8f5e9;color:#2e7d32;padding:1px 7px;border-radius:7px;display:inline-block;margin-top:3px;font-weight:700">Primary</div>'
+            : `<div onclick="ProfileScreen.makePrimaryVehicle(${v.id})" style="font-size:10px;color:var(--blue);cursor:pointer;font-weight:600;margin-top:3px;display:inline-block">Make primary</div>`}
+        </div>
+        <div onclick="ProfileScreen.removeVehicle(${v.id})" style="font-size:18px;color:var(--red);cursor:pointer">🗑️</div>
+      </div>
+    `).join('');
   },
 
-  removeVehicle(plate) {
-    if (confirm('Remove ' + plate + '?')) UI.toast('🗑️ Vehicle removed!');
+  async addVehicle() {
+    const plate  = document.getElementById('inp-vreg')?.value.trim();
+    const model  = document.getElementById('inp-vmodel')?.value.trim();
+    const colour = document.getElementById('inp-vcolour')?.value.trim();
+    if (!plate) { UI.toast('⚠️ Enter registration number'); return; }
+
+    try {
+      const r = await fetch('/api/profile/vehicles', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (Auth.getToken() || '') },
+        body: JSON.stringify({ plate, model, colour }),
+      });
+      const j = await r.json();
+      if (!r.ok || !j.success) throw new Error(j.error || 'Save failed');
+      await UserData.loadVehicles();
+      this.renderVehicles();
+      ['inp-vreg','inp-vmodel','inp-vcolour'].forEach(id => {
+        const inp = document.getElementById(id);
+        if (inp) inp.value = '';
+      });
+      UI.toast('✅ Vehicle added: ' + plate);
+    } catch (e) {
+      UI.toast('❌ ' + e.message);
+    }
+  },
+
+  async removeVehicle(id) {
+    if (!confirm('Remove this vehicle?')) return;
+    try {
+      const r = await fetch(`/api/profile/vehicles/${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: 'Bearer ' + (Auth.getToken() || '') },
+      });
+      if (!r.ok) throw new Error('Delete failed');
+      await UserData.loadVehicles();
+      this.renderVehicles();
+      UI.toast('🗑️ Vehicle removed');
+    } catch (e) {
+      UI.toast('❌ ' + e.message);
+    }
+  },
+
+  async makePrimaryVehicle(id) {
+    try {
+      const r = await fetch(`/api/profile/vehicles/${id}/primary`, {
+        method: 'PATCH',
+        headers: { Authorization: 'Bearer ' + (Auth.getToken() || '') },
+      });
+      if (!r.ok) throw new Error('Update failed');
+      await UserData.loadVehicles();
+      this.renderVehicles();
+      UI.toast('✅ Primary vehicle updated');
+    } catch (e) {
+      UI.toast('❌ ' + e.message);
+    }
   },
 
   // ── PROMO CODES ──

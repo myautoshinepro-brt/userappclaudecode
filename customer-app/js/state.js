@@ -76,7 +76,8 @@ const AppState = {
   },
 
   setPackage(washType, pkgId) {
-    const pkg = PACKAGES[washType]?.find(p => p.id === pkgId);
+    const source = (typeof ACTIVE_PACKAGES !== 'undefined' && ACTIVE_PACKAGES) || PACKAGES;
+    const pkg = (source[washType] || []).find(p => p.id === pkgId);
     if (!pkg) return;
     this.booking.washType = washType;
     this.booking.packageId = pkgId;

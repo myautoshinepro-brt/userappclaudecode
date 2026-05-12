@@ -695,4 +695,60 @@ module.exports = {
     const row = db.prepare("SELECT MIN(price) AS p FROM packages WHERE center_id=? AND is_active=1").get(centerId);
     return row && row.p != null ? row.p : null;
   },
+
+  // Public/customer-facing helpers ──────────────────────────────
+
+  // List active packages for a center, grouped-ready (frontend groups by wash_type).
+  listActivePackages(centerId) {
+    return db.prepare(`
+      SELECT id, center_id, wash_type, name, price, duration_minutes, tasks, sort_order
+      FROM packages
+      WHERE center_id=? AND is_active=1
+      ORDER BY wash_type, sort_order, id
+    `).all(centerId);
+  },
+
+  // Insert a booking submitted by the customer app. Status starts as 'new'.
+  // Returns the inserted row.
+  createCustomerBooking(data) {
+    const ref = '#SW' + Math.floor(100000 + Math.random() * 900000);
+    const info = db.prepare(`
+      INSERT INTO bookings (
+        booking_ref, center_id, customer_name, customer_phone, customer_email,
+        vehicle_plate, vehicle_model, wash_type, package_name, package_price,
+        slot_date, slot_time, duration_minutes,
+        app_discount, center_discount, status
+      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, 'new')
+    `).run(
+      ref, data.center_id, data.customer_name, data.customer_phone, data.customer_email || null,
+      data.vehicle_plate, data.vehicle_model || null, data.wash_type, data.package_name, data.package_price,
+      data.slot_date, data.slot_time, data.duration_minutes || 30,
+      data.app_discount || 0, data.center_discount || 0
+    );
+    return db.prepare('SELECT * FROM bookings WHERE id=?').get(info.lastInsertRowid);
+  },
+
+  // Get a customer's bookings across all centers, joined with center name.
+  getCustomerBookings(phone) {
+    return db.prepare(`
+      SELECT b.*, c.name AS center_name, c.address AS center_address
+      FROM bookings b
+      JOIN centers c ON c.id = b.center_id
+      WHERE b.customer_phone = ?
+      ORDER BY b.slot_date DESC, b.slot_time DESC
+    `).all(phone);
+  },
+
+  // Save a customer review on a booking. Idempotent — overwrites prior rating/comment.
+  saveCustomerReview(bookingRef, phone, rating, comment) {
+    const b = db.prepare('SELECT id, customer_phone, status FROM bookings WHERE booking_ref=?').get(bookingRef);
+    if (!b) return { ok: false, error: 'Booking not found' };
+    if (b.customer_phone !== phone) return { ok: false, error: 'Not your booking' };
+    if (b.status !== 'done') return { ok: false, error: 'Can only review completed wash' };
+    db.prepare(`
+      UPDATE bookings SET rating=?, review_comment=?, updated_at=datetime('now')
+      WHERE id=?
+    `).run(rating, (comment || '').trim() || null, b.id);
+    return { ok: true };
+  },
 };
