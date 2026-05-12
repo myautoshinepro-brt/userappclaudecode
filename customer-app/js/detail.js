@@ -126,32 +126,51 @@ const DetailScreen = {
     if (cta) { cta.className = 'bottom-bar-cta confirm'; cta.textContent = '✅ Review & confirm booking →'; }
   },
 
-  // Pre-selects wash type + package for Repeat Booking flow
-  initRepeat(center, washType, packageId, vehicleId) {
-    this.init(center); // sets up screen, resets to water tab
+  // Pre-selects wash type + package for Repeat Booking flow.
+  // packageName is the past booking's package_name (we don't carry the id),
+  // so we look it up in the loaded packages by name once they're available.
+  // vehicleId can be null — initVehicle() picks primary on summary in that case.
+  initRepeat(center, washType, packageName, vehicleId) {
+    this.init(center); // sets up screen, fetches packages, resets to water tab
 
-    // Switch to correct wash type tab
-    const tab = document.querySelector(`.wash-tab[data-type="${washType}"]`);
-    if (tab) {
-      document.querySelectorAll('.wash-tab').forEach(t => t.classList.remove('active'));
-      tab.classList.add('active');
+    AppState.booking.washType = washType || 'water';
+
+    // Switch to correct wash type tab visually.
+    document.querySelectorAll('.wash-tab').forEach(t => t.classList.remove('active'));
+    const tab = document.querySelector(`.wash-tab[data-type="${AppState.booking.washType}"]`);
+    if (tab) tab.classList.add('active');
+
+    if (vehicleId) AppState.setVehicle(vehicleId);
+
+    // Packages load async — try matching now (static fallback) and once more
+    // after the API returns. Either way, slot picker shows so the user can pick.
+    const tryMatch = () => {
+      const source = (typeof ACTIVE_PACKAGES !== 'undefined' && ACTIVE_PACKAGES) || PACKAGES;
+      const list   = source[AppState.booking.washType] || [];
+      const match  = packageName ? list.find(p => p.name === packageName) : null;
+      if (match) {
+        AppState.setPackage(AppState.booking.washType, match.id);
+        this.renderPackages(AppState.booking.washType);
+        this._updateBottomBar();
+        return true;
+      }
+      this.renderPackages(AppState.booking.washType);
+      return false;
+    };
+
+    const matched = tryMatch();
+    if (!matched && typeof UserData !== 'undefined') {
+      // The center's real packages may still be loading — retry once after.
+      UserData.loadCenterPackages(center.id).then(() => tryMatch());
     }
 
-    // Pre-select package + vehicle
-    AppState.setPackage(washType, packageId);
-    AppState.setVehicle(vehicleId);
-
-    // Re-render packages with the right type (shows selected state)
-    this.renderPackages(washType);
-
-    // Show slot picker immediately
+    // Show slot picker right away — even if no package matched, user can pick one.
     const slotSection = document.getElementById('slot-section');
     if (slotSection) {
       slotSection.classList.add('show');
       setTimeout(() => slotSection.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
     }
-    this._updateBottomBar();
-    UI.toast('🔁 Package pre-selected — pick a new date & slot!');
+    UI.toast(matched ? '🔁 Package pre-selected — pick a new date & slot!' : '🔁 Pick a package to continue');
   },
 
   proceed() {

@@ -3,6 +3,20 @@
 // Confirmed screen, manage, modify, cancel, bookings list
 // ============================================================
 
+// Strip null / undefined / empty strings (from HTML interpolation) to a real null.
+function _str(v) {
+  if (v == null) return null;
+  const s = String(v).trim();
+  if (!s || s === 'null' || s === 'undefined') return null;
+  return s;
+}
+
+// Normalise a plate for comparison: remove non-alphanumerics + upper-case.
+// "MH 01 AB-1234" and "mh01ab1234" both become "MH01AB1234".
+function _normPlate(p) {
+  return String(p || '').replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+}
+
 // Convert modify-modal date label ("Today, 13 May" | "13 May") to YYYY-MM-DD.
 // Mirrors the helper in summary.js but lives here so booking.js is self-contained.
 function _modifyDateToIso(label) {
@@ -79,7 +93,7 @@ const BookingScreen = {
           ${stars ? `<div style="display:flex;align-items:center;gap:3px;margin-top:5px"><span style="font-size:13px;color:#f9a825">${stars}</span></div>` : ''}
           <div class="action-btn-row" style="margin-top:8px">
             <div class="action-btn primary" style="flex:1;background:var(--blue);color:#fff;border-color:var(--blue)"
-                 onclick="BookingScreen.repeatBooking('${b.centerId}','${b.washType}','${b.packageId}','${b.vehicleId}')">
+                 onclick="BookingScreen.repeatBooking('${b.centerId}','${b.washType}','${b.packageName || ''}','${b.vehiclePlate || ''}')">
               🔁 Repeat this wash
             </div>
             <div class="action-btn primary" onclick="ChatScreen.openForBooking('${b.id}')">💬 Chat</div>
@@ -88,16 +102,31 @@ const BookingScreen = {
     }).join('');
   },
 
-  repeatBooking(centerId, washType, packageId, vehicleId) {
+  // Past bookings carry vehicle_plate + package_name (no FKs), so we match by
+  // those instead of relying on stable ids. Falsy / 'null' / 'undefined' inputs
+  // are normalised so initVehicle()'s "no vehicle picked yet" branch can fire.
+  repeatBooking(centerId, washType, packageName, vehiclePlate) {
     const center = CENTERS.find(c => c.id === centerId);
     if (!center) { UI.toast('⚠️ Center not available'); return; }
     if (!center.open) { UI.toast(`⚠️ ${center.name} is currently closed`); return; }
 
+    const pkgName = _str(packageName);
+    const plate   = _str(vehiclePlate);
+
+    // Try to match the past plate to one of the user's currently saved vehicles
+    // (ignore spaces/hyphens/case). If no match, leave vehicleId null so
+    // initVehicle() falls back to primary on the summary screen.
+    const matched = plate
+      ? SAVED_VEHICLES.find(v => _normPlate(v.plate) === _normPlate(plate))
+      : null;
+
     AppState.booking.centerId   = center.id;
     AppState.booking.centerName = center.name;
-    AppState.booking.vehicleId  = vehicleId;
+    AppState.booking.vehicleId  = matched ? matched.id : null;
 
-    if (typeof DetailScreen !== 'undefined') DetailScreen.initRepeat(center, washType, packageId, vehicleId);
+    if (typeof DetailScreen !== 'undefined') {
+      DetailScreen.initRepeat(center, washType, pkgName, matched ? matched.id : null);
+    }
     Router.go('detail');
   },
 

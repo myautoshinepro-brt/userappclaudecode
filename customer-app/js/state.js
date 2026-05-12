@@ -76,6 +76,8 @@ const AppState = {
   },
 
   setPackage(washType, pkgId) {
+    // Reject sentinel strings that come from inline HTML interpolation.
+    if (pkgId == null || pkgId === 'null' || pkgId === 'undefined' || pkgId === '') return;
     const source = (typeof ACTIVE_PACKAGES !== 'undefined' && ACTIVE_PACKAGES) || PACKAGES;
     const pkg = (source[washType] || []).find(p => p.id === pkgId);
     if (!pkg) return;
@@ -184,6 +186,8 @@ const AppState = {
   },
 
   setVehicle(vehicleId) {
+    // Reject sentinel strings from inline HTML interpolation.
+    if (vehicleId == null || vehicleId === 'null' || vehicleId === 'undefined' || vehicleId === '') return;
     const v = SAVED_VEHICLES.find(v => v.id === vehicleId);
     if (!v) return;
     this.booking.vehicleId = vehicleId;
@@ -191,7 +195,11 @@ const AppState = {
   },
 
   initVehicle() {
-    if (!this.booking.vehicleId) {
+    // Treat sentinel strings as "no vehicle picked" so the primary fallback kicks in.
+    const vid = this.booking.vehicleId;
+    const hasReal = vid != null && vid !== 'null' && vid !== 'undefined' && vid !== '';
+    if (!hasReal || !SAVED_VEHICLES.find(v => v.id === vid)) {
+      this.booking.vehicleId = null;
       const primary = SAVED_VEHICLES.find(v => v.isPrimary) || SAVED_VEHICLES[0];
       if (primary) this.setVehicle(primary.id);
     }
