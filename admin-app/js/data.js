@@ -15,24 +15,10 @@ let CITIES = [
   { id:'city4', name:'Nashik', state:'Maharashtra', active:false },
 ];
 
-let CENTERS = [
-  { id:'c1', name:'Shine Auto Wash',   owner:'Ramesh Patil',  phone:'+91 98200 11234', area:'Andheri West, Mumbai', address:'Shop 4, Veera Desai Rd, Andheri West', gstin:'27AABCS1429B1Z1', rating:4.8, totalReviews:210, isOpen:true,  washTypes:['water','dry','steam','d2d'], totalBookings:10, activeNow:2, todayRevenue:3850, visible:true,  displayOrder:1, cityId:'city1', pendingSettlement:349,  bankAccount:'00112233445566', ifsc:'HDFC0001234', accountName:'Ramesh Patil',  bankName:'HDFC Bank'  },
-  { id:'c2', name:'SparkWash Bandra',  owner:'Kiran Nair',    phone:'+91 98200 22345', area:'Bandra West, Mumbai',  address:'Unit 12, Hill Road, Bandra West',     gstin:'27BBCSK2341B2Z2', rating:4.6, totalReviews:187, isOpen:true,  washTypes:['water','dry','steam'],       totalBookings:8,  activeNow:1, todayRevenue:2900, visible:true,  displayOrder:2, cityId:'city1', pendingSettlement:199,  bankAccount:'00223344556677', ifsc:'ICIC0002345', accountName:'Kiran Nair',   bankName:'ICICI Bank' },
-  { id:'c3', name:'CleanRide Powai',   owner:'Sunita Joshi',  phone:'+91 98200 33456', area:'Powai, Mumbai',        address:'Shop 7, Hiranandani Gardens, Powai', gstin:'27CCJSK3452C3Z3', rating:4.4, totalReviews:143, isOpen:false, washTypes:['water','dry'],               totalBookings:5,  activeNow:0, todayRevenue:1250, visible:false, displayOrder:3, cityId:'city1', pendingSettlement:0,    bankAccount:null,             ifsc:null,           accountName:null,           bankName:null         },
-  { id:'c4', name:'QuickWash Thane',   owner:'Deepak Rao',    phone:'+91 98200 44567', area:'Thane West, Mumbai',   address:'Plot 3, Pokhran Rd, Thane West',      gstin:'27DDRSK4563D4Z4', rating:4.7, totalReviews:98,  isOpen:true,  washTypes:['water','dry','steam','d2d'], totalBookings:12, activeNow:3, todayRevenue:4200, visible:true,  displayOrder:4, cityId:'city2', pendingSettlement:798,  bankAccount:'00334455667788', ifsc:'SBIN0003456', accountName:'Deepak Rao',   bankName:'SBI'        },
-];
-
-// Settlement history — SparkWash offer settlements to centers
-// app_discount = SparkWash promo; SparkWash credits center bank account next working day
-let SETTLEMENTS = [
-  { id:'st1', centerId:'c1', centerName:'Shine Auto Wash',  bookingRef:'#SW20490', customer:'Rahul Kumar',   washType:'water', packageName:'Full Body Wash',    packagePrice:299, appDiscount:199, washDate:'6 May 2026', status:'settled', settledAt:Date.now()-86400000*2, creditedOn:'7 May 2026' },
-  { id:'st2', centerId:'c4', centerName:'QuickWash Thane',  bookingRef:'#SW20488', customer:'Priya Singh',   washType:'steam', packageName:'Steam Full Body',   packagePrice:699, appDiscount:349, washDate:'6 May 2026', status:'settled', settledAt:Date.now()-86400000*2, creditedOn:'7 May 2026' },
-  { id:'st3', centerId:'c2', centerName:'SparkWash Bandra', bookingRef:'#SW20491', customer:'Amit Patel',    washType:'dry',   packageName:'Dry Clean Premium', packagePrice:349, appDiscount:199, washDate:'7 May 2026', status:'settled', settledAt:Date.now()-86400000*1, creditedOn:'8 May 2026' },
-  { id:'st4', centerId:'c1', centerName:'Shine Auto Wash',  bookingRef:'#SW20509', customer:'Neha Gupta',    washType:'steam', packageName:'Steam Interior',    packagePrice:499, appDiscount:349, washDate:'8 May 2026', status:'pending', settledAt:null, creditedOn:null },
-  { id:'st5', centerId:'c2', centerName:'SparkWash Bandra', bookingRef:'#SW20601', customer:'Karan Joshi',   washType:'water', packageName:'Exterior Wash',     packagePrice:299, appDiscount:199, washDate:'8 May 2026', status:'pending', settledAt:null, creditedOn:null },
-  { id:'st6', centerId:'c4', centerName:'QuickWash Thane',  bookingRef:'#SW20801', customer:'Sunita Patil',  washType:'steam', packageName:'Steam Full Body',   packagePrice:699, appDiscount:349, washDate:'8 May 2026', status:'pending', settledAt:null, creditedOn:null },
-  { id:'st7', centerId:'c4', centerName:'QuickWash Thane',  bookingRef:'#SW20802', customer:'Vikram Sharma', washType:'d2d',   packageName:'D2D Premium',       packagePrice:599, appDiscount:449, washDate:'8 May 2026', status:'pending', settledAt:null, creditedOn:null },
-];
+// Replaced by AdminData.loadAll() once the user logs in. Starts empty so the UI
+// shows "Loading…" / empty states instead of flashing demo data.
+let CENTERS     = [];
+let SETTLEMENTS = [];
 
 // Center onboarding applications — submitted via center app, reviewed by SA
 // Center-app backend URL — update this when deploying to production
@@ -57,31 +43,8 @@ const STATUS_META = {
   cancelled: { label:'Cancelled',   cls:'b-cancel', icon:'❌' },
 };
 
-let ALL_BOOKINGS = [
-  // Shine Auto Wash c1
-  { id:'#SW20501', centerId:'c1', customer:'Rahul Kumar',   phone:'98765 43210', vehicle:'MH-01-AB-1234', model:'Alto 800',    type:'water', pkg:'Exterior + Vacuum',    price:349, slot:'10:30 AM', status:'washing',   date:'Today', rating:null },
-  { id:'#SW20502', centerId:'c1', customer:'Priya Shah',    phone:'91234 56789', vehicle:'MH-02-CD-5678', model:'Honda City',  type:'steam', pkg:'Full Steam Wash',      price:549, slot:'11:00 AM', status:'arrived',   date:'Today', rating:null },
-  { id:'#SW20503', centerId:'c1', customer:'Amit Desai',    phone:'99887 76655', vehicle:'MH-03-EF-9012', model:'Swift Dzire', type:'dry',   pkg:'Standard Dry Wash',    price:249, slot:'11:30 AM', status:'confirmed', date:'Today', rating:null },
-  { id:'#SW20504', centerId:'c1', customer:'Sunita Rao',    phone:'87654 32109', vehicle:'MH-04-GH-3456', model:'Baleno',      type:'water', pkg:'Full Body Detailing',  price:549, slot:'12:00 PM', status:'new',       date:'Today', rating:null },
-  { id:'#SW20509', centerId:'c1', customer:'Deepak Mehta',  phone:'90001 23456', vehicle:'MH-09-QR-3456', model:'Thar',        type:'water', pkg:'Exterior + Vacuum',    price:349, slot:'4:00 PM',  status:'done',      date:'Today', rating:5   },
-  { id:'#SW20510', centerId:'c1', customer:'Nisha Gupta',   phone:'89001 23456', vehicle:'MH-10-ST-7890', model:'Punch',       type:'dry',   pkg:'Basic Dry Wash',       price:149, slot:'9:30 AM',  status:'done',      date:'Today', rating:4   },
-  // SparkWash Bandra c2
-  { id:'#SW20601', centerId:'c2', customer:'Arjun Verma',   phone:'97001 11222', vehicle:'MH-04-AA-1111', model:'Nexon',       type:'water', pkg:'Full Body Detailing',  price:549, slot:'9:00 AM',  status:'done',      date:'Today', rating:5   },
-  { id:'#SW20602', centerId:'c2', customer:'Kavya Menon',   phone:'97002 22333', vehicle:'MH-04-BB-2222', model:'Creta',       type:'steam', pkg:'Steam + Polish & Wax', price:799, slot:'10:00 AM', status:'done',      date:'Today', rating:4   },
-  { id:'#SW20603', centerId:'c2', customer:'Rohan Das',     phone:'97003 33444', vehicle:'MH-04-CC-3333', model:'Seltos',      type:'dry',   pkg:'Premium Dry+Interior', price:399, slot:'12:00 PM', status:'washing',   date:'Today', rating:null },
-  { id:'#SW20604', centerId:'c2', customer:'Ananya Roy',    phone:'97004 44555', vehicle:'MH-04-DD-4444', model:'WagonR',      type:'water', pkg:'Exterior Wash',        price:199, slot:'3:00 PM',  status:'new',       date:'Today', rating:null },
-  // CleanRide Powai c3
-  { id:'#SW20701', centerId:'c3', customer:'Pooja Iyer',    phone:'96001 55666', vehicle:'MH-05-EE-5555', model:'i20',         type:'water', pkg:'Exterior + Vacuum',    price:349, slot:'9:30 AM',  status:'done',      date:'Today', rating:4   },
-  { id:'#SW20702', centerId:'c3', customer:'Karthik Nair',  phone:'96002 66777', vehicle:'MH-05-FF-6666', model:'Venue',       type:'dry',   pkg:'Standard Dry Wash',    price:249, slot:'11:00 AM', status:'done',      date:'Today', rating:5   },
-  { id:'#SW20703', centerId:'c3', customer:'Simran Kaur',   phone:'96003 77888', vehicle:'MH-05-GG-7777', model:'Brezza',      type:'steam', pkg:'Full Steam Wash',      price:549, slot:'1:00 PM',  status:'cancelled', date:'Today', rating:null },
-  // QuickWash Thane c4
-  { id:'#SW20801', centerId:'c4', customer:'Vishal Tiwari', phone:'95001 88999', vehicle:'MH-06-HH-8888', model:'XUV700',      type:'steam', pkg:'Steam + Polish & Wax', price:799, slot:'8:30 AM',  status:'done',      date:'Today', rating:5   },
-  { id:'#SW20802', centerId:'c4', customer:'Meera Pillai',  phone:'95002 99000', vehicle:'MH-06-II-9999', model:'Thar',        type:'water', pkg:'Full Body Detailing',  price:549, slot:'9:00 AM',  status:'done',      date:'Today', rating:5   },
-  { id:'#SW20803', centerId:'c4', customer:'Sanjay Gupta',  phone:'95003 00111', vehicle:'MH-06-JJ-0000', model:'Scorpio',     type:'d2d',   pkg:'D2D Water + Vacuum',   price:449, slot:'10:30 AM', status:'washing',   date:'Today', rating:null },
-  { id:'#SW20804', centerId:'c4', customer:'Ritu Sharma',   phone:'95004 11222', vehicle:'MH-06-KK-1111', model:'Ertiga',      type:'water', pkg:'Exterior + Vacuum',    price:349, slot:'11:00 AM', status:'arrived',   date:'Today', rating:null },
-  { id:'#SW20805', centerId:'c4', customer:'Anil Kumar',    phone:'95005 22333', vehicle:'MH-06-LL-2222', model:'Fortuner',    type:'steam', pkg:'Full Steam Wash',      price:549, slot:'12:00 PM', status:'confirmed', date:'Today', rating:null },
-  { id:'#SW20806', centerId:'c4', customer:'Divya Singh',   phone:'95006 33444', vehicle:'MH-06-MM-3333', model:'Bolero',      type:'dry',   pkg:'Standard Dry Wash',    price:249, slot:'2:30 PM',  status:'new',       date:'Today', rating:null },
-];
+// Loaded by AdminData.loadAll() on login.
+let ALL_BOOKINGS = [];
 
 const ALL_SLOTS = [
   '8:00 AM','8:30 AM','9:00 AM','9:30 AM','10:00 AM','10:30 AM',
@@ -90,65 +53,11 @@ const ALL_SLOTS = [
   '5:00 PM','5:30 PM','6:00 PM',
 ];
 
-let PROMO_CODES = [
-  { id:'p1', code:'SPARK20',    type:'percent', value:20,  minOrder:300, maxUses:500,  used:287, active:true,  expiry:'2025-08-31' },
-  { id:'p2', code:'FIRSTWASH',  type:'flat',    value:100, minOrder:200, maxUses:1000, used:876, active:true,  expiry:'2025-12-31' },
-  { id:'p3', code:'STEAM50',    type:'flat',    value:50,  minOrder:500, maxUses:200,  used:67,  active:true,  expiry:'2025-07-15' },
-  { id:'p4', code:'MONSOON30',  type:'percent', value:30,  minOrder:250, maxUses:300,  used:300, active:false, expiry:'2024-09-30' },
-  { id:'p5', code:'WEEKEND10',  type:'percent', value:10,  minOrder:150, maxUses:1000, used:142, active:true,  expiry:'2025-09-30' },
-];
+// Loaded by AdminData.loadAll() on login.
+let PROMO_CODES = [];
 
-let CHAT_THREADS = [
-  {
-    id:'t1', type:'customer', name:'Rahul Kumar', initials:'RK', avatarBg:'#3b82f6',
-    phone:'98765 43210', bookingId:'#SW20501', centerId:'c1', unread:2, lastTime:'10:42 AM',
-    lastMsg:'My car is still waiting, its been 30 min already',
-    messages:[
-      { from:'user',  text:'Hi, I booked at 10:30 AM for water wash. My car is still waiting.',       time:'10:38 AM' },
-      { from:'user',  text:'My car is still waiting, its been 30 min already',                        time:'10:42 AM' },
-      { from:'admin', text:'Hi Rahul! I am checking with Shine Auto Wash right now. One moment.',     time:'10:43 AM' },
-    ],
-  },
-  {
-    id:'t2', type:'center', name:'SparkWash Bandra', initials:'SB', avatarBg:'#10b981',
-    phone:'+91 98200 22345', centerId:'c2', unread:1, lastTime:'9:55 AM',
-    lastMsg:'We are facing staff shortage today, may need to reschedule 2 bookings',
-    messages:[
-      { from:'center', text:'Good morning! We are facing staff shortage today, may need to reschedule 2 bookings', time:'9:55 AM' },
-    ],
-  },
-  {
-    id:'t3', type:'customer', name:'Ananya Roy', initials:'AR', avatarBg:'#ec4899',
-    phone:'97004 44555', bookingId:'#SW20604', centerId:'c2', unread:0, lastTime:'9:30 AM',
-    lastMsg:'Thank you for the quick resolution!',
-    messages:[
-      { from:'user',  text:'I wanted to change my booking from 2:00 PM to 3:00 PM',                             time:'9:20 AM' },
-      { from:'admin', text:'Sure Ananya! I have updated your slot to 3:00 PM. You will receive a confirmation.', time:'9:28 AM' },
-      { from:'user',  text:'Thank you for the quick resolution!',                                                 time:'9:30 AM' },
-    ],
-  },
-  {
-    id:'t4', type:'center', name:'CleanRide Powai', initials:'CP', avatarBg:'#f59e0b',
-    phone:'+91 98200 33456', centerId:'c3', unread:0, lastTime:'Yesterday',
-    lastMsg:'Equipment maintenance done, opening at 10 AM tomorrow',
-    messages:[
-      { from:'center', text:'Our steam machine broke down, cancelling all steam bookings today',                      time:'8:00 AM' },
-      { from:'admin',  text:'Understood. I will notify affected customers and offer reschedule or full refund.',      time:'8:15 AM' },
-      { from:'center', text:'Equipment maintenance done, opening at 10 AM tomorrow',                                 time:'6:30 PM' },
-    ],
-  },
-  {
-    id:'t5', type:'customer', name:'Sanjay Gupta', initials:'SG', avatarBg:'#8b5cf6',
-    phone:'95003 00111', bookingId:'#SW20803', centerId:'c4', unread:0, lastTime:'Yesterday',
-    lastMsg:'Perfect, that works for me. Thank you!',
-    messages:[
-      { from:'user',  text:'Can the D2D agent come a bit earlier? Maybe 10 AM instead of 10:30?',    time:'9:10 AM' },
-      { from:'admin', text:'Let me check availability at QuickWash Thane for the 10 AM slot.',        time:'9:14 AM' },
-      { from:'admin', text:'Good news! 10:00 AM is available. I have updated your booking.',          time:'9:18 AM' },
-      { from:'user',  text:'Perfect, that works for me. Thank you!',                                  time:'9:20 AM' },
-    ],
-  },
-];
+// Loaded by AdminData.loadAll() on login.
+let CHAT_THREADS = [];
 
 const WEEK_DAYS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
 const WEEK_REVENUE = {
@@ -259,16 +168,8 @@ const AUDIT_SEED = [
   { id:'seed8', centerId:'c4', centerName:'QuickWash Thane',  actor:'center', actorName:'Deepak Rao',      actorRole:'Center Admin',  action:'Booking status updated', detail:'#SW20803 Arrived → In Progress (Wash started)',  ts: Date.now() - 600000  },
 ];
 
-const ACTIVITY_FEED = [
-  { icon:'🆕', text:'New booking #SW20806 — QuickWash Thane',   sub:'Divya Singh · ₹249 · 2:30 PM',             time:'5 min ago',  type:'booking' },
-  { icon:'⭐', text:'5★ review — QuickWash Thane',              sub:'Vishal Tiwari · Steam + Polish & Wax',      time:'12 min ago', type:'review'  },
-  { icon:'✨', text:'Booking #SW20802 completed',               sub:'Meera Pillai · ₹549 · QuickWash Thane',    time:'18 min ago', type:'done'    },
-  { icon:'💬', text:'New message from Rahul Kumar',             sub:'My car is still waiting, its been 30 min',  time:'23 min ago', type:'chat'    },
-  { icon:'🚗', text:'Customer arrived — #SW20804',              sub:'Ritu Sharma · Ertiga · QuickWash Thane',    time:'28 min ago', type:'arrived' },
-  { icon:'⭐', text:'5★ review — SparkWash Bandra',             sub:'Arjun Verma · Full Body Detailing',         time:'35 min ago', type:'review'  },
-  { icon:'🔴', text:'CleanRide Powai closed early',             sub:'Center marked closed by owner',              time:'1 hr ago',   type:'center'  },
-  { icon:'🎁', text:'Promo SPARK20 used 3 times',               sub:'₹612 discount given today',                 time:'2 hr ago',   type:'promo'   },
-];
+// Loaded by AdminData.loadAll() on login.
+const ACTIVITY_FEED = [];
 
 // ── PLATFORM-WIDE HISTORY (all apps) ────────────────────────
 // source: 'user' | 'center' | 'admin' | 'superadmin'
@@ -319,29 +220,6 @@ const PLATFORM_HISTORY = [
 // Revenue access requests: { id, adminId, adminName, centerId, centerName, status, requestedAt }
 let REVENUE_REQUESTS = [];
 
-// Customer reviews across all centers — status: 'active' | 'removed'
-let REVIEWS = [
-  { id:'rv1',  centerId:'c1', customerName:'Rahul Kumar',   bookingId:'#SW20509', rating:5, comment:'Excellent wash! Very thorough and the team was super professional. Will definitely come back.', ts: Date.now()-5400000,   status:'active'  },
-  { id:'rv2',  centerId:'c1', customerName:'Nisha Gupta',   bookingId:'#SW20510', rating:4, comment:'Good dry wash, finished quickly. Dashboard could have been wiped more carefully.',               ts: Date.now()-9000000,   status:'active'  },
-  { id:'rv3',  centerId:'c1', customerName:'Priya Shah',    bookingId:'#SW20502', rating:2, comment:'Had to wait 40 minutes past my slot. Staff was rude when I asked for an update. Very unhappy.',  ts: Date.now()-14400000,  status:'active'  },
-  { id:'rv4',  centerId:'c2', customerName:'Arjun Verma',   bookingId:'#SW20601', rating:5, comment:'Best car wash in Bandra! Shine like a mirror. Loved the complimentary air freshener.',          ts: Date.now()-3600000,   status:'active'  },
-  { id:'rv5',  centerId:'c2', customerName:'Kavya Menon',   bookingId:'#SW20602', rating:4, comment:'Steam wash was great, tyres look brand new. Slight delay but overall satisfied.',                ts: Date.now()-7200000,   status:'active'  },
-  { id:'rv6',  centerId:'c2', customerName:'Rohan Das',     bookingId:'#SW20603', rating:1, comment:'Worst experience. Scratched my car and denied responsibility. DO NOT COME HERE!!!',             ts: Date.now()-18000000,  status:'active'  },
-  { id:'rv7',  centerId:'c3', customerName:'Pooja Iyer',    bookingId:'#SW20701', rating:4, comment:'Decent wash for the price. Interior vacuum was thorough.',                                       ts: Date.now()-21600000,  status:'active'  },
-  { id:'rv8',  centerId:'c3', customerName:'Karthik Nair',  bookingId:'#SW20702', rating:5, comment:'Quick, affordable and efficient. Staff was friendly and helpful.',                               ts: Date.now()-28800000,  status:'active'  },
-  { id:'rv9',  centerId:'c4', customerName:'Vishal Tiwari', bookingId:'#SW20801', rating:5, comment:'Excellent service, very fast! XUV700 looked brand new after the steam wash. 10/10.',            ts: Date.now()-1800000,   status:'active'  },
-  { id:'rv10', centerId:'c4', customerName:'Meera Pillai',  bookingId:'#SW20802', rating:5, comment:'Fantastic detailing job. Worth every rupee. The team was meticulous.',                          ts: Date.now()-4500000,   status:'active'  },
-  { id:'rv11', centerId:'c4', customerName:'Sanjay Gupta',  bookingId:'#SW20803', rating:3, comment:'D2D agent arrived 20 mins late but the wash quality was good.',                                 ts: Date.now()-32400000,  status:'active'  },
-  { id:'rv12', centerId:'c1', customerName:'Amit Desai',    bookingId:'#SW20503', rating:1, comment:'SCAM! They damaged my wing mirror and asked for extra money. Reporting to consumer forum.',     ts: Date.now()-36000000,  status:'active'  },
-];
-
-let NOTIFICATIONS = [
-  { id:'n1', icon:'🆕', title:'New booking #SW20806',          body:'Divya Singh · QuickWash Thane · Dry Wash · ₹249',          time: Date.now() - 300000,  read:false, action:'bookings'  },
-  { id:'n2', icon:'⭐', title:'5★ review received',            body:'Vishal Tiwari · Steam + Polish & Wax · QuickWash Thane',   time: Date.now() - 720000,  read:false, action:'reports'   },
-  { id:'n3', icon:'💬', title:'New message from Rahul Kumar',  body:'My car is still waiting, its been 30 min already',         time: Date.now() - 1380000, read:false, action:'chat'      },
-  { id:'n4', icon:'✨', title:'Booking #SW20802 completed',    body:'Meera Pillai · ₹549 · QuickWash Thane',                   time: Date.now() - 1080000, read:true,  action:'bookings'  },
-  { id:'n5', icon:'🚗', title:'Customer arrived — #SW20804',   body:'Ritu Sharma · Ertiga · QuickWash Thane',                  time: Date.now() - 1680000, read:true,  action:'bookings'  },
-  { id:'n6', icon:'⭐', title:'4★ review received',            body:'Kavya Menon · Steam + Polish & Wax · SparkWash Bandra',   time: Date.now() - 2100000, read:true,  action:'reports'   },
-  { id:'n7', icon:'🔴', title:'CleanRide Powai closed early',  body:'Center marked closed by owner · Powai, Mumbai',           time: Date.now() - 3600000, read:true,  action:'centers'   },
-  { id:'n8', icon:'🎁', title:'Promo SPARK20 used 3 times',    body:'3 new redemptions · ₹612 discount given today',           time: Date.now() - 7200000, read:true,  action:'super'     },
-];
+// Loaded by AdminData.loadAll() on login.
+let REVIEWS       = [];
+let NOTIFICATIONS = [];

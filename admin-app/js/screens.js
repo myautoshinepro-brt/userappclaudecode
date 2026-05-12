@@ -1016,14 +1016,14 @@ const AdminBookings = {
       const wl = WASH_LABELS[b.type];
       const ctr = CENTERS.find(c => c.id === b.centerId);
       return `
-        <div class="bk-card">
+        <div class="bk-card" style="cursor:pointer" onclick="AdminBookings.openDetail('${b.id}')">
           <div class="flex-b" style="margin-bottom:6px">
             <div style="flex:1;min-width:0">
               <div class="flex-c gap6" style="margin-bottom:2px">
                 <div class="bold text-xs">${b.customer}</div>
-                <span class="text-xs text-muted">${b.id}</span>
+                <span class="text-xs text-muted" style="color:var(--primary);text-decoration:underline">${b.id}</span>
               </div>
-              <div style="font-size:10px;color:var(--muted)">${b.phone} · ${b.vehicle} · ${b.model}</div>
+              <div style="font-size:10px;color:var(--muted)">${Privacy.phone(b.phone, 'list-' + b.id)} · ${b.vehicle} · ${b.model}</div>
             </div>
             <span class="badge ${sm.cls}">${sm.icon} ${sm.label}</span>
           </div>
@@ -1034,13 +1034,19 @@ const AdminBookings = {
             <span class="text-xs bold text-primary">₹${b.price}</span>
             ${b.rating ? `<span style="font-size:10px;color:var(--gold)">${'★'.repeat(b.rating)}${'☆'.repeat(5-b.rating)}</span>` : ''}
           </div>
-          <div style="display:flex;gap:6px">
+          <div style="display:flex;gap:6px" onclick="event.stopPropagation()">
             <button class="btn btn-sm btn-primary" style="flex:1" onclick="AdminBookings.openEdit('${b.id}')">✏️ Edit Booking</button>
             <button class="btn btn-sm btn-ghost" onclick="openCall('${b.customer}','${b.phone}','${b.id}')">📞</button>
             <button class="btn btn-sm btn-ghost" onclick="AdminBookings.openChatWithCustomer('${b.id}')">💬</button>
           </div>
         </div>`;
     }).join('') : '<div style="padding:30px;text-align:center;color:var(--muted);font-size:12px">No bookings match this filter</div>');
+  },
+
+  // Clicking the booking name / ref opens the read-only detail view.
+  openDetail(bookingId) {
+    AppState.selectedBookingId = bookingId;
+    Router.go('booking-detail');
   },
 
   openEdit(bookingId) {
@@ -1490,9 +1496,10 @@ const AdminReports = {
 const SuperAdmin = {
   render() {
     if (AppState.role !== 'superadmin') {
-      setHtml('super-content', '<div style="padding:40px;text-align:center;color:var(--muted)">⛔ Access restricted to Super Admins</div>');
+      setHtml('sa-sections', '<div style="padding:40px;text-align:center;color:var(--muted)">⛔ Access restricted to Super Admins</div>');
       return;
     }
+    this._buildSections();
     this._renderSettlements();
     this._loadAndRenderApplications();
     this._renderRevenueRequests();
@@ -1501,6 +1508,58 @@ const SuperAdmin = {
     this._renderPromos();
     this._renderAccounts();
     this._renderCenters();
+  },
+
+  // Rebuild the SA page as a stack of collapsible cards. Each section's inner
+  // div carries the same id the individual _renderXxx() methods populate, so
+  // their setHtml() calls keep working unchanged.
+  _buildSections() {
+    const headerBadge = (id) => `<span style="font-size:10px;color:#dc2626;font-weight:700" id="${id}"></span>`;
+    const addBtn  = (label, fn) => `<button class="btn btn-sm btn-primary" onclick="event.stopPropagation();${fn}">${label}</button>`;
+    const viewAll = (target, label) => `<button class="btn btn-sm btn-ghost" style="font-size:11px;margin:0 13px 12px 0;float:right" onclick="Router.go('${target}')">${label} →</button><div style="clear:both"></div>`;
+
+    setHtml('sa-sections',
+      Collapsible.section('sa-sec-settle',
+        '💸 SparkWash Settlements',
+        '<div class="card" style="padding:0;margin:0 13px 4px" id="sa-settlements"></div>' + viewAll('settlements', 'View full settlement details'),
+        { defaultOpen: false, right: '<span id="sa-settle-badge"></span>' }
+      ) +
+      Collapsible.section('sa-sec-apps',
+        '🏪 Center Applications',
+        '<div class="card" style="padding:0;margin:0 13px 4px" id="sa-applications"></div>' + viewAll('applications', 'Manage all applications'),
+        { defaultOpen: false, right: '<span id="sa-apps-badge"></span>' }
+      ) +
+      Collapsible.section('sa-sec-promos',
+        '🎁 Promo Codes',
+        '<div style="padding:0 13px 10px"><div style="text-align:right;margin-bottom:6px">' + addBtn('+ Add', 'SuperAdmin.openAddPromo()') + '</div><div id="sa-promos"></div></div>',
+        { defaultOpen: false }
+      ) +
+      Collapsible.section('sa-sec-accounts',
+        '👥 Admin Accounts',
+        '<div style="padding:0 13px 10px"><div style="text-align:right;margin-bottom:6px">' + addBtn('+ Add Admin', 'SuperAdmin.openAddAdmin()') + '</div><div class="card" style="padding:0" id="sa-accounts"></div></div>',
+        { defaultOpen: false }
+      ) +
+      Collapsible.section('sa-sec-rev',
+        '💰 Revenue Access Requests',
+        '<div class="card" style="padding:0;margin:0 13px 10px" id="sa-rev-requests"></div>',
+        { defaultOpen: false, right: '<span style="color:var(--muted);font-weight:600" id="sa-rev-req-count"></span>' }
+      ) +
+      Collapsible.section('sa-sec-reviews',
+        '⭐ Review Moderation',
+        '<div class="card" style="padding:0;margin:0 13px 10px" id="sa-reviews-list"></div>',
+        { defaultOpen: false, right: '<span id="sa-reviews-count"></span>' }
+      ) +
+      Collapsible.section('sa-sec-cities',
+        '🏙️ Cities',
+        '<div style="padding:0 13px 10px"><div style="text-align:right;margin-bottom:6px">' + addBtn('+ Add City', 'SuperAdmin.openAddCity()') + '</div><div class="card" style="padding:0" id="sa-cities-list"></div></div>',
+        { defaultOpen: false }
+      ) +
+      Collapsible.section('sa-sec-centers',
+        '🏢 Centers Management',
+        '<div style="padding:0 13px 10px"><div style="text-align:right;margin-bottom:6px">' + addBtn('+ Add Center', 'SuperAdmin.openAddCenter()') + '</div><div id="sa-centers-list"></div></div>',
+        { defaultOpen: true }
+      )
+    );
   },
 
   _renderSettlements() {

@@ -303,6 +303,28 @@
 </div>
 
 <!-- ═══════════════════════════════════════════
+     BOOKING DETAIL  (full info + history + masked private fields)
+═══════════════════════════════════════════ -->
+<div class="screen" id="sc-booking-detail">
+  <div class="topbar">
+    <button class="topbar-icon" onclick="Router.go('bookings')">←</button>
+    <div style="flex:1">
+      <div class="topbar-title" id="bd-title">Booking</div>
+      <div class="topbar-sub"   id="bd-sub"></div>
+    </div>
+  </div>
+  <div class="scroll" id="bd-body" style="padding-bottom:40px"></div>
+  <div class="bnav">
+    <button class="bnav-btn" data-tab="home" onclick="Router.go('dashboard')"><span class="bnav-ico">🏠</span>Home</button>
+    <button class="bnav-btn" data-tab="ctr"  onclick="Router.go('centers')"> <span class="bnav-ico">🏢</span>Centers</button>
+    <button class="bnav-btn on" data-tab="bk" onclick="Router.go('bookings')"><span class="bnav-ico">📋</span>Bookings</button>
+    <button class="bnav-btn" data-tab="ch"   onclick="Router.go('chat')">    <span class="bnav-ico">💬</span>Chat</button>
+    <button class="bnav-btn admin-reports-btn" data-tab="rp" onclick="Router.go('reports')"><span class="bnav-ico">📊</span>Reports</button>
+    <button class="bnav-btn sa-only" data-tab="sa" onclick="Router.go('super')" style="display:none"><span class="bnav-ico">⚡</span>SA</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
      CHAT LIST
 ═══════════════════════════════════════════ -->
 <div class="screen" id="sc-chat">
@@ -413,71 +435,13 @@
   </div>
 
   <div class="scroll">
-    <div style="padding:12px 13px 0">
+    <!-- SuperAdmin.render() builds collapsible sections in here. Each section
+         carries the same inner ids (sa-settlements, sa-applications, ...) so the
+         existing _renderXxx() helpers keep working. -->
+    <div id="sa-sections" style="padding:12px 0 0"></div>
 
-      <!-- Settlements -->
-      <div class="flex-b" style="margin-bottom:8px;margin-top:2px">
-        <div class="slbl" style="margin-bottom:0">💸 SparkWash Settlements</div>
-        <span style="font-size:10px;color:#dc2626;font-weight:700" id="sa-settle-badge"></span>
-      </div>
-      <div class="card" style="padding:0;margin-bottom:4px" id="sa-settlements"></div>
-      <div style="text-align:right;margin-bottom:14px">
-        <button class="btn btn-sm btn-ghost" style="font-size:11px" onclick="Router.go('settlements')">View full settlement details →</button>
-      </div>
-
-      <!-- Center Applications -->
-      <div class="flex-b" style="margin-bottom:8px;margin-top:2px">
-        <div class="slbl" style="margin-bottom:0">🏪 Center Applications</div>
-        <span style="font-size:10px;color:#dc2626;font-weight:700" id="sa-apps-badge"></span>
-      </div>
-      <div class="card" style="padding:0;margin-bottom:4px" id="sa-applications"></div>
-      <div style="text-align:right;margin-bottom:14px">
-        <button class="btn btn-sm btn-ghost" style="font-size:11px" onclick="Router.go('applications')">Manage all applications →</button>
-      </div>
-
-      <!-- Promo Codes -->
-      <div class="flex-b" style="margin-bottom:8px">
-        <div class="slbl" style="margin-bottom:0">🎁 Promo Codes</div>
-        <button class="btn btn-sm btn-primary" onclick="SuperAdmin.openAddPromo()">+ Add</button>
-      </div>
-      <div id="sa-promos"></div>
-
-      <!-- Admin Accounts -->
-      <div class="flex-b" style="margin-bottom:8px;margin-top:6px">
-        <div class="slbl" style="margin-bottom:0">👥 Admin Accounts</div>
-        <button class="btn btn-sm btn-primary" onclick="SuperAdmin.openAddAdmin()">+ Add Admin</button>
-      </div>
-      <div class="card" style="padding:0" id="sa-accounts"></div>
-
-      <!-- Revenue Requests -->
-      <div class="flex-b" style="margin-bottom:8px">
-        <div class="slbl" style="margin-bottom:0">💰 Revenue Access Requests</div>
-        <span style="font-size:10px;color:var(--muted)" id="sa-rev-req-count"></span>
-      </div>
-      <div class="card" style="padding:0;margin-bottom:12px" id="sa-rev-requests"></div>
-
-      <!-- Review Moderation -->
-      <div class="flex-b" style="margin-bottom:8px;margin-top:4px">
-        <div class="slbl" style="margin-bottom:0">⭐ Review Moderation</div>
-        <span style="font-size:10px;color:#dc2626;font-weight:700" id="sa-reviews-count"></span>
-      </div>
-      <div class="card" style="padding:0;margin-bottom:12px" id="sa-reviews-list"></div>
-
-      <!-- Cities -->
-      <div class="flex-b" style="margin-bottom:8px;margin-top:4px">
-        <div class="slbl" style="margin-bottom:0">🏙️ Cities</div>
-        <button class="btn btn-sm btn-primary" onclick="SuperAdmin.openAddCity()">+ Add City</button>
-      </div>
-      <div class="card" style="padding:0;margin-bottom:10px" id="sa-cities-list"></div>
-
-      <!-- Centers -->
-      <div class="flex-b" style="margin-bottom:8px;margin-top:4px">
-        <div class="slbl" style="margin-bottom:0">🏢 Centers Management</div>
-        <button class="btn btn-sm btn-primary" onclick="SuperAdmin.openAddCenter()">+ Add Center</button>
-      </div>
-      <div id="sa-centers-list"></div>
-
-      <!-- Quick access links for SA -->
+    <!-- Quick access links for SA -->
+    <div style="padding:0 13px">
       <div class="flex-b" style="margin-bottom:8px;margin-top:10px">
         <div class="slbl" style="margin-bottom:0">Quick Access</div>
       </div>
@@ -487,7 +451,6 @@
         <button class="btn btn-sm btn-ghost" onclick="Router.go('customers')">👥 Customers</button>
         <button class="btn btn-sm btn-ghost" onclick="Router.go('notifications')">🔔 Notifications</button>
       </div>
-
       <div style="height:16px"></div>
     </div>
   </div>
@@ -947,6 +910,7 @@
 <script src="js/data.js"></script>
 <script src="js/app.js"></script>
 <script src="js/sync.js"></script>
+<script src="js/components.js"></script>
 <script src="js/dashboard.js"></script>
 <script src="js/screens.js"></script>
 

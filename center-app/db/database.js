@@ -193,6 +193,21 @@ db.exec(`
 try { db.exec("ALTER TABLE chat_threads ADD COLUMN admin_last_read_message_id    INTEGER NOT NULL DEFAULT 0"); } catch { /* exists */ }
 try { db.exec("ALTER TABLE chat_threads ADD COLUMN customer_last_read_message_id INTEGER NOT NULL DEFAULT 0"); } catch { /* exists */ }
 
+// ── Booking status history ──
+db.exec(`
+  CREATE TABLE IF NOT EXISTS booking_status_log (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    booking_id      INTEGER NOT NULL REFERENCES bookings(id),
+    from_status     TEXT,
+    to_status       TEXT    NOT NULL,
+    changed_by      TEXT    NOT NULL,    -- 'customer' | 'admin' | 'center' | 'system'
+    changed_by_name TEXT,
+    notes           TEXT,
+    created_at      TEXT    NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_booking_status_log_booking ON booking_status_log(booking_id, id);
+`);
+
 // ── Promo codes table ──
 db.exec(`
   CREATE TABLE IF NOT EXISTS promos (
@@ -619,9 +634,29 @@ module.exports = {
   },
   getBookingById(id) { return bookingById.get(id); },
   updateBookingStatus(id, centerId, status) {
-    return updateBookingStatus.run(status, id, centerId);
+    const prev = bookingById.get(id);
+    const r = updateBookingStatus.run(status, id, centerId);
+    if (prev && prev.status !== status) {
+      this.logBookingStatus(id, {
+        from_status: prev.status, to_status: status,
+        changed_by: 'center', changed_by_name: null,
+        notes: 'Status changed by center',
+      });
+    }
+    return r;
   },
-  rejectBooking(id, centerId) { return rejectBooking.run(id, centerId); },
+  rejectBooking(id, centerId) {
+    const prev = bookingById.get(id);
+    const r = rejectBooking.run(id, centerId);
+    if (prev && prev.status !== 'cancelled') {
+      this.logBookingStatus(id, {
+        from_status: prev.status, to_status: 'cancelled',
+        changed_by: 'center', changed_by_name: null,
+        notes: 'Rejected by center',
+      });
+    }
+    return r;
+  },
 
   // Dashboard stats
   getDashboardStats(centerId, date) {
@@ -865,7 +900,32 @@ module.exports = {
       data.slot_date, data.slot_time, data.duration_minutes || 30,
       data.app_discount || 0, data.center_discount || 0
     );
+    // Initial history entry — booking creation.
+    db.prepare(`
+      INSERT INTO booking_status_log (booking_id, from_status, to_status, changed_by, changed_by_name, notes)
+      VALUES (?, NULL, 'new', 'customer', ?, ?)
+    `).run(info.lastInsertRowid, data.customer_name || null, `Booking created · ${data.slot_date} ${data.slot_time}`);
     return db.prepare('SELECT * FROM bookings WHERE id=?').get(info.lastInsertRowid);
+  },
+
+  // Append a history entry to a booking. Used by every status change path.
+  logBookingStatus(bookingId, { from_status, to_status, changed_by, changed_by_name, notes }) {
+    db.prepare(`
+      INSERT INTO booking_status_log (booking_id, from_status, to_status, changed_by, changed_by_name, notes)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(
+      bookingId, from_status || null, to_status,
+      changed_by || 'system', changed_by_name || null, notes || null
+    );
+  },
+
+  listBookingHistory(bookingId) {
+    return db.prepare(`
+      SELECT id, from_status, to_status, changed_by, changed_by_name, notes, created_at
+      FROM booking_status_log
+      WHERE booking_id = ?
+      ORDER BY id ASC
+    `).all(bookingId);
   },
 
   // Get a customer's bookings across all centers, joined with center name.
@@ -881,25 +941,35 @@ module.exports = {
 
   // Customer cancels their own booking. Only allowed for bookings that haven't started.
   cancelCustomerBooking(bookingRef, phone) {
-    const b = db.prepare('SELECT id, customer_phone, status FROM bookings WHERE booking_ref=?').get(bookingRef);
+    const b = db.prepare('SELECT id, customer_name, customer_phone, status FROM bookings WHERE booking_ref=?').get(bookingRef);
     if (!b)                              return { ok: false, error: 'Booking not found' };
     if (b.customer_phone !== phone)      return { ok: false, error: 'Not your booking' };
     if (['done', 'cancelled', 'washing', 'arrived'].includes(b.status))
       return { ok: false, error: `Cannot cancel a ${b.status} booking` };
     db.prepare("UPDATE bookings SET status='cancelled', updated_at=datetime('now') WHERE id=?").run(b.id);
+    this.logBookingStatus(b.id, {
+      from_status: b.status, to_status: 'cancelled',
+      changed_by: 'customer', changed_by_name: b.customer_name,
+      notes: 'Customer cancelled the booking',
+    });
     return { ok: true };
   },
 
   // Customer reschedules their own booking. Same status guard.
   rescheduleCustomerBooking(bookingRef, phone, slotDate, slotTime) {
     if (!slotDate || !slotTime) return { ok: false, error: 'slot_date and slot_time required' };
-    const b = db.prepare('SELECT id, customer_phone, status FROM bookings WHERE booking_ref=?').get(bookingRef);
+    const b = db.prepare('SELECT id, customer_name, customer_phone, status, slot_date, slot_time FROM bookings WHERE booking_ref=?').get(bookingRef);
     if (!b)                              return { ok: false, error: 'Booking not found' };
     if (b.customer_phone !== phone)      return { ok: false, error: 'Not your booking' };
     if (['done', 'cancelled', 'washing', 'arrived'].includes(b.status))
       return { ok: false, error: `Cannot reschedule a ${b.status} booking` };
     db.prepare("UPDATE bookings SET slot_date=?, slot_time=?, updated_at=datetime('now') WHERE id=?")
       .run(slotDate, slotTime, b.id);
+    this.logBookingStatus(b.id, {
+      from_status: b.status, to_status: b.status,
+      changed_by: 'customer', changed_by_name: b.customer_name,
+      notes: `Rescheduled · ${b.slot_date} ${b.slot_time} → ${slotDate} ${slotTime}`,
+    });
     return { ok: true };
   },
 
@@ -1084,15 +1154,42 @@ module.exports = {
     if (!b) return { ok: false, error: 'Booking not found' };
     const sets = [];
     const args = [];
-    if (fields.status)    { sets.push('status=?');    args.push(fields.status); }
-    if (fields.slot_date) { sets.push('slot_date=?'); args.push(fields.slot_date); }
-    if (fields.slot_time) { sets.push('slot_time=?'); args.push(fields.slot_time); }
-    if (fields.center_id) { sets.push('center_id=?'); args.push(parseInt(fields.center_id, 10)); }
-    if (fields.package_price != null) { sets.push('package_price=?'); args.push(parseInt(fields.package_price, 10)); }
+    const changeNotes = [];
+    if (fields.status)    {
+      sets.push('status=?');    args.push(fields.status);
+      changeNotes.push(`status: ${b.status} → ${fields.status}`);
+    }
+    if (fields.slot_date) {
+      sets.push('slot_date=?'); args.push(fields.slot_date);
+      if (fields.slot_date !== b.slot_date) changeNotes.push(`date: ${b.slot_date} → ${fields.slot_date}`);
+    }
+    if (fields.slot_time) {
+      sets.push('slot_time=?'); args.push(fields.slot_time);
+      if (fields.slot_time !== b.slot_time) changeNotes.push(`time: ${b.slot_time} → ${fields.slot_time}`);
+    }
+    if (fields.center_id) {
+      const newCid = parseInt(fields.center_id, 10);
+      sets.push('center_id=?'); args.push(newCid);
+      if (newCid !== b.center_id) changeNotes.push(`center: #${b.center_id} → #${newCid}`);
+    }
+    if (fields.package_price != null) {
+      const newPrice = parseInt(fields.package_price, 10);
+      sets.push('package_price=?'); args.push(newPrice);
+      if (newPrice !== b.package_price) changeNotes.push(`price: ₹${b.package_price} → ₹${newPrice}`);
+    }
     if (!sets.length) return { ok: false, error: 'No updatable fields supplied' };
     sets.push("updated_at=datetime('now')");
     args.push(bookingId);
     db.prepare(`UPDATE bookings SET ${sets.join(', ')} WHERE id=?`).run(...args);
+    if (changeNotes.length) {
+      this.logBookingStatus(bookingId, {
+        from_status: b.status,
+        to_status:   fields.status || b.status,
+        changed_by:  'admin',
+        changed_by_name: 'SparkWash Admin',
+        notes: changeNotes.join(' · '),
+      });
+    }
     return { ok: true };
   },
 

@@ -98,6 +98,23 @@ router.patch('/promos/:id', adminAuth, (req, res) => {
   res.json({ success: true });
 });
 
+// GET /api/admin/bookings/:id — full booking row + center info
+router.get('/bookings/:id', adminAuth, (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (!id) return res.status(400).json({ error: 'Invalid id' });
+  const b = db.getBookingById(id);
+  if (!b) return res.status(404).json({ error: 'Booking not found' });
+  const center = db.findCenterById(b.center_id);
+  res.json({ success: true, data: b, center });
+});
+
+// GET /api/admin/bookings/:id/history — full status history
+router.get('/bookings/:id/history', adminAuth, (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (!id) return res.status(400).json({ error: 'Invalid id' });
+  res.json({ success: true, data: db.listBookingHistory(id) });
+});
+
 // PATCH /api/admin/bookings/:id  Body: { status?, slot_date?, slot_time?, center_id?, package_price? }
 router.patch('/bookings/:id', adminAuth, (req, res) => {
   const id = parseInt(req.params.id, 10);

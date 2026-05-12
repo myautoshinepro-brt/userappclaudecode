@@ -42,12 +42,13 @@ const Router = {
     if (id === 'customer-detail') CustomersScreen.renderDetail();
     if (id === 'settlements')     SettlementsScreen.render();
     if (id === 'applications')    ApplicationsScreen.render();
+    if (id === 'booking-detail')  BookingDetail.render();
   },
 
   _nav(id) {
     const map = {
       dashboard:'home', centers:'ctr', 'center-detail':'ctr',
-      bookings:'bk', chat:'ch', reports:'rp', super:'sa', history:'',
+      bookings:'bk', 'booking-detail':'bk', chat:'ch', reports:'rp', super:'sa', history:'',
       customers:'bk', 'customer-detail':'bk',
       settlements:'sa', applications:'sa',
       notifications:'home', profile:'home',
