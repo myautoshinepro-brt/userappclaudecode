@@ -79,172 +79,210 @@ const HelpScreen = {
   },
 };
 
-// ── CHAT SCREEN ──
-
-const CHAT_AUTO_REPLIES = [
-  { match: /\bbook(ing)?\b/i,         reply: "Sure! Could you share your booking ID? It starts with #SW." },
-  { match: /cancel/i,                  reply: "To cancel: go to My Bookings → tap your booking → Cancel. Refunds arrive in 3–5 business days to your original payment method." },
-  { match: /pay|refund|money|charge/i, reply: "For payment issues, please share your booking ID and the amount deducted. I'll check it right away! 🔍" },
-  { match: /promo|code|discount|offer/i, reply: "Promo codes can be applied on the booking summary screen before confirming payment. Which code are you trying? 🎁" },
-  { match: /vehicle|car|bike/i,        reply: "You can manage your vehicles under Profile → My Vehicles. Want help adding or editing one?" },
-  { match: /wash|service|package/i,    reply: "We offer Water Wash, Dry Wash, Steam Wash, and Door-to-Door service. Which one can I tell you more about? 💧" },
-  { match: /center|centre|location/i,  reply: "We have centers across Andheri, Bandra, Juhu, and Malad. Use the home screen to find the nearest one. 📍" },
-  { match: /slot|time|schedule/i,      reply: "Slots can be changed from My Bookings → Manage → Modify. Would you like help with that?" },
-  { match: /hello|hi\b|hey\b/i,        reply: "Hello! 😊 Happy to help. What's your query today?" },
-  { match: /thank/i,                   reply: "You're welcome! 😊 Is there anything else I can help you with?" },
-  { match: /bye|done|ok\s*$|okay/i,    reply: "Great! Have a sparkling clean ride! 🚗✨ Feel free to reach out anytime." },
-];
-
-const CHAT_DEFAULT_REPLIES = [
-  "Let me check that for you! Give me a moment. 🔍",
-  "I understand. Could you provide more details so I can assist better?",
-  "Thanks for reaching out! I'll look into this for you.",
-  "Got it! I'm pulling up the details now. 📋",
-  "Sure thing! Our team typically resolves this within a few hours.",
-];
+// ── CHAT SCREEN (real-time via polling against /api/chat) ──
 
 const ChatScreen = {
-  _messages: [],
-  _msgCounter: 10,
-  _storageKey: 'sw_chat_history',
+  _thread:        null,
+  _messages:      [],
+  _lastMessageId: 0,
+  _pollHandle:    null,
+  _pollMs:        4000,
+  _pendingType:   'general',
+  _pendingBookingRef: null,
 
-  init() {
-    this._load();
-    this._renderMessages();
-    this._scrollBottom(true);
-    document.getElementById('chat-input')?.focus();
+  // Called by Help screen "Chat with support" button.
+  openGeneral() {
+    this._pendingType = 'general';
+    this._pendingBookingRef = null;
+    Router.go('chat');
   },
 
-  _load() {
-    try {
-      const saved = localStorage.getItem(this._storageKey);
-      if (saved) {
-        this._messages = JSON.parse(saved);
-        this._msgCounter = this._messages.length + 10;
-        return;
-      }
-    } catch { /* ignore */ }
-    // Seed initial admin greeting
-    const t = this._now();
-    this._messages = [
-      { id: 'm1', from: 'admin', text: 'Hi ' + (AppState.user.name?.split(' ')[0] || 'there') + '! 👋 Welcome to SparkWash Support.', time: t },
-      { id: 'm2', from: 'admin', text: 'How can I help you today? You can ask about bookings, payments, refunds, or anything else.', time: t },
-    ];
-    this._save();
+  // Called from a booking card; auto-attaches the booking ref.
+  openForBooking(bookingRef) {
+    if (!bookingRef) return;
+    this._pendingType = 'booking';
+    this._pendingBookingRef = bookingRef;
+    Router.go('chat');
   },
 
-  _save() {
-    try { localStorage.setItem(this._storageKey, JSON.stringify(this._messages)); } catch { /* ignore */ }
-  },
-
-  clearHistory() {
-    localStorage.removeItem(this._storageKey);
+  // Router calls this on chat-screen entry.
+  async init() {
     this._messages = [];
-    this._msgCounter = 10;
-    this.init();
+    this._lastMessageId = 0;
+    this._renderMessages([]);
+    this._setHeader(this._pendingType, this._pendingBookingRef);
+
+    const wrap = document.getElementById('chat-messages');
+    if (wrap) wrap.innerHTML = `<div style="padding:24px;text-align:center;color:var(--text-secondary);font-size:11px">Connecting to support…</div>`;
+
+    try {
+      // Idempotent: returns existing thread for this customer + booking_ref, else creates.
+      const r = await fetch('/api/chat/threads', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (Auth.getToken() || '') },
+        body:    JSON.stringify({
+          type:        this._pendingType,
+          booking_ref: this._pendingBookingRef || undefined,
+        }),
+      });
+      const j = await r.json();
+      if (!r.ok || !j.success) throw new Error(j.error || 'Could not open chat');
+      this._thread = j.data;
+
+      await this._loadMessages();
+      await this._markRead();
+      this._startPolling();
+      document.getElementById('chat-input')?.focus();
+    } catch (e) {
+      console.warn('Chat init failed:', e);
+      const errWrap = document.getElementById('chat-messages');
+      if (errWrap) errWrap.innerHTML = `<div style="padding:24px;text-align:center;color:var(--red);font-size:11px">Could not open chat: ${e.message}</div>`;
+    }
   },
 
-  _now() {
-    const d = new Date();
-    return d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0');
+  // Router calls this on chat-screen leave.
+  destroy() {
+    this._stopPolling();
+    this._thread = null;
   },
 
-  // ── SENDING ──
+  _setHeader(type, bookingRef) {
+    const name = document.getElementById('chat-header-name');
+    const sub  = document.getElementById('chat-header-sub');
+    if (name) name.textContent = 'SparkWash Support';
+    if (sub)  sub.textContent  = type === 'booking' ? `About booking ${bookingRef}` : 'General support';
+  },
 
-  send() {
+  async _loadMessages() {
+    if (!this._thread) return;
+    const r = await fetch('/api/chat/threads/' + this._thread.id + '/messages', {
+      headers: { Authorization: 'Bearer ' + (Auth.getToken() || '') },
+    });
+    const j = await r.json();
+    if (!r.ok || !j.success) return;
+    this._messages = j.data;
+    this._lastMessageId = this._messages.length ? this._messages[this._messages.length - 1].id : 0;
+    this._renderMessages(this._messages);
+    this._scrollBottom(true);
+  },
+
+  async _markRead() {
+    if (!this._thread) return;
+    try {
+      await fetch('/api/chat/threads/' + this._thread.id + '/read', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + (Auth.getToken() || '') },
+      });
+    } catch { /* non-critical */ }
+  },
+
+  _startPolling() {
+    this._stopPolling();
+    this._pollHandle = setInterval(() => this._poll(), this._pollMs);
+  },
+  _stopPolling() {
+    if (this._pollHandle) clearInterval(this._pollHandle);
+    this._pollHandle = null;
+  },
+
+  async _poll() {
+    if (!this._thread) return;
+    try {
+      const r = await fetch('/api/chat/threads/' + this._thread.id + '/messages', {
+        headers: { Authorization: 'Bearer ' + (Auth.getToken() || '') },
+      });
+      const j = await r.json();
+      if (!r.ok || !j.success) return;
+      const fresh = j.data.filter(m => m.id > this._lastMessageId);
+      if (fresh.length) {
+        fresh.forEach(m => this._appendBubble(m));
+        this._lastMessageId = fresh[fresh.length - 1].id;
+        this._scrollBottom();
+        this._markRead();
+      }
+    } catch { /* silent — next tick will retry */ }
+  },
+
+  async send() {
     const input = document.getElementById('chat-input');
     const text  = input?.value.trim();
-    if (!text) return;
+    if (!text || !this._thread) return;
     input.value = '';
-    this._addMsg('user', text);
-    this._scheduleReply(text);
-  },
 
-  sendQuick(text) {
-    const qw = document.getElementById('chat-quick-wrap');
-    if (qw) qw.style.display = 'none';
-    this._addMsg('user', text);
-    this._scheduleReply(text);
+    // Optimistic render. Re-poll will get the canonical row.
+    const optimistic = {
+      id: Date.now(), thread_id: this._thread.id, sender: 'customer',
+      text, created_at: new Date().toISOString(),
+    };
+    this._appendBubble(optimistic);
+    this._scrollBottom();
+
+    try {
+      const r = await fetch('/api/chat/threads/' + this._thread.id + '/messages', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (Auth.getToken() || '') },
+        body:    JSON.stringify({ text }),
+      });
+      const j = await r.json();
+      if (!r.ok || !j.success) throw new Error(j.error || 'Send failed');
+      if (j.data && j.data.id) this._lastMessageId = Math.max(this._lastMessageId, j.data.id);
+    } catch (e) {
+      UI.toast('❌ ' + e.message);
+    }
   },
 
   handleKeyup(e) {
     if (e.key === 'Enter') this.send();
   },
 
-  _scheduleReply(userText) {
-    // Show typing bubble
-    const wrap = document.getElementById('chat-messages');
-    if (wrap) {
-      wrap.insertAdjacentHTML('beforeend', this._typingHTML());
-      this._scrollBottom();
-    }
-    const delay = 900 + Math.random() * 900;
-    setTimeout(() => {
-      document.getElementById('chat-typing-indicator')?.remove();
-      this._addMsg('admin', this._autoReply(userText));
-    }, delay);
+  // sendQuick is still wired in the HTML — same path as typing the text.
+  async sendQuick(text) {
+    const input = document.getElementById('chat-input');
+    if (input) input.value = text;
+    const qw = document.getElementById('chat-quick-wrap');
+    if (qw) qw.style.display = 'none';
+    return this.send();
   },
 
-  _autoReply(text) {
-    for (const r of CHAT_AUTO_REPLIES) {
-      if (r.match.test(text)) return r.reply;
-    }
-    return CHAT_DEFAULT_REPLIES[Math.floor(Math.random() * CHAT_DEFAULT_REPLIES.length)];
-  },
-
-  _addMsg(from, text) {
-    const msg = { id: 'm' + (++this._msgCounter), from, text, time: this._now() };
-    this._messages.push(msg);
-    this._save();
-
-    const wrap = document.getElementById('chat-messages');
-    if (wrap) {
-      wrap.insertAdjacentHTML('beforeend', this._bubbleHTML(msg));
-      // hide quick replies once user sends anything
-      if (from === 'user') {
-        const qw = document.getElementById('chat-quick-wrap');
-        if (qw) qw.style.display = 'none';
-      }
-      this._scrollBottom();
-    }
-  },
-
-  // ── RENDER ──
-
-  _renderMessages() {
+  _renderMessages(list) {
     const wrap = document.getElementById('chat-messages');
     if (!wrap) return;
-    wrap.innerHTML = this._messages.map(m => this._bubbleHTML(m)).join('');
-    // Show quick replies only if user hasn't typed yet
+    wrap.innerHTML = list.map(m => this._bubbleHTML(m)).join('') || '';
     const qw = document.getElementById('chat-quick-wrap');
-    const userSent = this._messages.some(m => m.from === 'user');
-    if (qw) qw.style.display = userSent ? 'none' : 'flex';
+    if (qw) qw.style.display = list.some(m => m.sender === 'customer') ? 'none' : 'flex';
+  },
+
+  _appendBubble(m) {
+    const wrap = document.getElementById('chat-messages');
+    if (!wrap) return;
+    wrap.insertAdjacentHTML('beforeend', this._bubbleHTML(m));
+    const qw = document.getElementById('chat-quick-wrap');
+    if (qw && m.sender === 'customer') qw.style.display = 'none';
   },
 
   _bubbleHTML(m) {
-    const isUser = m.from === 'user';
+    if (m.sender === 'system') {
+      return `<div style="text-align:center;font-size:10px;color:var(--text-tertiary);margin:8px 0">${this._escHTML(m.text)}</div>`;
+    }
+    const isUser = m.sender === 'customer';
     return `
       <div class="chat-row ${isUser ? 'chat-row-user' : 'chat-row-admin'}">
         ${!isUser ? `<div class="chat-avatar-sm">SW</div>` : ''}
         <div class="chat-bubble ${isUser ? 'chat-bubble-user' : 'chat-bubble-admin'}">
           <div class="chat-bubble-text">${this._escHTML(m.text)}</div>
-          <div class="chat-bubble-meta">${m.time}${isUser ? ' <span class="chat-ticks">✓✓</span>' : ''}</div>
+          <div class="chat-bubble-meta">${this._formatTime(m.created_at)}${isUser ? ' <span class="chat-ticks">✓✓</span>' : ''}</div>
         </div>
       </div>`;
   },
 
-  _typingHTML() {
-    return `
-      <div class="chat-row chat-row-admin" id="chat-typing-indicator">
-        <div class="chat-avatar-sm">SW</div>
-        <div class="chat-bubble chat-bubble-admin chat-typing">
-          <span class="chat-dot"></span><span class="chat-dot"></span><span class="chat-dot"></span>
-        </div>
-      </div>`;
+  _formatTime(iso) {
+    const d = new Date(String(iso || '').replace(' ', 'T') + (iso && iso.endsWith('Z') ? '' : 'Z'));
+    if (isNaN(d)) return '';
+    return d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0');
   },
 
   _escHTML(str) {
-    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   },
 
   _scrollBottom(instant) {

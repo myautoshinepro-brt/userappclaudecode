@@ -26,6 +26,11 @@ const Router = {
       pushHistory = false;
     }
 
+    // Stop background work on screens that need cleanup before we leave.
+    if (this.current === 'chat' && screenId !== 'chat' && typeof ChatScreen !== 'undefined' && ChatScreen.destroy) {
+      ChatScreen.destroy();
+    }
+
     // Hide all
     Object.values(this.screens).forEach(el => {
       el.style.visibility = 'hidden';

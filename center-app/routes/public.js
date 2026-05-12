@@ -186,4 +186,68 @@ router.get('/promos', (_req, res) => {
   res.json({ success: true, data: db.listActivePromos() });
 });
 
+// ── CHAT ──────────────────────────────────────────────────────
+// Customer endpoints. Every call must include the customer's phone so we can
+// (a) scope to their threads and (b) verify thread ownership.
+
+function _ownThreadOr403(thread, phone) {
+  if (!thread) return { err: 404, msg: 'Thread not found' };
+  if (thread.customer_phone !== phone) return { err: 403, msg: 'Not your thread' };
+  return null;
+}
+
+// GET /api/public/chat/threads?phone=...
+router.get('/chat/threads', (req, res) => {
+  const phone = String(req.query.phone || '').replace(/\s+/g, '');
+  if (!/^[6-9]\d{9}$/.test(phone)) return res.status(400).json({ error: 'valid phone required' });
+  res.json({ success: true, data: db.listChatThreadsForCustomer(phone) });
+});
+
+// POST /api/public/chat/threads  Body: { phone, customer_name, type, booking_ref? }
+router.post('/chat/threads', (req, res) => {
+  const b = req.body || {};
+  const phone = String(b.phone || '').replace(/\s+/g, '');
+  if (!/^[6-9]\d{9}$/.test(phone)) return res.status(400).json({ error: 'valid phone required' });
+  if (b.type !== 'general' && b.type !== 'booking') return res.status(400).json({ error: 'type must be general or booking' });
+  if (b.type === 'booking' && !b.booking_ref) return res.status(400).json({ error: 'booking_ref required for booking type' });
+
+  const thread = db.findOrCreateChatThread({
+    customer_phone: phone,
+    customer_name:  b.customer_name || null,
+    booking_ref:    b.type === 'booking' ? b.booking_ref : null,
+  });
+  res.json({ success: true, data: thread });
+});
+
+// GET /api/public/chat/threads/:id/messages?phone=...
+router.get('/chat/threads/:id/messages', (req, res) => {
+  const phone = String(req.query.phone || '').replace(/\s+/g, '');
+  const thread = db.getChatThread(parseInt(req.params.id, 10));
+  const own = _ownThreadOr403(thread, phone);
+  if (own) return res.status(own.err).json({ error: own.msg });
+  res.json({ success: true, data: db.listChatMessages(thread.id) });
+});
+
+// POST /api/public/chat/threads/:id/messages  Body: { phone, customer_name, text }
+router.post('/chat/threads/:id/messages', (req, res) => {
+  const b = req.body || {};
+  const phone = String(b.phone || '').replace(/\s+/g, '');
+  const thread = db.getChatThread(parseInt(req.params.id, 10));
+  const own = _ownThreadOr403(thread, phone);
+  if (own) return res.status(own.err).json({ error: own.msg });
+  if (!b.text || !String(b.text).trim()) return res.status(400).json({ error: 'text required' });
+  const msg = db.sendChatMessage(thread.id, 'customer', b.customer_name || thread.customer_name || null, b.text);
+  res.status(201).json({ success: true, data: msg });
+});
+
+// POST /api/public/chat/threads/:id/read  Body: { phone }
+router.post('/chat/threads/:id/read', (req, res) => {
+  const phone = String((req.body || {}).phone || '').replace(/\s+/g, '');
+  const thread = db.getChatThread(parseInt(req.params.id, 10));
+  const own = _ownThreadOr403(thread, phone);
+  if (own) return res.status(own.err).json({ error: own.msg });
+  db.markChatThreadRead(thread.id, 'customer');
+  res.json({ success: true });
+});
+
 module.exports = router;

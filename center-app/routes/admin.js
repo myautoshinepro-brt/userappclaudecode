@@ -182,4 +182,31 @@ router.patch('/centers/:id/open-status', adminAuth, (req, res) => {
   res.json({ success: true, id, is_open: isOpen });
 });
 
+// ── ADMIN CHAT ────────────────────────────────────────────────
+router.get('/chat/threads', adminAuth, (_req, res) => {
+  res.json({ success: true, data: db.listAllChatThreads() });
+});
+
+router.get('/chat/threads/:id/messages', adminAuth, (req, res) => {
+  const t = db.getChatThread(parseInt(req.params.id, 10));
+  if (!t) return res.status(404).json({ error: 'Thread not found' });
+  res.json({ success: true, thread: t, data: db.listChatMessages(t.id) });
+});
+
+router.post('/chat/threads/:id/messages', adminAuth, (req, res) => {
+  const t = db.getChatThread(parseInt(req.params.id, 10));
+  if (!t) return res.status(404).json({ error: 'Thread not found' });
+  const b = req.body || {};
+  if (!b.text || !String(b.text).trim()) return res.status(400).json({ error: 'text required' });
+  const msg = db.sendChatMessage(t.id, 'admin', b.sender_name || 'SparkWash Support', b.text);
+  res.status(201).json({ success: true, data: msg });
+});
+
+router.post('/chat/threads/:id/read', adminAuth, (req, res) => {
+  const t = db.getChatThread(parseInt(req.params.id, 10));
+  if (!t) return res.status(404).json({ error: 'Thread not found' });
+  db.markChatThreadRead(t.id, 'admin');
+  res.json({ success: true });
+});
+
 module.exports = router;

@@ -15,6 +15,11 @@ const AppState = {
 // ── ROUTER ──────────────────────────────────────────────────
 const Router = {
   go(id) {
+    // Stop background polling on screens that have it before we leave.
+    const prev = AppState.screen;
+    if (prev === 'chat'        && id !== 'chat'        && typeof Chat       !== 'undefined' && Chat.destroy)       Chat.destroy();
+    if (prev === 'chat-detail' && id !== 'chat-detail' && typeof ChatDetail !== 'undefined' && ChatDetail.destroy) ChatDetail.destroy();
+
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('on'));
     const sc = document.getElementById('sc-' + id);
     if (sc) sc.classList.add('on');

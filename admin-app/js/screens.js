@@ -1106,40 +1106,84 @@ const AdminBookings = {
     }
   },
 
-  openChatWithCustomer(bookingId) {
-    const thread = CHAT_THREADS.find(t => t.bookingId === bookingId);
-    if (thread) {
-      AppState.selectedThreadId = thread.id;
-      Router.go('chat-detail');
-    } else {
-      UI.toast('No existing chat for this booking');
+  async openChatWithCustomer(bookingId) {
+    try {
+      const threads = await AdminData.fetchChatThreads();
+      const t = threads.find(x => x.booking_ref === bookingId);
+      if (t) {
+        AppState.selectedThreadId = t.id;
+        Router.go('chat-detail');
+      } else {
+        UI.toast('No chat yet for this booking — customer hasn\'t reached out');
+      }
+    } catch (e) {
+      UI.toast('❌ ' + e.message);
     }
   },
 };
 
 // ── CHAT ─────────────────────────────────────────────────────
+// ── CHAT (live from /api/admin/chat) ─────────────────────────
 const Chat = {
-  render() {
-    const total  = CHAT_THREADS.reduce((s,t) => s+t.unread, 0);
-    setText('chat-topbar-sub', total > 0 ? `${total} unread message${total>1?'s':''}` : 'All caught up');
+  _threads:    [],
+  _listPoll:   null,
 
-    setHtml('chat-list', CHAT_THREADS.map(t => {
-      const typeBadge = t.type === 'center'
-        ? '<span class="badge b-center" style="margin-left:4px">Center</span>'
-        : '<span class="badge b-customer" style="margin-left:4px">Customer</span>';
+  async render() {
+    setText('chat-topbar-sub', 'Loading…');
+    try {
+      this._threads = await AdminData.fetchChatThreads();
+    } catch (e) {
+      setText('chat-topbar-sub', '⚠️ Failed to load');
+      setHtml('chat-list', `<div style="padding:40px;text-align:center;color:var(--muted);font-size:12px">Could not load threads: ${e.message}</div>`);
+      return;
+    }
+    this._renderList();
+
+    // Light polling so unread counts stay fresh while admin is on this screen.
+    clearInterval(this._listPoll);
+    this._listPoll = setInterval(() => this._silentRefresh(), 8000);
+  },
+
+  destroy() {
+    clearInterval(this._listPoll);
+    this._listPoll = null;
+  },
+
+  async _silentRefresh() {
+    try {
+      this._threads = await AdminData.fetchChatThreads();
+      this._renderList();
+    } catch { /* ignore */ }
+  },
+
+  _renderList() {
+    const total = this._threads.reduce((s, t) => s + (t.unread_admin || 0), 0);
+    setText('chat-topbar-sub', total > 0 ? `${total} unread message${total > 1 ? 's' : ''}` : 'All caught up');
+
+    if (!this._threads.length) {
+      setHtml('chat-list', `<div style="padding:60px;text-align:center;color:var(--muted);font-size:12px">💬 No conversations yet</div>`);
+      return;
+    }
+
+    setHtml('chat-list', this._threads.map(t => {
+      const initials = UI.initials(t.customer_name || t.customer_phone || '?');
+      const typeBadge = t.booking_ref
+        ? `<span class="badge b-conf" style="margin-left:4px">${t.booking_ref}</span>`
+        : '<span class="badge b-customer" style="margin-left:4px">General</span>';
+      const unread = t.unread_admin || 0;
       return `
-        <div class="thread-item" onclick="Chat.openThread('${t.id}')">
-          <div class="thread-avatar" style="background:${t.avatarBg}">${t.initials}</div>
+        <div class="thread-item" onclick="Chat.openThread(${t.id})">
+          <div class="thread-avatar" style="background:${UI.avatarColor(t.id)}">${initials}</div>
           <div style="flex:1;min-width:0">
             <div class="flex-c gap4">
-              <div class="thread-name">${t.name}</div>
+              <div class="thread-name">${t.customer_name || t.customer_phone}</div>
               ${typeBadge}
             </div>
-            <div class="thread-preview">${t.lastMsg}</div>
+            <div class="thread-preview">${this._escape(t.last_message_preview || '(no messages yet)')}</div>
           </div>
           <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0">
-            <div class="thread-time">${t.lastTime}</div>
-            ${t.unread > 0 ? `<div class="thread-unread">${t.unread}</div>` : ''}
+            <div class="thread-time">${this._timeLabel(t.last_message_at || t.created_at)}</div>
+            ${unread > 0 ? `<div class="thread-unread">${unread}</div>` : ''}
           </div>
         </div>`;
     }).join(''));
@@ -1149,53 +1193,140 @@ const Chat = {
     AppState.selectedThreadId = threadId;
     Router.go('chat-detail');
   },
+
+  _escape(s) {
+    return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  },
+  _timeLabel(iso) {
+    if (!iso) return '';
+    const d = new Date(String(iso).replace(' ', 'T') + 'Z');
+    if (isNaN(d)) return '';
+    const diff = Date.now() - d.getTime();
+    if (diff < 60000)        return 'just now';
+    if (diff < 3600000)      return Math.floor(diff / 60000) + 'm';
+    if (diff < 86400000)     return d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+    return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
+  },
 };
 
 // ── CHAT DETAIL ──────────────────────────────────────────────
 const ChatDetail = {
-  render() {
-    const t = CHAT_THREADS.find(x => x.id === AppState.selectedThreadId);
-    if (!t) return;
+  _thread:       null,
+  _messages:     [],
+  _lastId:       0,
+  _pollHandle:   null,
+  _pollMs:       4000,
 
-    // Mark as read
-    t.unread = 0;
+  async render() {
+    const threadId = AppState.selectedThreadId;
+    if (!threadId) return;
+
+    // Show shell while we fetch.
+    setText('cd-thread-name', 'Loading…');
+    setText('cd-thread-sub',  '');
+    setHtml('chat-messages', '<div style="padding:24px;text-align:center;color:var(--muted);font-size:11px">Loading messages…</div>');
+
+    try {
+      const j = await AdminData.fetchChatMessages(threadId);
+      this._thread   = j.thread;
+      this._messages = j.data || [];
+      this._lastId   = this._messages.length ? this._messages[this._messages.length - 1].id : 0;
+    } catch (e) {
+      setHtml('chat-messages', `<div style="padding:24px;text-align:center;color:var(--red);font-size:11px">Could not load: ${e.message}</div>`);
+      return;
+    }
 
     // Header
-    setText('cd-thread-name', t.name);
-    setText('cd-thread-sub',  t.type === 'center' ? '🏢 Wash Center' : `📞 ${t.phone}`);
-    $id('cd-call-btn').onclick = () => openCall(t.name, t.phone, t.type === 'center' ? 'Wash Center' : 'Customer');
+    const t = this._thread;
+    setText('cd-thread-name', t.customer_name || t.customer_phone || 'Customer');
+    setText('cd-thread-sub',  t.booking_ref ? `📋 ${t.booking_ref} · 📞 ${t.customer_phone}` : `📞 ${t.customer_phone}`);
+    const callBtn = $id('cd-call-btn');
+    if (callBtn) callBtn.onclick = () => openCall(t.customer_name || 'Customer', t.customer_phone, t.booking_ref || 'General support');
 
-    // Messages
-    setHtml('chat-messages', t.messages.map(m => {
-      const isAdmin = m.from === 'admin';
-      return `
-        <div class="msg ${isAdmin ? 'msg-admin' : 'msg-other'}">
-          <div class="msg-bubble">${m.text}</div>
-          <div class="msg-time">${m.time}</div>
-        </div>`;
-    }).join(''));
+    // Mark read on entry; ignore failure (next poll will retry).
+    AdminData.markChatThreadRead(t.id).catch(() => {});
 
-    // Scroll to bottom
-    const msgs = $id('chat-messages');
-    if (msgs) setTimeout(() => msgs.scrollTop = msgs.scrollHeight, 50);
+    this._renderMessages();
+    clearInterval(this._pollHandle);
+    this._pollHandle = setInterval(() => this._poll(), this._pollMs);
   },
 
-  send() {
+  destroy() {
+    clearInterval(this._pollHandle);
+    this._pollHandle = null;
+    this._thread   = null;
+    this._messages = [];
+  },
+
+  async _poll() {
+    if (!this._thread) return;
+    try {
+      const j = await AdminData.fetchChatMessages(this._thread.id);
+      const fresh = (j.data || []).filter(m => m.id > this._lastId);
+      if (fresh.length) {
+        this._messages.push(...fresh);
+        this._lastId = fresh[fresh.length - 1].id;
+        fresh.forEach(m => this._appendBubble(m));
+        this._scrollBottom();
+        AdminData.markChatThreadRead(this._thread.id).catch(() => {});
+      }
+    } catch { /* silent */ }
+  },
+
+  _renderMessages() {
+    setHtml('chat-messages', this._messages.map(m => this._bubbleHTML(m)).join(''));
+    this._scrollBottom(true);
+  },
+
+  _appendBubble(m) {
+    const wrap = $id('chat-messages');
+    if (!wrap) return;
+    wrap.insertAdjacentHTML('beforeend', this._bubbleHTML(m));
+  },
+
+  _bubbleHTML(m) {
+    if (m.sender === 'system') {
+      return `<div style="text-align:center;font-size:10px;color:var(--muted);margin:8px 0">${this._escape(m.text)}</div>`;
+    }
+    const isAdmin = m.sender === 'admin';
+    return `
+      <div class="msg ${isAdmin ? 'msg-admin' : 'msg-other'}">
+        <div class="msg-bubble">${this._escape(m.text)}</div>
+        <div class="msg-time">${this._timeLabel(m.created_at)}</div>
+      </div>`;
+  },
+
+  async send() {
     const inp = $id('chat-input');
     const text = inp?.value?.trim();
-    if (!text) return;
+    if (!text || !this._thread) return;
+    inp.value = '';
 
-    const t = CHAT_THREADS.find(x => x.id === AppState.selectedThreadId);
-    if (!t) return;
+    // Optimistic bubble.
+    const optimistic = { id: Date.now(), sender: 'admin', text, created_at: new Date().toISOString() };
+    this._appendBubble(optimistic);
+    this._scrollBottom();
 
-    const now = new Date();
-    const time = now.toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit', hour12:true });
-    t.messages.push({ from:'admin', text, time });
-    t.lastMsg  = text;
-    t.lastTime = time;
-    inp.value  = '';
+    try {
+      const saved = await AdminData.sendChatReply(this._thread.id, text, AppState.admin?.name || 'SparkWash Support');
+      if (saved && saved.id) this._lastId = Math.max(this._lastId, saved.id);
+    } catch (e) {
+      UI.toast('❌ ' + e.message);
+    }
+  },
 
-    this.render();
+  _scrollBottom(instant) {
+    const msgs = $id('chat-messages');
+    if (msgs) setTimeout(() => msgs.scrollTop = msgs.scrollHeight, instant ? 0 : 50);
+  },
+
+  _escape(s) {
+    return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  },
+  _timeLabel(iso) {
+    if (!iso) return '';
+    const d = new Date(String(iso).replace(' ', 'T') + 'Z');
+    return isNaN(d) ? '' : d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
   },
 };
 

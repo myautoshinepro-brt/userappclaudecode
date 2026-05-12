@@ -857,7 +857,7 @@
         </div>
 
         <div class="section-label">Contact us</div>
-        <div class="help-contact-card" onclick="Router.go('chat')">
+        <div class="help-contact-card" onclick="ChatScreen.openGeneral()">
           <div class="help-icon-wrap" style="background:#f0fdf4">💬</div>
           <div style="flex:1">
             <div class="help-card-title">Chat with support</div>
@@ -964,12 +964,12 @@
     <!-- ══ CHAT ══ -->
     <div data-screen="chat" id="sc-chat">
       <div class="chat-header">
-        <button class="chat-back-btn" onclick="Router.go('help')">←</button>
+        <button class="chat-back-btn" onclick="Router.back()">←</button>
         <div class="chat-header-info">
           <div class="chat-header-avatar">SW</div>
           <div>
-            <div class="chat-header-name">SparkWash Support</div>
-            <div class="chat-header-status"><span class="chat-online-dot"></span> Online · usually replies instantly</div>
+            <div class="chat-header-name" id="chat-header-name">SparkWash Support</div>
+            <div class="chat-header-status" id="chat-header-sub"><span class="chat-online-dot"></span> Online · usually replies instantly</div>
           </div>
         </div>
         <button class="chat-call-icon-btn" onclick="HelpScreen.openCallSheet()" title="Call support">📞</button>

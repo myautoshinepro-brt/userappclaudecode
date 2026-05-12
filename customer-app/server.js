@@ -96,6 +96,38 @@ app.patch('/api/bookings/:ref/reschedule', requireAuth, (req, res) => {
   });
 });
 
+// ── CHAT (authed; phone + name injected from JWT) ────────────────────
+app.get('/api/chat/threads', requireAuth, (req, res) =>
+  relayJson(res, `${CENTER_APP_URL}/api/public/chat/threads?phone=${encodeURIComponent(req.user.mobile)}`));
+
+app.post('/api/chat/threads', requireAuth, (req, res) => {
+  const payload = { ...req.body, phone: req.user.mobile, customer_name: req.user.full_name };
+  relayJson(res, `${CENTER_APP_URL}/api/public/chat/threads`, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify(payload),
+  });
+});
+
+app.get('/api/chat/threads/:id/messages', requireAuth, (req, res) =>
+  relayJson(res, `${CENTER_APP_URL}/api/public/chat/threads/${encodeURIComponent(req.params.id)}/messages?phone=${encodeURIComponent(req.user.mobile)}`));
+
+app.post('/api/chat/threads/:id/messages', requireAuth, (req, res) => {
+  const payload = { ...req.body, phone: req.user.mobile, customer_name: req.user.full_name };
+  relayJson(res, `${CENTER_APP_URL}/api/public/chat/threads/${encodeURIComponent(req.params.id)}/messages`, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify(payload),
+  });
+});
+
+app.post('/api/chat/threads/:id/read', requireAuth, (req, res) =>
+  relayJson(res, `${CENTER_APP_URL}/api/public/chat/threads/${encodeURIComponent(req.params.id)}/read`, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ phone: req.user.mobile }),
+  }));
+
 // Catch-all: always serve index.html for any non-API route
 app.get(/^(?!\/api).*$/, (_req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));

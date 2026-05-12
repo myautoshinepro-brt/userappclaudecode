@@ -48,6 +48,7 @@ const BookingScreen = {
         <div class="action-btn-row">
           <div class="action-btn primary" onclick="Router.go('manage')">📍 Track</div>
           <div class="action-btn primary" onclick="BookingScreen.openModify();Router.go('manage')">✏️ Modify</div>
+          <div class="action-btn primary" onclick="ChatScreen.openForBooking('${b.id}')">💬 Chat</div>
           <div class="action-btn danger" onclick="BookingScreen.cancelBooking()">✕ Cancel</div>
         </div>
       </div>`;
@@ -81,6 +82,7 @@ const BookingScreen = {
                  onclick="BookingScreen.repeatBooking('${b.centerId}','${b.washType}','${b.packageId}','${b.vehicleId}')">
               🔁 Repeat this wash
             </div>
+            <div class="action-btn primary" onclick="ChatScreen.openForBooking('${b.id}')">💬 Chat</div>
           </div>
         </div>`;
     }).join('');

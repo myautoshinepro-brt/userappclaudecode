@@ -85,6 +85,34 @@ const AdminData = (() => {
     return _patch(`/api/admin/promos/${id}`, fields);
   }
 
+  // ── CHAT ──
+  async function fetchChatThreads() {
+    const r = await fetch(`${CENTER_APP_URL}/api/admin/chat/threads`, { headers: _headers() });
+    if (!r.ok) throw new Error('chat threads HTTP ' + r.status);
+    const j = await r.json();
+    return (j.data || []);
+  }
+  async function fetchChatMessages(threadId) {
+    const r = await fetch(`${CENTER_APP_URL}/api/admin/chat/threads/${threadId}/messages`, { headers: _headers() });
+    if (!r.ok) throw new Error('chat msgs HTTP ' + r.status);
+    return r.json();
+  }
+  async function sendChatReply(threadId, text, senderName) {
+    const r = await fetch(`${CENTER_APP_URL}/api/admin/chat/threads/${threadId}/messages`, {
+      method:  'POST',
+      headers: { ..._headers(), 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ text, sender_name: senderName }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.success) throw new Error(j.error || `HTTP ${r.status}`);
+    return j.data;
+  }
+  async function markChatThreadRead(threadId) {
+    return fetch(`${CENTER_APP_URL}/api/admin/chat/threads/${threadId}/read`, {
+      method: 'POST', headers: _headers(),
+    });
+  }
+
   // Format slot_date (YYYY-MM-DD) to 'Today' / 'Yesterday' / 'DD MMM'.
   function _formatDate(iso) {
     if (!iso) return '';
@@ -349,6 +377,7 @@ const AdminData = (() => {
     markNotificationRead,
     setVisibility, setDisplayOrder, swapDisplayOrder, setOpenStatus,
     createPromo, updatePromo,
+    fetchChatThreads, fetchChatMessages, sendChatReply, markChatThreadRead,
   };
 
 })();

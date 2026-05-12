@@ -159,6 +159,35 @@ try { db.exec("ALTER TABLE applications ADD COLUMN certificates  TEXT"); } catch
 try { db.exec("ALTER TABLE applications ADD COLUMN wash_types    TEXT"); } catch { /* exists */ }
 try { db.exec("ALTER TABLE applications ADD COLUMN bank_name     TEXT"); } catch { /* exists */ }
 
+// ── Chat tables ──
+db.exec(`
+  CREATE TABLE IF NOT EXISTS chat_threads (
+    id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+    customer_phone       TEXT    NOT NULL,
+    customer_name        TEXT,
+    booking_ref          TEXT,
+    subject              TEXT,
+    status               TEXT    NOT NULL DEFAULT 'open',
+    last_message_at      TEXT,
+    last_message_preview TEXT,
+    last_message_sender  TEXT,
+    unread_customer      INTEGER NOT NULL DEFAULT 0,
+    unread_admin         INTEGER NOT NULL DEFAULT 0,
+    created_at           TEXT    NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE TABLE IF NOT EXISTS chat_messages (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    thread_id   INTEGER NOT NULL REFERENCES chat_threads(id),
+    sender      TEXT    NOT NULL,           -- 'customer' | 'admin' | 'system'
+    sender_name TEXT,
+    text        TEXT    NOT NULL,
+    created_at  TEXT    NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_chat_threads_phone   ON chat_threads(customer_phone);
+  CREATE INDEX IF NOT EXISTS idx_chat_threads_booking ON chat_threads(booking_ref);
+  CREATE INDEX IF NOT EXISTS idx_chat_messages_thread ON chat_messages(thread_id, id);
+`);
+
 // ── Promo codes table ──
 db.exec(`
   CREATE TABLE IF NOT EXISTS promos (
@@ -867,6 +896,113 @@ module.exports = {
     db.prepare("UPDATE bookings SET slot_date=?, slot_time=?, updated_at=datetime('now') WHERE id=?")
       .run(slotDate, slotTime, b.id);
     return { ok: true };
+  },
+
+  // ── CHAT ──
+  listChatThreadsForCustomer(phone) {
+    return db.prepare(`
+      SELECT * FROM chat_threads
+      WHERE customer_phone = ?
+      ORDER BY datetime(COALESCE(last_message_at, created_at)) DESC
+    `).all(phone);
+  },
+  listAllChatThreads() {
+    return db.prepare(`
+      SELECT * FROM chat_threads
+      ORDER BY datetime(COALESCE(last_message_at, created_at)) DESC
+      LIMIT 200
+    `).all();
+  },
+  getChatThread(id) {
+    return db.prepare('SELECT * FROM chat_threads WHERE id=?').get(id);
+  },
+  listChatMessages(threadId) {
+    return db.prepare(`
+      SELECT id, thread_id, sender, sender_name, text, created_at
+      FROM chat_messages
+      WHERE thread_id=?
+      ORDER BY id ASC
+    `).all(threadId);
+  },
+  // Idempotent: returns existing thread for (phone, booking_ref) or (phone, NULL+open) if found,
+  // else creates a new one. Reopens closed threads.
+  findOrCreateChatThread({ customer_phone, customer_name, booking_ref }) {
+    const phone = String(customer_phone || '').replace(/\s+/g, '');
+    if (!phone) return null;
+
+    let existing;
+    if (booking_ref) {
+      existing = db.prepare(
+        "SELECT * FROM chat_threads WHERE customer_phone=? AND booking_ref=? ORDER BY id DESC LIMIT 1"
+      ).get(phone, booking_ref);
+    } else {
+      existing = db.prepare(
+        "SELECT * FROM chat_threads WHERE customer_phone=? AND booking_ref IS NULL ORDER BY id DESC LIMIT 1"
+      ).get(phone);
+    }
+
+    if (existing) {
+      if (existing.status !== 'open') {
+        db.prepare("UPDATE chat_threads SET status='open' WHERE id=?").run(existing.id);
+        existing.status = 'open';
+      }
+      return existing;
+    }
+
+    const subject = booking_ref ? `Booking ${booking_ref}` : 'General support';
+    const info = db.prepare(`
+      INSERT INTO chat_threads (customer_phone, customer_name, booking_ref, subject, status)
+      VALUES (?, ?, ?, ?, 'open')
+    `).run(phone, customer_name || null, booking_ref || null, subject);
+
+    // Auto-insert a system message so the admin immediately sees context.
+    const systemText = booking_ref
+      ? `Customer opened chat about booking ${booking_ref}.`
+      : `Customer opened a general support chat.`;
+    db.prepare(`
+      INSERT INTO chat_messages (thread_id, sender, sender_name, text)
+      VALUES (?, 'system', 'SparkWash', ?)
+    `).run(info.lastInsertRowid, systemText);
+    db.prepare(`
+      UPDATE chat_threads
+      SET last_message_at = datetime('now'),
+          last_message_preview = ?,
+          last_message_sender = 'system',
+          unread_admin = unread_admin + 1
+      WHERE id = ?
+    `).run(systemText.slice(0, 120), info.lastInsertRowid);
+
+    return db.prepare('SELECT * FROM chat_threads WHERE id=?').get(info.lastInsertRowid);
+  },
+  // sender: 'customer' | 'admin' | 'system'
+  sendChatMessage(threadId, sender, senderName, text) {
+    const trimmed = String(text || '').trim();
+    if (!trimmed) return null;
+    const t = db.prepare('SELECT * FROM chat_threads WHERE id=?').get(threadId);
+    if (!t) return null;
+    db.prepare(`
+      INSERT INTO chat_messages (thread_id, sender, sender_name, text)
+      VALUES (?, ?, ?, ?)
+    `).run(threadId, sender, senderName || null, trimmed);
+
+    // Increment unread for the OTHER side; reopen if closed.
+    const incCol = sender === 'customer' ? 'unread_admin' : 'unread_customer';
+    db.prepare(`
+      UPDATE chat_threads
+      SET last_message_at = datetime('now'),
+          last_message_preview = ?,
+          last_message_sender = ?,
+          ${incCol} = ${incCol} + 1,
+          status = 'open'
+      WHERE id = ?
+    `).run(trimmed.slice(0, 120), sender, threadId);
+
+    return db.prepare("SELECT * FROM chat_messages WHERE id = last_insert_rowid()").get();
+  },
+  markChatThreadRead(threadId, side /* 'customer' | 'admin' */) {
+    const col = side === 'admin' ? 'unread_admin' : 'unread_customer';
+    db.prepare(`UPDATE chat_threads SET ${col} = 0 WHERE id = ?`).run(threadId);
+    return true;
   },
 
   // ── PROMOS ──
