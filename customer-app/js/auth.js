@@ -49,9 +49,13 @@ const Auth = (() => {
     const token = getToken();
     if (!token) return null;
     try {
-      const user = await api('GET', '/me', null, token);
-      // Refresh stored user data
-      localStorage.setItem(US_KEY, JSON.stringify(user));
+      const res = await api('GET', '/me', null, token);
+      // Server returns a fresh token on every /me — save it so the session
+      // slides forward indefinitely while the user is active on this device.
+      const refreshed = res.token;
+      const user = { id: res.id, full_name: res.full_name, mobile: res.mobile, email: res.email };
+      if (refreshed) saveSession(refreshed, user);
+      else           localStorage.setItem(US_KEY, JSON.stringify(user));
       return user;
     } catch {
       clearSession();

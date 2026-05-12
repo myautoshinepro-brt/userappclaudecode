@@ -11,8 +11,10 @@ const Auth = {
         const res  = await this._api('/api/auth/me');
         const data = await res.json();
         if (res.ok) {
-          AppState.center = data;
-          localStorage.setItem('sw_center_data', JSON.stringify(data));
+          // Server returns a fresh token (sliding window) so the center stays
+          // logged in indefinitely while active on this device.
+          if (data.token) AppState.setAuth(data.token, data);
+          else { AppState.center = data; localStorage.setItem('sw_center_data', JSON.stringify(data)); }
           Router.go('dashboard');
           return;
         }

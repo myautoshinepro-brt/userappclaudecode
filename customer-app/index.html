@@ -548,16 +548,16 @@
           <div class="pulse"></div><span>Booking confirmed — waiting for wash</span>
         </div>
         <div class="manage-map-wrap">
-          <div class="manage-map" onclick="UI.toast('📍 Opening Google Maps...')">
+          <div class="manage-map" onclick="BookingScreen.navigateToCenter()">
             <svg width="100%" height="82" style="position:absolute;inset:0"><rect width="100%" height="82" fill="#dbeafe"/><rect x="0" y="34" width="100%" height="14" fill="#e2eaf6"/><rect x="62" y="0" width="12" height="82" fill="#e2eaf6"/><rect x="142" y="0" width="12" height="82" fill="#e2eaf6"/><rect x="9" y="7" width="46" height="23" rx="3" fill="#c7d9f0"/><rect x="78" y="7" width="56" height="23" rx="3" fill="#c7d9f0"/><rect x="78" y="52" width="56" height="22" rx="3" fill="#bfdbfe" stroke="#93c5fd" stroke-width="1"/><text x="106" y="66" font-size="7" fill="#1e40af" text-anchor="middle" font-weight="bold">SHINE AUTO</text></svg>
             <div style="position:absolute;top:35px;left:106px;transform:translate(-50%,-100%);font-size:18px">📍</div>
             <div class="manage-map-nav-bar">🗺️ Navigate to wash center</div>
           </div>
           <div class="manage-info-card">
-            <div><div style="font-size:11px;font-weight:700;color:var(--text-primary)">Shine Auto Wash</div><div style="font-size:10px;color:var(--text-secondary)">Andheri West · 1.2 km</div></div>
+            <div><div style="font-size:11px;font-weight:700;color:var(--text-primary)" id="manage-center-name">—</div><div style="font-size:10px;color:var(--text-secondary)" id="manage-center-area">—</div></div>
             <div style="display:flex;gap:5px">
-              <button class="btn btn-sm btn-outline" onclick="UI.toast('📞 Calling...')">📞 Call</button>
-              <button class="btn btn-sm btn-primary" onclick="UI.toast('📍 Opening Maps...')">Navigate</button>
+              <button class="btn btn-sm btn-outline" onclick="BookingScreen.callCenter()">📞 Call</button>
+              <button class="btn btn-sm btn-primary" onclick="BookingScreen.navigateToCenter()">Navigate</button>
             </div>
           </div>
         </div>
@@ -582,7 +582,7 @@
         </div>
         <div class="action-btn-row" style="padding:0 13px 12px">
           <div class="action-btn primary" onclick="BookingScreen.openModify()">✏️ Modify</div>
-          <div class="action-btn" onclick="UI.toast('📤 Sharing...')">📤 Share</div>
+          <div class="action-btn" onclick="BookingScreen.shareBooking()">📤 Share</div>
           <div class="action-btn danger" onclick="BookingScreen.cancelBooking()">✕ Cancel</div>
         </div>
       </div>
@@ -703,9 +703,7 @@
     <div data-screen="reviews" id="sc-reviews">
       <div class="header-sub" style="background:var(--blue)"><button class="header-back" onclick="Router.back()">← Back</button><div class="header-title">My reviews</div><div class="header-subtitle">Your ratings & feedback</div></div>
       <div class="scroll-area"><div style="padding:12px 13px 0">
-        <div class="review-card"><div style="display:flex;justify-content:space-between;align-items:flex-start"><div style="font-size:12px;font-weight:700;color:var(--text-primary)">Shine Auto Wash</div><div class="review-stars">★★★★★</div></div><div style="font-size:10px;color:var(--text-secondary);margin-top:1px">20 Apr · Full Steam Wash</div><div style="font-size:11px;color:var(--text-secondary);margin-top:6px;line-height:1.5">"Excellent service! Thorough and professional. Will come again."</div></div>
-        <div class="review-card"><div style="display:flex;justify-content:space-between;align-items:flex-start"><div style="font-size:12px;font-weight:700;color:var(--text-primary)">PureClean Juhu</div><div class="review-stars">★★★★<span style="color:var(--text-tertiary)">★</span></div></div><div style="font-size:10px;color:var(--text-secondary);margin-top:1px">12 Apr · Exterior + Vacuum</div><div style="font-size:11px;color:var(--text-secondary);margin-top:6px;line-height:1.5">"Good wash overall. Took a bit longer but quality was good."</div></div>
-        <div class="review-card"><div style="display:flex;justify-content:space-between;align-items:flex-start"><div style="font-size:12px;font-weight:700;color:var(--text-primary)">CleanDrive Express</div><div class="review-stars">★★★★★</div></div><div style="font-size:10px;color:var(--text-secondary);margin-top:1px">5 Apr · Exterior Wash</div><div style="font-size:11px;color:var(--text-secondary);margin-top:6px;line-height:1.5">"Super quick and efficient. Great value for money."</div></div>
+        <div id="my-reviews-list"></div>
         <div style="height:16px"></div>
       </div></div>
     </div>
@@ -720,9 +718,8 @@
           <button class="btn btn-primary btn-sm" style="padding:10px 14px;margin-top:0" onclick="ProfileScreen.addPromoCode()">Apply</button>
         </div>
         <div id="profile-promo-msg" style="font-size:11px;margin:-8px 0 10px;display:none"></div>
-        <div class="section-label">Active codes</div>
-        <div class="promo-code-card"><div><div class="promo-code-name">SPARKFIRST10</div><div class="promo-code-desc">10% off your first wash</div></div><div class="promo-code-badge">Not used</div></div>
-        <div class="promo-code-card"><div><div class="promo-code-name">MUMBAI30</div><div class="promo-code-desc">₹30 off — Mumbai launch</div></div><div class="promo-code-badge">Not used</div></div>
+        <div class="section-label">Available codes</div>
+        <div id="my-promo-list"></div>
         <div id="extra-promo-codes"></div>
         <div class="section-label" style="margin-top:4px">Refer & earn</div>
         <div style="background:var(--bg-secondary);border-radius:12px;padding:12px;margin-bottom:8px">

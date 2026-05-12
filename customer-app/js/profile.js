@@ -236,6 +236,63 @@ const ProfileScreen = {
     }
   },
 
+  // ── MY REVIEWS (rendered from real bookings with rating != null) ──
+
+  renderMyReviews() {
+    const list = document.getElementById('my-reviews-list');
+    if (!list) return;
+    const reviews = (typeof PAST_BOOKINGS !== 'undefined' ? PAST_BOOKINGS : [])
+      .filter(b => b.rating)
+      .sort((a, b) => (b.slotDate || '').localeCompare(a.slotDate || ''));
+
+    if (!reviews.length) {
+      list.innerHTML = `
+        <div style="padding:32px 16px;text-align:center;color:var(--text-secondary);font-size:11px">
+          You haven't rated any washes yet. After a wash completes, you'll be able to leave a review here.
+        </div>`;
+      return;
+    }
+    list.innerHTML = reviews.map(b => {
+      const full   = '★'.repeat(b.rating);
+      const empty  = '<span style="color:var(--text-tertiary)">' + '★'.repeat(5 - b.rating) + '</span>';
+      const wash   = WASH_TYPES.find(t => t.key === b.washType)?.name || b.washType;
+      const cmt    = b.reviewComment ? `<div style="font-size:11px;color:var(--text-secondary);margin-top:6px;line-height:1.5">"${b.reviewComment.replace(/"/g, '&quot;')}"</div>` : '';
+      return `
+        <div class="review-card">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start">
+            <div style="font-size:12px;font-weight:700;color:var(--text-primary)">${b.centerName}</div>
+            <div class="review-stars">${full}${empty}</div>
+          </div>
+          <div style="font-size:10px;color:var(--text-secondary);margin-top:1px">${b.date} · ${wash}${b.packageName ? ' · ' + b.packageName : ''}</div>
+          ${cmt}
+        </div>`;
+    }).join('');
+  },
+
+  // ── MY PROMOS (rendered from /api/promos loaded into PROMO_CODES) ──
+
+  renderMyPromos() {
+    const list = document.getElementById('my-promo-list');
+    if (!list) return;
+    const promos = (typeof PROMO_CODES !== 'undefined' ? PROMO_CODES : []);
+
+    if (!promos.length) {
+      list.innerHTML = `
+        <div style="padding:24px 16px;text-align:center;color:var(--text-secondary);font-size:11px">
+          No active promo codes right now. Check back later!
+        </div>`;
+      return;
+    }
+    list.innerHTML = promos.map(p => `
+      <div class="promo-code-card">
+        <div>
+          <div class="promo-code-name">${p.code}</div>
+          <div class="promo-code-desc">${p.title}${p.minOrder ? ' · Min ₹' + p.minOrder : ''}</div>
+        </div>
+        <div class="promo-code-badge">Available</div>
+      </div>`).join('');
+  },
+
   async makePrimaryVehicle(id) {
     try {
       const r = await fetch(`/api/profile/vehicles/${id}/primary`, {
@@ -253,33 +310,31 @@ const ProfileScreen = {
 
   // ── PROMO CODES ──
 
+  // Validate a user-typed promo code against the real promos loaded on boot.
+  // We don't have a 'wallet' table on the server, so we just confirm the code
+  // exists and is active — it'll apply at booking time via the server.
   addPromoCode() {
     const val = document.getElementById('profile-promo-input')?.value.trim().toUpperCase();
     const msgEl = document.getElementById('profile-promo-msg');
     if (!val) return;
 
-    const VALID = {
-      WASH20: '20% off water wash',
-      STEAM15: '15% off steam wash',
-      BDAY100: '₹100 birthday offer',
-      RAHUL50: '₹50 referral reward',
-    };
-
-    if (VALID[val]) {
-      const container = document.getElementById('extra-promo-codes');
-      if (container) {
-        container.innerHTML += `
-          <div class="promo-code-card">
-            <div><div class="promo-code-name">${val}</div><div class="promo-code-desc">${VALID[val]}</div></div>
-            <div class="promo-code-badge">Added ✓</div>
-          </div>`;
-      }
-      if (document.getElementById('profile-promo-input')) document.getElementById('profile-promo-input').value = '';
-      if (msgEl) msgEl.style.display = 'none';
-      UI.toast('✅ Code ' + val + ' added!');
-    } else {
+    const promo = (typeof PROMO_CODES !== 'undefined' ? PROMO_CODES : []).find(p => p.code === val);
+    if (!promo) {
       if (msgEl) { msgEl.style.color = 'var(--red)'; msgEl.textContent = '❌ Invalid or expired code.'; msgEl.style.display = 'block'; }
+      return;
     }
+    const container = document.getElementById('extra-promo-codes');
+    if (container) {
+      container.innerHTML += `
+        <div class="promo-code-card">
+          <div><div class="promo-code-name">${promo.code}</div><div class="promo-code-desc">${promo.title}${promo.minOrder ? ' · Min ₹' + promo.minOrder : ''}</div></div>
+          <div class="promo-code-badge">Added ✓</div>
+        </div>`;
+    }
+    const inp = document.getElementById('profile-promo-input');
+    if (inp) inp.value = '';
+    if (msgEl) msgEl.style.display = 'none';
+    UI.toast('✅ Code ' + val + ' is valid · apply it at checkout');
   },
 
   // ── LANGUAGE ──

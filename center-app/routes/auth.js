@@ -5,7 +5,10 @@ const { sendOtpEmail }   = require('../utils/email');
 
 const router         = express.Router();
 const JWT_SECRET     = process.env.JWT_SECRET || 'sparkwash_center_dev_secret';
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '30d';
+// Long-lived JWT — center stays logged in across restarts on the same device.
+// /me re-issues a fresh token on every call (sliding window), so an active
+// center never expires; only a switched device or explicit logout forces login.
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '365d';
 const OTP_MINUTES    = parseInt(process.env.OTP_EXPIRES_MINUTES || '5', 10);
 const DEV_MODE       = process.env.DEV_MODE !== 'false'; // default ON; set DEV_MODE=false in prod to hide
 
@@ -102,7 +105,7 @@ router.post('/verify-otp', (req, res) => {
   });
 });
 
-// GET /api/auth/me
+// GET /api/auth/me — also re-issues a fresh token (sliding window).
 router.get('/me', requireAuth, (req, res) => {
   const c = req.center;
   res.json({
@@ -115,6 +118,7 @@ router.get('/me', requireAuth, (req, res) => {
     account_name: c.account_name || null,
     bank_name: c.bank_name || null,
     gstin: c.gstin || null,
+    token: makeToken(c.id),
   });
 });
 

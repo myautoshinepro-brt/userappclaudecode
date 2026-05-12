@@ -5,7 +5,11 @@ const { sendOtpEmail } = require('../utils/email');
 
 const router          = express.Router();
 const JWT_SECRET      = process.env.JWT_SECRET || 'sparkwash_dev_secret';
-const JWT_EXPIRES_IN  = process.env.JWT_EXPIRES_IN || '30d';
+// Long-lived JWT so users stay logged in across browser/app restarts on the
+// same device. /me re-issues a fresh token on every successful call, so an
+// active user effectively never expires; only a switched device (where the
+// token isn't in localStorage) or explicit logout forces re-login.
+const JWT_EXPIRES_IN  = process.env.JWT_EXPIRES_IN || '365d';
 const OTP_MINUTES     = parseInt(process.env.OTP_EXPIRES_MINUTES || '5', 10);
 const DEV_MODE        = process.env.DEV_MODE !== 'false'; // default ON; set DEV_MODE=false in prod to hide
 
@@ -170,10 +174,16 @@ router.post('/verify-otp', (req, res) => {
 /**
  * GET /api/auth/me
  * Header: Authorization: Bearer <token>
+ *
+ * Returns the current user *and* re-issues a fresh token (sliding window).
+ * The client should save the new token if present.
  */
 router.get('/me', requireAuth, (req, res) => {
   const { id, full_name, mobile, email } = req.user;
-  res.json({ id, full_name, mobile, email });
+  res.json({
+    id, full_name, mobile, email,
+    token: makeToken(id),
+  });
 });
 
 /**

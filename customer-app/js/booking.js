@@ -150,6 +150,9 @@ const BookingScreen = {
     _setText('conf-amount-paid', `₹${collectAmt}`);
 
     // Sync manage screen
+    const center = CENTERS.find(c => c.id === confirmed.centerId);
+    _setText('manage-center-name', confirmed.centerName || '—');
+    _setText('manage-center-area', center ? `${center.area || ''}${center.distance ? ' · ' + center.distance + ' km' : ''}` : '');
     _setText('manage-pkg',        confirmed.packageName || '—');
     _setText('manage-vehicle',    vehicleStr);
     _setText('manage-date',       confirmed.date);
@@ -160,6 +163,54 @@ const BookingScreen = {
     // Sync bookings list
     _setText('bklist-pkg',  `${confirmed.date} · ${confirmed.slot} · ${confirmed.packageName}`);
     _setText('bklist-meta', `${confirmed.id} · ₹${collectAmt} to pay at center`);
+  },
+
+  // ── REAL ACTIONS for Manage Booking buttons ──
+
+  // Look up the center for the currently-active booking. Tries both
+  // confirmedBooking (just placed) and the in-flight booking state.
+  _activeCenter() {
+    const id = AppState.confirmedBooking?.centerId || AppState.booking.centerId;
+    return id ? CENTERS.find(c => c.id === id) : null;
+  },
+
+  callCenter() {
+    const c = this._activeCenter();
+    // Real DB centers don't currently expose owner mobile to customers
+    // (privacy). Fall back to SparkWash support if missing.
+    const phone = (c && c.phone) || '18005720001';
+    window.location.href = 'tel:' + String(phone).replace(/\D/g, '');
+  },
+
+  navigateToCenter() {
+    const c = this._activeCenter();
+    if (!c) { UI.toast('⚠️ Center info not loaded'); return; }
+    // Prefer lat/lng if we have them; otherwise search by name + area.
+    let url;
+    if (c.lat && c.lng) {
+      url = `https://www.google.com/maps/dir/?api=1&destination=${c.lat},${c.lng}&travelmode=driving`;
+    } else {
+      const q = encodeURIComponent([c.name, c.area, 'Mumbai'].filter(Boolean).join(' '));
+      url = `https://www.google.com/maps/dir/?api=1&destination=${q}&travelmode=driving`;
+    }
+    window.open(url, '_blank');
+  },
+
+  async shareBooking() {
+    const b = AppState.confirmedBooking;
+    if (!b || !b.id) { UI.toast('⚠️ No booking to share'); return; }
+    const text = `My SparkWash booking ${b.id}\n${b.packageName} at ${b.centerName}\n${b.date} · ${b.slot}\nAmount: ₹${b.collectAmount ?? b.totalPaid} (pay at center)`;
+    if (navigator.share) {
+      try { await navigator.share({ title: 'SparkWash booking', text }); return; }
+      catch { /* user cancelled or share unsupported */ }
+    }
+    // Fallback: copy to clipboard.
+    try {
+      await navigator.clipboard.writeText(text);
+      UI.toast('📋 Booking details copied');
+    } catch {
+      UI.toast('⚠️ Share not supported on this browser');
+    }
   },
 
   // ── MODIFY SHEET ──

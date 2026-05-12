@@ -105,6 +105,12 @@ const Router = {
       case 'addresses':
         if (typeof ProfileScreen !== 'undefined' && ProfileScreen.renderAddresses) ProfileScreen.renderAddresses();
         break;
+      case 'reviews':
+        if (typeof ProfileScreen !== 'undefined' && ProfileScreen.renderMyReviews) ProfileScreen.renderMyReviews();
+        break;
+      case 'promos':
+        if (typeof ProfileScreen !== 'undefined' && ProfileScreen.renderMyPromos)  ProfileScreen.renderMyPromos();
+        break;
       default:
         break;
     }
