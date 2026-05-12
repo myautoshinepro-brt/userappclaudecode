@@ -84,26 +84,38 @@ const Centers = {
     Router.go('center-detail');
   },
 
-  toggleVisibility(centerId) {
+  async toggleVisibility(centerId) {
     const c = CENTERS.find(x => x.id === centerId);
     if (!c) return;
-    c.visible = !c.visible;
-    logChange(centerId, 'App visibility changed', `${c.name} ${c.visible ? 'shown in' : 'hidden from'} customer app`);
-    UI.toast(c.visible ? `👁️ ${c.name} visible in app` : `🚫 ${c.name} hidden from app`);
-    this.render();
+    const next = !c.visible;
+    try {
+      await AdminData.setVisibility(c._dbId, next);
+      c.visible = next;
+      logChange(centerId, 'App visibility changed', `${c.name} ${next ? 'shown in' : 'hidden from'} customer app`);
+      UI.toast(next ? `👁️ ${c.name} visible in app` : `🚫 ${c.name} hidden from app`);
+      this.render();
+    } catch (e) {
+      UI.toast('❌ ' + e.message);
+    }
   },
 
-  changeOrder(centerId, delta) {
+  async changeOrder(centerId, delta) {
     const c = CENTERS.find(x => x.id === centerId);
     if (!c) return;
-    const newOrder = Math.max(1, Math.min(CENTERS.length, (c.displayOrder || 1) + delta));
-    if (newOrder === c.displayOrder) return;
-    const other = CENTERS.find(x => x.id !== centerId && x.displayOrder === newOrder);
-    if (other) other.displayOrder = c.displayOrder;
-    c.displayOrder = newOrder;
-    logChange(centerId, 'Display order changed', `${c.name} moved to position #${newOrder} in customer app`);
-    UI.toast(`📋 ${c.name} → #${newOrder} in app`);
-    this.render();
+    const sorted = [...CENTERS].sort((a, b) => (a.displayOrder || 99) - (b.displayOrder || 99));
+    const idx    = sorted.findIndex(x => x.id === centerId);
+    const swapIdx = idx + delta;
+    if (swapIdx < 0 || swapIdx >= sorted.length) return;
+    const other = sorted[swapIdx];
+    try {
+      await AdminData.swapDisplayOrder(c._dbId, other._dbId);
+      [c.displayOrder, other.displayOrder] = [other.displayOrder, c.displayOrder];
+      logChange(centerId, 'Display order changed', `${c.name} moved to position #${c.displayOrder} in customer app`);
+      UI.toast(`📋 ${c.name} → #${c.displayOrder} in app`);
+      this.render();
+    } catch (e) {
+      UI.toast('❌ ' + e.message);
+    }
   },
 
   reqRev(centerId) { requestRevenue(centerId); },
@@ -682,37 +694,55 @@ const CenterDetail = {
       <div style="height:16px"></div>`);
   },
 
-  toggleVisibility(centerId) {
+  async toggleVisibility(centerId) {
     const c = CENTERS.find(x => x.id === centerId);
     if (!c) return;
-    c.visible = !c.visible;
-    const detail = `${c.name} ${c.visible ? 'shown in' : 'hidden from'} customer app`;
-    logChange(centerId, 'App visibility changed', detail);
-    UI.toast(c.visible ? `👁️ ${c.name} now visible in app` : `🚫 ${c.name} hidden from app`);
-    this.render();
+    const next = !c.visible;
+    try {
+      await AdminData.setVisibility(c._dbId, next);
+      c.visible = next;
+      const detail = `${c.name} ${next ? 'shown in' : 'hidden from'} customer app`;
+      logChange(centerId, 'App visibility changed', detail);
+      UI.toast(next ? `👁️ ${c.name} now visible in app` : `🚫 ${c.name} hidden from app`);
+      this.render();
+    } catch (e) {
+      UI.toast('❌ ' + e.message);
+    }
   },
 
-  changeOrder(centerId, delta) {
+  async changeOrder(centerId, delta) {
     const c = CENTERS.find(x => x.id === centerId);
     if (!c) return;
-    const newOrder = Math.max(1, Math.min(CENTERS.length, (c.displayOrder || 1) + delta));
-    if (newOrder === c.displayOrder) return;
-    // Swap with the center currently holding that position
-    const other = CENTERS.find(x => x.id !== centerId && x.displayOrder === newOrder);
-    if (other) other.displayOrder = c.displayOrder;
-    c.displayOrder = newOrder;
-    logChange(centerId, 'Display order changed', `${c.name} moved to position #${newOrder} in customer app`);
-    UI.toast(`📋 ${c.name} is now #${newOrder} in app`);
-    this.render();
+    const sorted  = [...CENTERS].sort((a, b) => (a.displayOrder || 99) - (b.displayOrder || 99));
+    const idx     = sorted.findIndex(x => x.id === centerId);
+    const swapIdx = idx + delta;
+    if (swapIdx < 0 || swapIdx >= sorted.length) return;
+    const other = sorted[swapIdx];
+    try {
+      await AdminData.swapDisplayOrder(c._dbId, other._dbId);
+      [c.displayOrder, other.displayOrder] = [other.displayOrder, c.displayOrder];
+      logChange(centerId, 'Display order changed', `${c.name} moved to position #${c.displayOrder} in customer app`);
+      UI.toast(`📋 ${c.name} is now #${c.displayOrder} in app`);
+      this.render();
+    } catch (e) {
+      UI.toast('❌ ' + e.message);
+    }
   },
 
-  toggleOpen(centerId) {
+  async toggleOpen(centerId) {
     const c = CENTERS.find(x => x.id === centerId);
     if (!c) return;
-    c.isOpen = !c.isOpen;
-    const detail = `${c.name} marked ${c.isOpen ? 'Open' : 'Closed'}`;
+    const next = !c.isOpen;
+    try {
+      await AdminData.setOpenStatus(c._dbId, next);
+      c.isOpen = next;
+    } catch (e) {
+      UI.toast('❌ ' + e.message);
+      return;
+    }
+    const detail = `${c.name} marked ${next ? 'Open' : 'Closed'}`;
     logChange(centerId, 'Center open/close', detail);
-    UI.toast(c.isOpen ? `🟢 ${c.name} is now Open` : `🔴 ${c.name} marked Closed`);
+    UI.toast(next ? `🟢 ${c.name} is now Open` : `🔴 ${c.name} marked Closed`);
     this.render();
     AdminDashboard.render();
   },

@@ -46,7 +46,9 @@ function shapeForCustomer(c) {
 }
 
 router.get('/centers', (_req, res) => {
-  res.json({ success: true, data: db.getAllCenters().map(shapeForCustomer) });
+  // Hide centers the super admin has flipped off; order is already DESC by display_order from the DB.
+  const visible = db.getAllCenters().filter(c => c.visible !== 0);
+  res.json({ success: true, data: visible.map(shapeForCustomer) });
 });
 
 router.get('/centers/:id', (req, res) => {

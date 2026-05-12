@@ -69,4 +69,46 @@ router.get('/bookings', adminAuth, (req, res) => {
   res.json({ success: true, data: db.getAllBookings({ date, status, center_id: centerId }) });
 });
 
+// PATCH /api/admin/centers/:id/visibility  Body: { visible: true | false }
+router.patch('/centers/:id/visibility', adminAuth, (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (!id) return res.status(400).json({ error: 'Invalid id' });
+  const visible = !!(req.body || {}).visible;
+  db.setCenterVisibility(id, visible);
+  console.log(`👁️ Center #${id} visibility set to ${visible}`);
+  res.json({ success: true, id, visible });
+});
+
+// PATCH /api/admin/centers/:id/display-order
+// Body: { display_order: N }  OR  { swap_with: otherCenterId } for relative moves
+router.patch('/centers/:id/display-order', adminAuth, (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (!id) return res.status(400).json({ error: 'Invalid id' });
+  const body = req.body || {};
+  if (body.swap_with) {
+    const other = parseInt(body.swap_with, 10);
+    if (!other) return res.status(400).json({ error: 'Invalid swap_with' });
+    const ok = db.swapDisplayOrder(id, other);
+    if (!ok) return res.status(404).json({ error: 'Center(s) not found' });
+    console.log(`📋 Swapped display order: #${id} <→ #${other}`);
+    return res.json({ success: true });
+  }
+  const order = parseInt(body.display_order, 10);
+  if (!order) return res.status(400).json({ error: 'display_order required' });
+  db.setCenterDisplayOrder(id, order);
+  console.log(`📋 Center #${id} display_order set to ${order}`);
+  res.json({ success: true, id, display_order: order });
+});
+
+// PATCH /api/admin/centers/:id/open-status  Body: { is_open: true | false }
+// Super-admin override for when the center owner can't toggle their own status.
+router.patch('/centers/:id/open-status', adminAuth, (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (!id) return res.status(400).json({ error: 'Invalid id' });
+  const isOpen = !!(req.body || {}).is_open;
+  db.setCenterOpenStatus(id, isOpen);
+  console.log(`🔆 Center #${id} is_open set to ${isOpen} (admin override)`);
+  res.json({ success: true, id, is_open: isOpen });
+});
+
 module.exports = router;

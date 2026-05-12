@@ -141,6 +141,16 @@ try { db.exec("ALTER TABLE centers ADD COLUMN bank_name     TEXT"); } catch { /*
 try { db.exec("ALTER TABLE centers ADD COLUMN lat REAL"); } catch { /* exists */ }
 try { db.exec("ALTER TABLE centers ADD COLUMN lng REAL"); } catch { /* exists */ }
 
+// ── Migration: super-admin controls (visibility in customer app + sort order) ──
+try { db.exec("ALTER TABLE centers ADD COLUMN visible       INTEGER NOT NULL DEFAULT 1"); }   catch { /* exists */ }
+try { db.exec("ALTER TABLE centers ADD COLUMN display_order INTEGER NOT NULL DEFAULT 999"); } catch { /* exists */ }
+// Existing rows that came in before the migration get NULLs from SQLite even
+// with a DEFAULT clause on ADD COLUMN — backfill display_order from id so each
+// center has a stable, deterministic slot until the super admin reorders.
+try {
+  db.prepare("UPDATE centers SET display_order = id WHERE display_order IS NULL OR display_order = 999").run();
+} catch { /* table empty or no-op */ }
+
 // ── Migration: enhanced application fields ──
 try { db.exec("ALTER TABLE applications ADD COLUMN geo_lat       REAL"); } catch { /* exists */ }
 try { db.exec("ALTER TABLE applications ADD COLUMN geo_lng       REAL"); } catch { /* exists */ }
@@ -717,7 +727,30 @@ module.exports = {
     return db.prepare('SELECT * FROM applications ORDER BY created_at DESC').all();
   },
   getAllCenters() {
-    return db.prepare(`SELECT id, name, owner_name, mobile, email, address, city, gstin, wash_types, open_time, close_time, is_open, lat, lng, created_at FROM centers ORDER BY created_at DESC`).all();
+    return db.prepare(`
+      SELECT id, name, owner_name, mobile, email, address, city, gstin, wash_types,
+             open_time, close_time, is_open, lat, lng, visible, display_order, created_at
+      FROM centers
+      ORDER BY display_order ASC, id ASC
+    `).all();
+  },
+  setCenterVisibility(id, visible) {
+    return db.prepare("UPDATE centers SET visible=? WHERE id=?").run(visible ? 1 : 0, id);
+  },
+  setCenterDisplayOrder(id, order) {
+    return db.prepare("UPDATE centers SET display_order=? WHERE id=?").run(parseInt(order, 10) || 999, id);
+  },
+  // Swap display_order between two centers (used by admin "move up / down").
+  swapDisplayOrder(centerAId, centerBId) {
+    const a = db.prepare("SELECT display_order FROM centers WHERE id=?").get(centerAId);
+    const b = db.prepare("SELECT display_order FROM centers WHERE id=?").get(centerBId);
+    if (!a || !b) return false;
+    const t = db.transaction(() => {
+      db.prepare("UPDATE centers SET display_order=? WHERE id=?").run(b.display_order, centerAId);
+      db.prepare("UPDATE centers SET display_order=? WHERE id=?").run(a.display_order, centerBId);
+    });
+    t();
+    return true;
   },
   // Admin: all bookings across all centers, joined with the center name.
   // Optional filters: date (YYYY-MM-DD), status, center_id.

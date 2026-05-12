@@ -11,7 +11,7 @@ const AdminData = (() => {
   }
 
   // DB row → admin-app CENTERS shape. Sensible defaults for fields
-  // the DB doesn't store (rating, displayOrder, settlements, etc.).
+  // the DB doesn't store (rating, settlements, cityId).
   function _mapCenter(c, idx) {
     const washTypes = String(c.wash_types || '').split(',').map(s => s.trim()).filter(Boolean);
     const area      = String(c.address || '').split(',').pop().trim() || c.city || '';
@@ -31,8 +31,8 @@ const AdminData = (() => {
       totalBookings:     0,    // filled in after bookings load
       activeNow:         0,    // filled in after bookings load
       todayRevenue:      0,    // filled in after bookings load
-      visible:           true,
-      displayOrder:      idx + 1,
+      visible:           c.visible == null ? true : !!c.visible,
+      displayOrder:      c.display_order || (idx + 1),
       cityId:            'city1',
       pendingSettlement: 0,
       bankAccount:       c.bank_account || null,
@@ -40,6 +40,34 @@ const AdminData = (() => {
       accountName:       c.account_name || null,
       bankName:          c.bank_name || null,
     };
+  }
+
+  // ── Mutations that the super-admin screens call ──────────────
+
+  async function _patch(path, body) {
+    const r = await fetch(`${CENTER_APP_URL}${path}`, {
+      method:  'PATCH',
+      headers: { ..._headers(), 'Content-Type': 'application/json' },
+      body:    JSON.stringify(body || {}),
+    });
+    if (!r.ok) {
+      const j = await r.json().catch(() => ({}));
+      throw new Error(j.error || `HTTP ${r.status}`);
+    }
+    return r.json();
+  }
+
+  async function setVisibility(dbCenterId, visible) {
+    return _patch(`/api/admin/centers/${dbCenterId}/visibility`, { visible });
+  }
+  async function setDisplayOrder(dbCenterId, order) {
+    return _patch(`/api/admin/centers/${dbCenterId}/display-order`, { display_order: order });
+  }
+  async function swapDisplayOrder(dbCenterIdA, dbCenterIdB) {
+    return _patch(`/api/admin/centers/${dbCenterIdA}/display-order`, { swap_with: dbCenterIdB });
+  }
+  async function setOpenStatus(dbCenterId, isOpen) {
+    return _patch(`/api/admin/centers/${dbCenterId}/open-status`, { is_open: isOpen });
   }
 
   // Format slot_date (YYYY-MM-DD) to 'Today' / 'Yesterday' / 'DD MMM'.
@@ -273,6 +301,10 @@ const AdminData = (() => {
     localStorage.setItem(KEY, JSON.stringify([...set]));
   }
 
-  return { loadAll, markNotificationRead };
+  return {
+    loadAll,
+    markNotificationRead,
+    setVisibility, setDisplayOrder, swapDisplayOrder, setOpenStatus,
+  };
 
 })();
