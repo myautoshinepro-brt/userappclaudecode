@@ -2,6 +2,7 @@ const express            = require('express');
 const jwt                = require('jsonwebtoken');
 const db                 = require('../db/database');
 const { sendOtpEmail }   = require('../utils/email');
+const { sendOtpSms }     = require('../utils/sms');
 
 const router         = express.Router();
 const JWT_SECRET     = process.env.JWT_SECRET || 'sparkwash_center_dev_secret';
@@ -40,7 +41,7 @@ function requireAuth(req, res, next) {
 }
 
 // POST /api/auth/send-otp  { mobile }
-router.post('/send-otp', (req, res) => {
+router.post('/send-otp', async (req, res) => {
   const { mobile } = req.body || {};
   if (!mobile || !isMobile(mobile.replace(/\s+/g, '')))
     return res.status(400).json({ error: 'Enter a valid 10-digit mobile number.' });
@@ -54,23 +55,34 @@ router.post('/send-otp', (req, res) => {
   db.saveOtp(norm, otp, OTP_MINUTES);
   console.log(`\n🔐 OTP for ${norm}: ${otp}  (expires in ${OTP_MINUTES} min)\n`);
 
-  // Send OTP to center's registered email if available
+  // Centers log in by mobile, so the primary channel is SMS. Email is a
+  // secondary copy when the center has one on file.
+  let primaryDelivery = null;
+  try { await sendOtpSms(norm, otp, OTP_MINUTES); primaryDelivery = 'sms'; }
+  catch (e) { console.error('📱 SMS send error:', e.message); }
+
+  // Always copy the email if available — useful when the owner isn't holding
+  // their phone but is at the desk with their laptop open.
   if (center.email) {
-    sendOtpEmail(center.email, otp, center.owner_name, OTP_MINUTES).catch(err => {
-      console.error(`📧 OTP email error for ${center.email}:`, err.message);
-    });
+    sendOtpEmail(center.email, otp, center.owner_name, OTP_MINUTES)
+      .then(() => { if (!primaryDelivery) primaryDelivery = 'email'; })
+      .catch(err => console.error('📧 OTP email error:', err.message));
   }
 
-  const payload = {
+  const dest = primaryDelivery === 'sms'
+    ? `your mobile (••${norm.slice(-2)})`
+    : center.email
+      ? `your registered email (${center.email})`
+      : 'your registered contact';
+
+  res.json({
     success:    true,
-    message:    center.email
-      ? `OTP sent to your registered email (${center.email}).`
-      : 'OTP generated — check server logs.',
+    message:    `OTP sent to ${dest}.`,
     centerName: center.name,
     ownerName:  center.owner_name,
-  };
-  if (DEV_MODE) payload.devOtp = otp;
-  res.json(payload);
+    deliveredVia: primaryDelivery || 'log',
+    ...(DEV_MODE ? { devOtp: otp } : {}),
+  });
 });
 
 // POST /api/auth/verify-otp  { mobile, otp }

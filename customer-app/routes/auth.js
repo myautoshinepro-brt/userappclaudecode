@@ -2,6 +2,7 @@ const express        = require('express');
 const jwt            = require('jsonwebtoken');
 const db             = require('../db/database');
 const { sendOtpEmail } = require('../utils/email');
+const { sendOtpSms }   = require('../utils/sms');
 
 const router          = express.Router();
 const JWT_SECRET      = process.env.JWT_SECRET || 'sparkwash_dev_secret';
@@ -92,7 +93,7 @@ router.post('/register', (req, res) => {
  * POST /api/auth/send-otp
  * Body: { identifier }  — mobile number or email address
  */
-router.post('/send-otp', (req, res) => {
+router.post('/send-otp', async (req, res) => {
   const { identifier } = req.body || {};
   if (!identifier || !identifier.trim())
     return res.status(400).json({ error: 'Enter your mobile number or email.' });
@@ -113,21 +114,53 @@ router.post('/send-otp', (req, res) => {
 
   console.log(`\n🔐 OTP for ${parsed.value}: ${otp}  (expires in ${OTP_MINUTES} min)\n`);
 
-  // Always send OTP to user's registered email
-  if (user.email) {
+  // Route the OTP to the channel the user actually picked. Email-identifier
+  // users get email; mobile-identifier users get SMS. If the primary channel
+  // fails we fall back to the *other* registered channel so login still works.
+  let primaryDelivery = null;
+  let primaryError    = null;
+
+  if (parsed.type === 'mobile') {
+    try { await sendOtpSms(parsed.value, otp, OTP_MINUTES); primaryDelivery = 'sms'; }
+    catch (e) { primaryError = e.message; console.error('📱 SMS send error:', e.message); }
+    // If SMS failed but we have an email on file, also send via email as a fallback.
+    if (!primaryDelivery && user.email) {
+      try {
+        await sendOtpEmail(user.email, otp, user.full_name, OTP_MINUTES);
+        primaryDelivery = 'email';
+      } catch (e2) { console.error('📧 email fallback failed:', e2.message); }
+    }
+  } else {
+    // identifier was an email
+    try { await sendOtpEmail(user.email, otp, user.full_name, OTP_MINUTES); primaryDelivery = 'email'; }
+    catch (e) { primaryError = e.message; console.error('📧 email send error:', e.message); }
+    if (!primaryDelivery && user.mobile) {
+      try { await sendOtpSms(user.mobile, otp, OTP_MINUTES); primaryDelivery = 'sms'; }
+      catch (e2) { console.error('📱 SMS fallback failed:', e2.message); }
+    }
+  }
+
+  // Always also try to fire off an email when the user has one — useful as a
+  // secondary copy of the OTP (lots of Indian users prefer to read it on
+  // WhatsApp/SMS but having it in inbox too is nice). Don't await.
+  if (parsed.type === 'mobile' && user.email && primaryDelivery === 'sms') {
     sendOtpEmail(user.email, otp, user.full_name, OTP_MINUTES).catch(err => {
-      console.error(`📧 OTP email error for ${user.email}:`, err.message);
+      console.error('📧 secondary email copy failed:', err.message);
     });
   }
 
+  const deliveryLabel = primaryDelivery === 'sms'   ? `your mobile number (••${parsed.value.slice(-2)})`
+                      : primaryDelivery === 'email' ? `your email address`
+                      : 'your registered contact';
+
   const responsePayload = {
-    success: true,
-    message: `OTP sent to your ${parsed.type === 'mobile' ? 'mobile number' : 'email address'}.`,
-    userName: user.full_name,
+    success:    true,
+    message:    `OTP sent to ${deliveryLabel}.`,
+    userName:   user.full_name,
+    deliveredVia: primaryDelivery,
   };
 
   if (DEV_MODE) responsePayload.devOtp = otp;
-
   res.json(responsePayload);
 });
 

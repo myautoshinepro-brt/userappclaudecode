@@ -100,7 +100,7 @@ const Auth = {
       }
 
       this._mobile = mobile;
-      this.renderOtpStep(data.centerName, data.ownerName, data.devOtp);
+      this.renderOtpStep(data.centerName, data.ownerName, data.devOtp, data.deliveredVia);
     } catch {
       UI.toast('Network error. Try again.');
     } finally {
@@ -108,11 +108,14 @@ const Auth = {
     }
   },
 
-  renderOtpStep(centerName, ownerName, devOtp) {
+  renderOtpStep(centerName, ownerName, devOtp, deliveredVia) {
+    const channelTag = deliveredVia === 'sms'   ? ' (via SMS)'
+                     : deliveredVia === 'email' ? ' (via email)'
+                     : '';
     document.getElementById('login-form-area').innerHTML = `
       <div class="otp-sent-info">
         <strong>👋 ${ownerName || 'Welcome back!'}</strong>
-        ${centerName || ''} — OTP sent to ${this._mobile}
+        ${centerName || ''} — OTP sent to ${this._mobile}${channelTag}
         ${devOtp ? `<div style="display:flex;align-items:center;justify-content:space-between;background:#f5f3ff;border:1px solid #c4b5fd;border-radius:8px;padding:8px 12px;margin-top:8px"><span style="font-size:12px;color:#7c3aed;font-weight:700">🔑 OTP: ${devOtp}</span><button type="button" onclick="Auth._fillOtp('${devOtp}')" style="background:#7c3aed;color:#fff;border:none;border-radius:5px;padding:3px 9px;font-size:11px;font-weight:700;cursor:pointer">Tap to fill ↑</button></div>` : ''}
       </div>
       <div class="otp-row">

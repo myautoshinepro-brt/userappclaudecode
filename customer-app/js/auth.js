@@ -125,12 +125,17 @@ const LoginScreen = (() => {
     });
   }
 
-  function showStep2(userName) {
+  function showStep2(userName, deliveredVia) {
     _renderStep('login-step-otp', () => {
       const el = document.getElementById('login-otp-who');
       if (el) el.textContent = userName || 'you';
       const dest = document.getElementById('login-otp-dest');
-      if (dest) dest.textContent = _identifier;
+      if (dest) {
+        // Reflect the channel the server actually used.
+        if (deliveredVia === 'sms')        dest.textContent = `${_identifier} (SMS)`;
+        else if (deliveredVia === 'email') dest.textContent = _identifier;
+        else                                dest.textContent = _identifier;
+      }
       _resetOtpBoxes();
       document.getElementById('login-otp-box-0')?.focus();
       _startResendTimer();
@@ -169,7 +174,7 @@ const LoginScreen = (() => {
       const res = await Auth.sendOtp(_identifier);
       // Dev mode: show OTP hint on screen
       if (res.devOtp) _showDevOtpHint(res.devOtp);
-      showStep2(res.userName);
+      showStep2(res.userName, res.deliveredVia);
     } catch (err) {
       _showError('login-id-error', err.message);
     } finally {
