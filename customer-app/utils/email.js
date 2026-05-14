@@ -5,7 +5,7 @@ async function sendViaResend(to, subject, html) {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) return { skipped: true };
 
-  const from = process.env.RESEND_FROM || 'SparkWash <onboarding@resend.dev>';
+  const from = process.env.RESEND_FROM || 'Pitbay <onboarding@resend.dev>';
   const res  = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: {
@@ -45,8 +45,8 @@ function getTransporter() {
 }
 
 async function sendOtpEmail(toEmail, otp, userName, expiresMinutes) {
-  const subject = `${otp} is your SparkWash OTP`;
-  const from    = process.env.SMTP_FROM || `"SparkWash" <${process.env.SMTP_USER}>`;
+  const subject = `${otp} is your Pitbay OTP`;
+  const from    = process.env.SMTP_FROM || `"Pitbay" <${process.env.SMTP_USER}>`;
 
   const html = `
 <!DOCTYPE html><html>
@@ -56,14 +56,14 @@ async function sendOtpEmail(toEmail, otp, userName, expiresMinutes) {
 
     <div style="background:linear-gradient(135deg,#1e40af,#0369a1);border-radius:16px 16px 0 0;padding:28px 24px;text-align:center">
       <div style="font-size:40px;margin-bottom:8px">🚿</div>
-      <div style="color:#fff;font-size:22px;font-weight:800;letter-spacing:-0.5px">SparkWash</div>
+      <div style="color:#fff;font-size:22px;font-weight:800;letter-spacing:-0.5px">Pitbay</div>
       <div style="color:#bfdbfe;font-size:12px;margin-top:4px">India's smartest car wash booking</div>
     </div>
 
     <div style="background:#fff;padding:28px 24px;border-radius:0 0 16px 16px;box-shadow:0 4px 12px rgba(0,0,0,.08)">
       <h2 style="margin:0 0 6px;font-size:18px;color:#0f172a">Your Login OTP</h2>
       <p style="margin:0 0 24px;color:#6b7280;font-size:13px">
-        Hi <strong>${userName || 'there'}</strong>! Use the code below to log in to SparkWash.
+        Hi <strong>${userName || 'there'}</strong>! Use the code below to log in to Pitbay.
       </p>
 
       <div style="background:#eff6ff;border:2px dashed #93c5fd;border-radius:14px;padding:24px;text-align:center;margin-bottom:20px">
@@ -73,12 +73,12 @@ async function sendOtpEmail(toEmail, otp, userName, expiresMinutes) {
       </div>
 
       <div style="background:#fef9c3;border-radius:10px;padding:12px 14px;margin-bottom:20px;font-size:12px;color:#92400e">
-        🔒 Never share this OTP with anyone. SparkWash will never call and ask for it.
+        🔒 Never share this OTP with anyone. Pitbay will never call and ask for it.
       </div>
 
       <div style="text-align:center;font-size:11px;color:#9ca3af;line-height:1.6">
         If you didn't request this, simply ignore this email.<br>
-        SparkWash · Powered by technology, driven by cleanliness
+        Pitbay · Powered by technology, driven by cleanliness
       </div>
     </div>
 

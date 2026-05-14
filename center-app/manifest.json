@@ -1,7 +1,7 @@
 {
-  "name": "SparkWash Center",
+  "name": "Pitbay Center",
   "short_name": "SW Center",
-  "description": "Manage your SparkWash center — bookings, queue, slots, revenue.",
+  "description": "Manage your Pitbay center — bookings, queue, slots, revenue.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
@@ -18,7 +18,7 @@
   "related_applications": [
     {
       "platform": "play",
-      "url": "https://play.google.com/store/apps/details?id=com.sparkwash.center"
+      "url": "https://play.google.com/store/apps/details?id=com.pitbay.center"
     }
   ],
   "prefer_related_applications": false

@@ -1,5 +1,5 @@
 // ============================================================
-// SparkWash — notifications.js
+// Pitbay — notifications.js
 // Notification settings (channels, events, quiet hours) + inbox
 // ============================================================
 
@@ -24,7 +24,7 @@ const NOTIF_INBOX_SEED = [
     id: 'n3', type: 'promo',
     icon: '🎁', iconBg: '#fef9c3',
     title: '20% off on steam wash!',
-    body: 'Use code STEAM20 this weekend at any SparkWash center. Valid till Sunday.',
+    body: 'Use code STEAM20 this weekend at any Pitbay center. Valid till Sunday.',
     relTime: '1 hr ago', timestamp: 0, read: false,
   },
   {
@@ -425,7 +425,7 @@ const NotificationScreen = {
       NotifState.pushPermission = perm;
       if (perm === 'granted') {
         UI.toast('✅ Push notifications enabled!');
-        new Notification('SparkWash 🚗', {
+        new Notification('Pitbay 🚗', {
           body: 'You\'ll now get booking updates, reminders & offers.',
         });
       } else {

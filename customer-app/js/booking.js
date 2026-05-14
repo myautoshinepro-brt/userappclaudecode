@@ -1,5 +1,5 @@
 // ============================================================
-// SparkWash — booking.js
+// Pitbay — booking.js
 // Confirmed screen, manage, modify, cancel, bookings list
 // ============================================================
 
@@ -177,7 +177,7 @@ const BookingScreen = {
   callCenter() {
     const c = this._activeCenter();
     // Real DB centers don't currently expose owner mobile to customers
-    // (privacy). Fall back to SparkWash support if missing.
+    // (privacy). Fall back to Pitbay support if missing.
     const phone = (c && c.phone) || '18005720001';
     window.location.href = 'tel:' + String(phone).replace(/\D/g, '');
   },
@@ -199,9 +199,9 @@ const BookingScreen = {
   async shareBooking() {
     const b = AppState.confirmedBooking;
     if (!b || !b.id) { UI.toast('⚠️ No booking to share'); return; }
-    const text = `My SparkWash booking ${b.id}\n${b.packageName} at ${b.centerName}\n${b.date} · ${b.slot}\nAmount: ₹${b.collectAmount ?? b.totalPaid} (pay at center)`;
+    const text = `My Pitbay booking ${b.id}\n${b.packageName} at ${b.centerName}\n${b.date} · ${b.slot}\nAmount: ₹${b.collectAmount ?? b.totalPaid} (pay at center)`;
     if (navigator.share) {
-      try { await navigator.share({ title: 'SparkWash booking', text }); return; }
+      try { await navigator.share({ title: 'Pitbay booking', text }); return; }
       catch { /* user cancelled or share unsupported */ }
     }
     // Fallback: copy to clipboard.

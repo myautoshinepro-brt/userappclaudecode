@@ -1,4 +1,4 @@
-// SparkWash Center App — state.js
+// Pitbay Center App — state.js
 
 const AppState = {
   // Auth

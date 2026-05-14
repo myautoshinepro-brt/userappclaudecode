@@ -1,5 +1,5 @@
 // ============================================================
-// SparkWash — state.js
+// Pitbay — state.js
 // Global app state management
 // ============================================================
 
@@ -31,8 +31,8 @@ const AppState = {
     vehicleId: null,   // set on first summary render
     vehicle: '',       // derived string, kept for confirmation screens
     promoCode: null,
-    promoDiscount: 0,  // app discount (SparkWash promo) — settled by SparkWash to center
-    centerDiscount: 0, // center's own offer — NOT settled by SparkWash
+    promoDiscount: 0,  // app discount (Pitbay promo) — settled by Pitbay to center
+    centerDiscount: 0, // center's own offer — NOT settled by Pitbay
   },
 
   // Confirmed booking (after payment)
@@ -110,7 +110,7 @@ const AppState = {
 
   calcTotal() {
     const base           = this.booking.packagePrice || 0;
-    const appDiscount    = this.booking.promoDiscount  || 0;  // SparkWash settles to center
+    const appDiscount    = this.booking.promoDiscount  || 0;  // Pitbay settles to center
     const centerDiscount = this.booking.centerDiscount || 0;  // Center's own, not settled
     const collectAmount  = Math.max(0, base - appDiscount - centerDiscount);
     return {
@@ -118,7 +118,7 @@ const AppState = {
       appDiscount,
       centerDiscount,
       collectAmount,
-      settlementAmount: appDiscount, // what SparkWash owes the center
+      settlementAmount: appDiscount, // what Pitbay owes the center
       // Legacy aliases (keep for any code still reading .discount / .total)
       discount: appDiscount,
       total:    collectAmount,

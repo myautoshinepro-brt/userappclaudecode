@@ -1,5 +1,5 @@
 // ============================================================
-// SparkWash — summary.js
+// Pitbay — summary.js
 // Booking summary screen + promo code bottom sheet
 // ============================================================
 
@@ -37,7 +37,7 @@ const SummaryScreen = {
     // Price breakdown
     _setText('sum-base-price', '₹' + t.base);
 
-    // App promo discount row (SparkWash offer)
+    // App promo discount row (Pitbay offer)
     const appDiscRow = document.getElementById('sum-app-discount-row');
     if (appDiscRow) {
       appDiscRow.style.display = t.appDiscount > 0 ? 'flex' : 'none';

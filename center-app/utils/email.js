@@ -5,7 +5,7 @@ async function sendViaResend(to, subject, html) {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) return { skipped: true };
 
-  const from = process.env.RESEND_FROM || 'SparkWash Center <onboarding@resend.dev>';
+  const from = process.env.RESEND_FROM || 'Pitbay Center <onboarding@resend.dev>';
   const res  = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: {
@@ -66,7 +66,7 @@ async function sendWashDoneEmail(booking, center) {
 
   const discountRows = [
     booking.app_discount > 0
-      ? `<tr><td style="padding:6px 0;color:#166534">🎁 SparkWash offer</td><td style="text-align:right;color:#166534">-₹${booking.app_discount}</td></tr>`
+      ? `<tr><td style="padding:6px 0;color:#166534">🎁 Pitbay offer</td><td style="text-align:right;color:#166534">-₹${booking.app_discount}</td></tr>`
       : '',
     booking.center_discount > 0
       ? `<tr><td style="padding:6px 0;color:#1d4ed8">🏢 Center offer</td><td style="text-align:right;color:#1d4ed8">-₹${booking.center_discount}</td></tr>`
@@ -92,7 +92,7 @@ async function sendWashDoneEmail(booking, center) {
     <!-- Header -->
     <div style="background:linear-gradient(135deg,#0f172a,#1e3a5f);border-radius:16px 16px 0 0;padding:28px 24px;text-align:center">
       <div style="font-size:40px;margin-bottom:8px">🚿</div>
-      <div style="color:#fff;font-size:22px;font-weight:800;letter-spacing:-0.5px">SparkWash</div>
+      <div style="color:#fff;font-size:22px;font-weight:800;letter-spacing:-0.5px">Pitbay</div>
       <div style="color:#94a3b8;font-size:12px;margin-top:4px">Your car is sparkling clean!</div>
     </div>
 
@@ -158,20 +158,20 @@ async function sendWashDoneEmail(booking, center) {
 
       <!-- Footer note -->
       <div style="text-align:center;font-size:11px;color:#9ca3af;line-height:1.6;margin-top:8px">
-        Thank you for using SparkWash! 🚗✨<br>
+        Thank you for using Pitbay! 🚗✨<br>
         Questions? Contact ${center.name} · ${center.mobile || ''}
       </div>
     </div>
 
     <!-- Bottom -->
     <div style="text-align:center;padding:16px;font-size:10px;color:#9ca3af">
-      SparkWash · Powered by technology, driven by cleanliness
+      Pitbay · Powered by technology, driven by cleanliness
     </div>
   </div>
 </body>
 </html>`;
 
-  const from = process.env.SMTP_FROM || `"SparkWash" <${process.env.SMTP_USER}>`;
+  const from = process.env.SMTP_FROM || `"Pitbay" <${process.env.SMTP_USER}>`;
 
   try {
     const info = await t.sendMail({
@@ -206,7 +206,7 @@ async function sendApplicationStatusEmail(app, status) {
   <div style="max-width:480px;margin:0 auto;padding:24px 16px">
     <div style="background:linear-gradient(135deg,#0f172a,#1e3a5f);border-radius:16px 16px 0 0;padding:28px 24px;text-align:center">
       <div style="font-size:40px;margin-bottom:8px">${isApproved ? '✅' : '❌'}</div>
-      <div style="color:#fff;font-size:22px;font-weight:800">SparkWash</div>
+      <div style="color:#fff;font-size:22px;font-weight:800">Pitbay</div>
       <div style="color:#94a3b8;font-size:12px;margin-top:4px">Center Registration Update</div>
     </div>
     <div style="background:#fff;padding:24px;border-radius:0 0 16px 16px;box-shadow:0 4px 12px rgba(0,0,0,.08)">
@@ -214,13 +214,13 @@ async function sendApplicationStatusEmail(app, status) {
       <p style="margin:0 0 20px;color:#6b7280;font-size:13px">
         Dear <strong>${app.owner_name}</strong>,<br><br>
         ${isApproved
-          ? `We are excited to inform you that your center <strong>${app.name}</strong> has been <strong>approved</strong> on SparkWash!`
+          ? `We are excited to inform you that your center <strong>${app.name}</strong> has been <strong>approved</strong> on Pitbay!`
           : `We regret to inform you that your center application for <strong>${app.name}</strong> could not be approved at this time.`}
       </p>
       ${isApproved ? `
       <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:12px;padding:16px;margin-bottom:20px">
         <div style="font-size:13px;color:#14532d;line-height:1.8">
-          ✅ Your center is now <strong>live on SparkWash</strong><br>
+          ✅ Your center is now <strong>live on Pitbay</strong><br>
           📱 Login using your mobile: <strong>${app.mobile}</strong><br>
           🚀 Start accepting customer bookings today!
         </div>
@@ -228,21 +228,21 @@ async function sendApplicationStatusEmail(app, status) {
       <div style="background:#fef2f2;border:1px solid #fca5a5;border-radius:12px;padding:16px;margin-bottom:20px">
         <div style="font-size:13px;color:#7f1d1d;line-height:1.8">
           ${app.notes ? `📝 Reason: ${app.notes}<br>` : ''}
-          You may re-apply with updated information on the SparkWash center app.
+          You may re-apply with updated information on the Pitbay center app.
         </div>
       </div>`}
       <div style="text-align:center;font-size:11px;color:#9ca3af;line-height:1.6;margin-top:8px">
-        Questions? Reach out to SparkWash support.<br>
-        SparkWash · Powered by technology, driven by cleanliness
+        Questions? Reach out to Pitbay support.<br>
+        Pitbay · Powered by technology, driven by cleanliness
       </div>
     </div>
   </div>
 </body></html>`;
 
-  const from    = process.env.SMTP_FROM || `"SparkWash" <${process.env.SMTP_USER}>`;
+  const from    = process.env.SMTP_FROM || `"Pitbay" <${process.env.SMTP_USER}>`;
   const subject = isApproved
-    ? `✅ Your SparkWash center is approved — ${app.name}`
-    : `SparkWash center application update — ${app.name}`;
+    ? `✅ Your Pitbay center is approved — ${app.name}`
+    : `Pitbay center application update — ${app.name}`;
 
   try {
     const info = await t.sendMail({ from, to: app.email, subject, html });
@@ -254,8 +254,8 @@ async function sendApplicationStatusEmail(app, status) {
 
 // ── OTP email ─────────────────────────────────────────────────
 async function sendOtpEmail(toEmail, otp, name, expiresMinutes) {
-  const subject = `${otp} is your SparkWash Center OTP`;
-  const from    = process.env.SMTP_FROM || `"SparkWash" <${process.env.SMTP_USER}>`;
+  const subject = `${otp} is your Pitbay Center OTP`;
+  const from    = process.env.SMTP_FROM || `"Pitbay" <${process.env.SMTP_USER}>`;
 
   const html = `
 <!DOCTYPE html><html>
@@ -264,13 +264,13 @@ async function sendOtpEmail(toEmail, otp, name, expiresMinutes) {
   <div style="max-width:480px;margin:0 auto;padding:24px 16px">
     <div style="background:linear-gradient(135deg,#0f172a,#1e3a5f);border-radius:16px 16px 0 0;padding:28px 24px;text-align:center">
       <div style="font-size:40px;margin-bottom:8px">🚿</div>
-      <div style="color:#fff;font-size:22px;font-weight:800">SparkWash Center</div>
+      <div style="color:#fff;font-size:22px;font-weight:800">Pitbay Center</div>
       <div style="color:#94a3b8;font-size:12px;margin-top:4px">Center Management Portal</div>
     </div>
     <div style="background:#fff;padding:28px 24px;border-radius:0 0 16px 16px;box-shadow:0 4px 12px rgba(0,0,0,.08)">
       <h2 style="margin:0 0 6px;font-size:18px;color:#0f172a">Your Login OTP</h2>
       <p style="margin:0 0 24px;color:#6b7280;font-size:13px">
-        Hi <strong>${name || 'there'}</strong>! Use the code below to log in to the SparkWash Center portal.
+        Hi <strong>${name || 'there'}</strong>! Use the code below to log in to the Pitbay Center portal.
       </p>
       <div style="background:#f0fdf4;border:2px dashed #86efac;border-radius:14px;padding:24px;text-align:center;margin-bottom:20px">
         <div style="font-size:11px;color:#16a34a;font-weight:700;letter-spacing:1px;margin-bottom:8px">ONE-TIME PASSWORD</div>
@@ -278,11 +278,11 @@ async function sendOtpEmail(toEmail, otp, name, expiresMinutes) {
         <div style="font-size:11px;color:#6b7280;margin-top:10px">Expires in ${expiresMinutes} minutes</div>
       </div>
       <div style="background:#fef9c3;border-radius:10px;padding:12px 14px;margin-bottom:20px;font-size:12px;color:#92400e">
-        🔒 Never share this OTP with anyone. SparkWash will never call and ask for it.
+        🔒 Never share this OTP with anyone. Pitbay will never call and ask for it.
       </div>
       <div style="text-align:center;font-size:11px;color:#9ca3af;line-height:1.6">
         If you didn't request this, simply ignore this email.<br>
-        SparkWash · Powered by technology, driven by cleanliness
+        Pitbay · Powered by technology, driven by cleanliness
       </div>
     </div>
   </div>

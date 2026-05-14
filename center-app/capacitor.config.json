@@ -1,6 +1,6 @@
 {
-  "appId": "com.sparkwash.center",
-  "appName": "SparkWash Center",
+  "appId": "com.pitbay.center",
+  "appName": "Pitbay Center",
   "webDir": ".",
   "server": {
     "androidScheme": "https",
@@ -28,7 +28,7 @@
     "minWebViewVersion": 60
   },
   "ios": {
-    "scheme": "SparkWashCenter",
+    "scheme": "PitbayCenter",
     "limitsNavigationsToAppBoundDomains": false
   }
 }

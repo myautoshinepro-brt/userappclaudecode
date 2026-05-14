@@ -1,4 +1,4 @@
-// SparkWash Center App — data.js
+// Pitbay Center App — data.js
 // Static reference data (wash types, labels, slot times)
 
 const WASH_TYPES = ['water', 'dry', 'steam', 'd2d'];

@@ -1,4 +1,4 @@
-// SparkWash Center App — bookings.js
+// Pitbay Center App — bookings.js
 
 const BookingsScreen = {
   async render() {
@@ -127,7 +127,7 @@ const BookingsScreen = {
     const appDisc    = b.app_discount    || 0;
     const ctrDisc    = b.center_discount || 0;
     const collectAmt = this._collectAmount(b);
-    const settleAmt  = appDisc; // SparkWash settles only app discount
+    const settleAmt  = appDisc; // Pitbay settles only app discount
 
     document.getElementById('booking-detail-title').textContent = b.customer_name;
     document.getElementById('booking-detail-sub').textContent   = b.booking_ref;
@@ -137,7 +137,7 @@ const BookingsScreen = {
       ${appDisc > 0 ? `
         <div class="booking-detail-row">
           <span class="bd-ico">🎁</span>
-          <div><div class="bd-label">SparkWash offer</div><div class="bd-value" style="color:var(--green)">-${UI.formatPrice(appDisc)}</div></div>
+          <div><div class="bd-label">Pitbay offer</div><div class="bd-value" style="color:var(--green)">-${UI.formatPrice(appDisc)}</div></div>
         </div>` : ''}
       ${ctrDisc > 0 ? `
         <div class="booking-detail-row">
@@ -145,10 +145,10 @@ const BookingsScreen = {
           <div><div class="bd-label">Your offer</div><div class="bd-value" style="color:var(--blue)">-${UI.formatPrice(ctrDisc)}</div></div>
         </div>` : ''}`;
 
-    // Settlement note (only when SparkWash discount applied)
+    // Settlement note (only when Pitbay discount applied)
     const settleNote = settleAmt > 0 ? `
       <div style="background:#f0fdf4;border-radius:10px;padding:10px 12px;margin:10px 14px 0;font-size:11px;color:var(--green)">
-        ✅ SparkWash will settle <strong>${UI.formatPrice(settleAmt)}</strong> to you within 24 hrs of wash completion
+        ✅ Pitbay will settle <strong>${UI.formatPrice(settleAmt)}</strong> to you within 24 hrs of wash completion
       </div>` : '';
 
     // Payment status badge

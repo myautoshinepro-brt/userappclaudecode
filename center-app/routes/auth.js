@@ -49,7 +49,7 @@ router.post('/send-otp', async (req, res) => {
   const norm   = mobile.replace(/\s+/g, '');
   const center = db.findCenterByMobile(norm);
   if (!center)
-    return res.status(404).json({ error: 'No center found for this number. Contact SparkWash support.' });
+    return res.status(404).json({ error: 'No center found for this number. Contact Pitbay support.' });
 
   const otp = generateOtp();
   db.saveOtp(norm, otp, OTP_MINUTES);

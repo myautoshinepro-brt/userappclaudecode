@@ -1,4 +1,4 @@
-// SparkWash Center App — reviews.js
+// Pitbay Center App — reviews.js
 // Customer Reviews screen: avg rating hero, distribution chart,
 // filter chips, review cards with inline reply composer.
 

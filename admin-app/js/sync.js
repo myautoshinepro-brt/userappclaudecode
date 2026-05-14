@@ -1,5 +1,5 @@
 // ============================================================
-// SparkWash Admin App — sync.js
+// Pitbay Admin App — sync.js
 // Fetches real centers + bookings from center-app's admin API
 // and replaces the static demo arrays in data.js with live data.
 // ============================================================

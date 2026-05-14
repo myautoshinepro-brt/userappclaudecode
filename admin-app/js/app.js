@@ -1,5 +1,5 @@
 // ============================================================
-// SparkWash Admin App — app.js  (state, router, UI)
+// Pitbay Admin App — app.js  (state, router, UI)
 // ============================================================
 
 const AppState = {

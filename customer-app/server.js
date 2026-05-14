@@ -134,6 +134,6 @@ app.get(/^(?!\/api).*$/, (_req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`\n🚿 SparkWash server running at http://localhost:${PORT}`);
+  console.log(`\n🚿 Pitbay server running at http://localhost:${PORT}`);
   console.log('   OTPs will be printed here in development mode.\n');
 });

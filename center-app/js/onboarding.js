@@ -1,4 +1,4 @@
-// SparkWash Center App — onboarding.js
+// Pitbay Center App — onboarding.js
 
 const Onboarding = {
   _step: 1,
@@ -474,7 +474,7 @@ const Onboarding = {
             <div>✅ Team reviews your details & documents</div>
             <div>📞 We call you on <strong>${this._data.mobile}</strong> for a quick check</div>
             <div>📧 Approval email sent to <strong>${this._data.email || 'your email'}</strong></div>
-            <div>🚀 Your center goes live on SparkWash!</div>
+            <div>🚀 Your center goes live on Pitbay!</div>
           </div>
         </div>
 

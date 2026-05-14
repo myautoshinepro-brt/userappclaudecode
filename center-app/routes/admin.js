@@ -265,7 +265,7 @@ router.post('/chat/threads/:id/messages', adminAuth, (req, res) => {
   if (!t) return res.status(404).json({ error: 'Thread not found' });
   const b = req.body || {};
   if (!b.text || !String(b.text).trim()) return res.status(400).json({ error: 'text required' });
-  const msg = db.sendChatMessage(t.id, 'admin', b.sender_name || 'SparkWash Support', b.text);
+  const msg = db.sendChatMessage(t.id, 'admin', b.sender_name || 'Pitbay Support', b.text);
   res.status(201).json({ success: true, data: msg });
 });
 

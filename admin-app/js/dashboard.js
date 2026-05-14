@@ -1,5 +1,5 @@
 // ============================================================
-// SparkWash Admin App — dashboard.js
+// Pitbay Admin App — dashboard.js
 // ============================================================
 
 const AdminDashboard = {
@@ -11,7 +11,7 @@ const AdminDashboard = {
     const h = new Date().getHours();
     const greet = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
     setText('dash-greeting', `${greet}, ${admin?.name?.split(' ')[0]} 👋`);
-    setText('dash-sub', role === 'superadmin' ? 'SparkWash Platform — Super Admin' : 'SparkWash Platform — Admin');
+    setText('dash-sub', role === 'superadmin' ? 'Pitbay Platform — Super Admin' : 'Pitbay Platform — Admin');
     setText('dash-role-badge', role === 'superadmin' ? '⚡ Super Admin' : '🛡️ Admin');
 
     // Platform totals

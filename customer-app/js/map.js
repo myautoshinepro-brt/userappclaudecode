@@ -1,4 +1,4 @@
-// SparkWash Customer App — map.js
+// Pitbay Customer App — map.js
 // Leaflet/OpenStreetMap integration for "Find centers near me"
 
 const MapView = (() => {

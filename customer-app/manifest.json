@@ -1,6 +1,6 @@
 {
-  "name": "SparkWash — Car Wash Booking",
-  "short_name": "SparkWash",
+  "name": "Pitbay — Car Wash Booking",
+  "short_name": "Pitbay",
   "description": "Book your car wash in seconds. Choose a center, pick a slot, done.",
   "start_url": "/",
   "scope": "/",
@@ -19,7 +19,7 @@
   "related_applications": [
     {
       "platform": "play",
-      "url": "https://play.google.com/store/apps/details?id=com.sparkwash.customer"
+      "url": "https://play.google.com/store/apps/details?id=com.pitbay.customer"
     }
   ],
   "prefer_related_applications": false

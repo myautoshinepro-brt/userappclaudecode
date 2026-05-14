@@ -1,5 +1,5 @@
 // ============================================================
-// SparkWash — home.js
+// Pitbay — home.js
 // Home screen: search, filter chips, mini-map, center cards
 // ============================================================
 

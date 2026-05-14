@@ -1,5 +1,5 @@
 // ============================================================
-// SparkWash Admin App — screens.js
+// Pitbay Admin App — screens.js
 // Centers, AdminBookings, Chat, ChatDetail, AdminReports, SuperAdmin
 // ============================================================
 
@@ -875,7 +875,7 @@ const HistoryScreen = {
       const ctr = CENTERS.find(c => c.id === e.centerId);
       return [new Date(e.ts).toLocaleString('en-IN'), this._SRC[e.source]?.label||e.source, e.actor||'', ctr?.name||e.centerId||'', e.action, e.detail];
     });
-    exportCSV('sparkwash-history-' + new Date().toISOString().slice(0,10) + '.csv', headers, rows);
+    exportCSV('pitbay-history-' + new Date().toISOString().slice(0,10) + '.csv', headers, rows);
     UI.toast(`📥 Exported ${list.length} entries`);
   },
 
@@ -1360,7 +1360,7 @@ const ChatDetail = {
     this._scrollBottom();
 
     try {
-      const saved = await AdminData.sendChatReply(this._thread.id, text, AppState.admin?.name || 'SparkWash Support');
+      const saved = await AdminData.sendChatReply(this._thread.id, text, AppState.admin?.name || 'Pitbay Support');
       if (saved && saved.id) this._lastId = Math.max(this._lastId, saved.id);
     } catch (e) {
       UI.toast('❌ ' + e.message);
@@ -1487,7 +1487,7 @@ const AdminReports = {
       const ctr = CENTERS.find(c => c.id === b.centerId);
       return [ctr?.name||b.centerId, b.status, b.customer, b.vehicle+' '+b.model, WASH_LABELS[b.type]?.label||b.type, b.pkg, b.price, b.slot, b.rating||''];
     });
-    exportCSV('sparkwash-report-' + new Date().toISOString().slice(0,10) + '.csv', headers, rows);
+    exportCSV('pitbay-report-' + new Date().toISOString().slice(0,10) + '.csv', headers, rows);
     UI.toast('📥 Report exported as CSV');
   },
 };
@@ -1520,7 +1520,7 @@ const SuperAdmin = {
 
     setHtml('sa-sections',
       Collapsible.section('sa-sec-settle',
-        '💸 SparkWash Settlements',
+        '💸 Pitbay Settlements',
         '<div class="card" style="padding:0;margin:0 13px 4px" id="sa-settlements"></div>' + viewAll('settlements', 'View full settlement details'),
         { defaultOpen: false, right: '<span id="sa-settle-badge"></span>' }
       ) +
@@ -1581,7 +1581,7 @@ const SuperAdmin = {
       <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 13px;border-bottom:.5px solid var(--border)">
         <div>
           <div class="bold text-xs">${info.name}</div>
-          <div style="font-size:10px;color:var(--muted)">${info.count} booking${info.count>1?'s':''} · SparkWash promos</div>
+          <div style="font-size:10px;color:var(--muted)">${info.count} booking${info.count>1?'s':''} · Pitbay promos</div>
         </div>
         <div style="display:flex;align-items:center;gap:8px">
           <span style="font-size:13px;font-weight:800;color:#0369a1">${UI.formatPrice(info.total)}</span>
@@ -2412,7 +2412,7 @@ const SettlementsScreen = {
                 </div>
                 <div style="text-align:right">
                   <div style="font-size:13px;font-weight:800;color:#0369a1">${UI.formatPrice(s.appDiscount)}</div>
-                  <div style="font-size:9px;color:var(--muted)">SparkWash owes</div>
+                  <div style="font-size:9px;color:var(--muted)">Pitbay owes</div>
                 </div>
               </div>`).join('')}
             <div style="padding:10px 13px;background:#f0fdf4;border-radius:0 0 12px 12px">

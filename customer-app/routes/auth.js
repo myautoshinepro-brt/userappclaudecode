@@ -240,7 +240,7 @@ router.get('/email-diag', async (req, res) => {
   const env = {
     resend: {
       hasKey: !!process.env.RESEND_API_KEY,
-      from:   process.env.RESEND_FROM || 'SparkWash <onboarding@resend.dev>',
+      from:   process.env.RESEND_FROM || 'Pitbay <onboarding@resend.dev>',
     },
     smtp: {
       host:    process.env.SMTP_HOST   || null,
@@ -265,7 +265,7 @@ router.get('/email-diag', async (req, res) => {
         body: JSON.stringify({
           from,
           to: [to],
-          subject: 'SparkWash diag (Resend) — ' + new Date().toISOString(),
+          subject: 'Pitbay diag (Resend) — ' + new Date().toISOString(),
           html:    '<p>If you received this, Resend from Railway is working.</p>',
         }),
       });
@@ -300,9 +300,9 @@ router.get('/email-diag', async (req, res) => {
   try {
     await t.verify();
     const info = await t.sendMail({
-      from:    process.env.SMTP_FROM || `"SparkWash Diag" <${env.smtp.user}>`,
+      from:    process.env.SMTP_FROM || `"Pitbay Diag" <${env.smtp.user}>`,
       to,
-      subject: 'SparkWash diag (SMTP) — ' + new Date().toISOString(),
+      subject: 'Pitbay diag (SMTP) — ' + new Date().toISOString(),
       text:    'If you received this, SMTP from Railway is working.',
     });
     res.json({ ok: true, via: 'smtp', ms: Date.now() - started, env, messageId: info.messageId });

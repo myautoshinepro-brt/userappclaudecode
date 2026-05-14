@@ -51,7 +51,7 @@ router.post('/apply', (req, res) => {
 
   const info = db.createApplication(data);
   console.log(`📋 New center application: ${name} (${norm})`);
-  res.json({ success: true, message: 'Application submitted! SparkWash team will review and contact you within 24–48 hours.', id: info.lastInsertRowid });
+  res.json({ success: true, message: 'Application submitted! Pitbay team will review and contact you within 24–48 hours.', id: info.lastInsertRowid });
 });
 
 // GET /api/onboard/status/:mobile

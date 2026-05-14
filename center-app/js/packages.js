@@ -1,4 +1,4 @@
-// SparkWash Center App — packages.js
+// Pitbay Center App — packages.js
 // Manage Packages screen: list + create/edit/delete with duration-aware slot capacity.
 
 const PackagesScreen = {

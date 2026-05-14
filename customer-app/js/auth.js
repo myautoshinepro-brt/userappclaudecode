@@ -1,5 +1,5 @@
 // ============================================================
-// SparkWash — auth.js
+// Pitbay — auth.js
 // Frontend authentication module
 // Handles: session storage, API calls, login/signup flow
 // ============================================================

@@ -1,4 +1,4 @@
-// SparkWash Center App — dashboard.js
+// Pitbay Center App — dashboard.js
 
 const DashboardScreen = {
   async render() {

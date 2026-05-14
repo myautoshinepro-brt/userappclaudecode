@@ -194,7 +194,7 @@ try { db.exec("ALTER TABLE chat_threads ADD COLUMN admin_last_read_message_id   
 try { db.exec("ALTER TABLE chat_threads ADD COLUMN customer_last_read_message_id INTEGER NOT NULL DEFAULT 0"); } catch { /* exists */ }
 
 // ── Settlements ──
-// One row per booking-and-discount that SparkWash owes the center. Pending
+// One row per booking-and-discount that Pitbay owes the center. Pending
 // until super admin marks it settled.
 db.exec(`
   CREATE TABLE IF NOT EXISTS settlements (
@@ -300,7 +300,7 @@ if (centerCount.n === 0) {
     'Shine Auto Wash',
     'Rajesh Sharma',
     '9876543210',
-    'shine@sparkwash.in',
+    'shine@pitbay.in',
     'Shop 4, Lokhandwala Complex, Andheri West',
     'Mumbai',
     'water,dry,steam,d2d'
@@ -494,8 +494,8 @@ const _demoAppInsert = db.prepare(`
 // ── SEED additional demo centers (idempotent) ─────────────────
 const _demoCenterInsert = db.prepare('INSERT OR IGNORE INTO centers (name, owner_name, mobile, email, address, city, wash_types) VALUES (?,?,?,?,?,?,?)');
 [
-  ['SparkWash Bandra', 'Kiran Nair',  '9876543211', 'bandra@sparkwash.in', 'Unit 12, Hill Road, Bandra West',   'Mumbai', 'water,dry,steam'],
-  ['QuickWash Thane',  'Deepak Rao',  '9876543212', 'thane@sparkwash.in',  'Plot 3, Pokhran Road, Thane West',  'Mumbai', 'water,dry,steam,d2d'],
+  ['Pitbay Bandra', 'Kiran Nair',  '9876543211', 'bandra@pitbay.in', 'Unit 12, Hill Road, Bandra West',   'Mumbai', 'water,dry,steam'],
+  ['QuickWash Thane',  'Deepak Rao',  '9876543212', 'thane@pitbay.in',  'Plot 3, Pokhran Road, Thane West',  'Mumbai', 'water,dry,steam,d2d'],
 ].forEach(c => _demoCenterInsert.run(...c));
 
 // ── PREPARED STATEMENTS ──────────────────────────────────────
@@ -1141,7 +1141,7 @@ module.exports = {
       : `Customer opened a general support chat.`;
     db.prepare(`
       INSERT INTO chat_messages (thread_id, sender, sender_name, text)
-      VALUES (?, 'system', 'SparkWash', ?)
+      VALUES (?, 'system', 'Pitbay', ?)
     `).run(info.lastInsertRowid, systemText);
     db.prepare(`
       UPDATE chat_threads
@@ -1291,7 +1291,7 @@ module.exports = {
         from_status: b.status,
         to_status:   fields.status || b.status,
         changed_by:  'admin',
-        changed_by_name: 'SparkWash Admin',
+        changed_by_name: 'Pitbay Admin',
         notes: changeNotes.join(' · '),
       });
     }

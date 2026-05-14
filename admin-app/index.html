@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>SparkWash Admin</title>
+  <title>Pitbay Admin</title>
 
   <!-- PWA -->
   <link rel="manifest" href="/manifest.json">
@@ -13,7 +13,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="SW Admin">
   <link rel="apple-touch-icon" href="/icon.svg">
-  <meta name="description" content="SparkWash platform administration.">
+  <meta name="description" content="Pitbay platform administration.">
 
   <link rel="stylesheet" href="css/base.css">
   <link rel="stylesheet" href="css/screens.css">
@@ -52,7 +52,7 @@
   <div style="flex:1;display:flex;align-items:center;justify-content:center;padding:24px">
     <div class="login-box">
       <div class="login-logo">⚡</div>
-      <div class="login-title">SparkWash Admin</div>
+      <div class="login-title">Pitbay Admin</div>
       <div class="login-sub">Platform management portal</div>
 
       <div class="role-card" onclick="login('admin')">
@@ -60,7 +60,7 @@
         <div style="flex:1">
           <div class="role-name">Admin</div>
           <div class="role-desc">Manage centers, bookings, chat with customers and centers</div>
-          <div style="margin-top:4px;font-size:10px;color:var(--muted)">Demo: Rajiv Sharma · rajiv@sparkwash.in</div>
+          <div style="margin-top:4px;font-size:10px;color:var(--muted)">Demo: Rajiv Sharma · rajiv@pitbay.in</div>
         </div>
       </div>
 
@@ -69,7 +69,7 @@
         <div style="flex:1">
           <div class="role-name">Super Admin</div>
           <div class="role-desc">All admin powers + add centers, manage promo codes & accounts</div>
-          <div style="margin-top:4px;font-size:10px;color:var(--muted)">Demo: Arjun Mehta · arjun@sparkwash.in</div>
+          <div style="margin-top:4px;font-size:10px;color:var(--muted)">Demo: Arjun Mehta · arjun@pitbay.in</div>
         </div>
       </div>
 
@@ -530,7 +530,7 @@
           <span style="color:var(--red)">›</span>
         </div>
       </div>
-      <div style="text-align:center;font-size:10px;color:var(--faint);padding-bottom:16px">SparkWash Admin v1.0</div>
+      <div style="text-align:center;font-size:10px;color:var(--faint);padding-bottom:16px">Pitbay Admin v1.0</div>
     </div>
   </div>
   <div class="bnav">
@@ -611,7 +611,7 @@
     <button class="topbar-back" onclick="Router.back()">← Back</button>
     <div>
       <div class="topbar-title">💸 Settlements</div>
-      <div class="topbar-sub" id="settle-sub">SparkWash promo payouts to centers</div>
+      <div class="topbar-sub" id="settle-sub">Pitbay promo payouts to centers</div>
     </div>
     <div class="topbar-icon" onclick="SettlementsScreen.render();UI.toast('🔄 Refreshed')">🔄</div>
   </div>
@@ -779,7 +779,7 @@
     </div>
     <div style="padding:14px">
       <label class="flbl">Center Name *</label>
-      <input class="finp" id="add-ctr-name" placeholder="e.g. SparkWash Goregaon">
+      <input class="finp" id="add-ctr-name" placeholder="e.g. Pitbay Goregaon">
 
       <label class="flbl">Owner Name *</label>
       <input class="finp" id="add-ctr-owner" placeholder="Owner full name">
@@ -808,7 +808,7 @@
       <label class="flbl">Full Name *</label>
       <input class="finp" id="add-admin-name" placeholder="e.g. Priya Sharma">
       <label class="flbl">Email *</label>
-      <input class="finp" id="add-admin-email" type="email" placeholder="e.g. priya@sparkwash.in">
+      <input class="finp" id="add-admin-email" type="email" placeholder="e.g. priya@pitbay.in">
       <label class="flbl">Phone</label>
       <input class="finp" id="add-admin-phone" placeholder="+91 98765 XXXXX">
       <label class="flbl">Assign Centers (hold Ctrl/Cmd to select multiple)</label>

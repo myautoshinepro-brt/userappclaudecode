@@ -1,4 +1,4 @@
-// SparkWash Center App — reports.js
+// Pitbay Center App — reports.js
 // Revenue Report screen: period filter (today/week/month/custom),
 // hero stats, daily trend bar chart, wash-type & top-package breakdowns.
 

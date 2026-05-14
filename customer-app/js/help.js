@@ -1,5 +1,5 @@
 // ============================================================
-// SparkWash — help.js
+// Pitbay — help.js
 // Help screen (call sheet) + Chat screen
 // ============================================================
 
@@ -56,12 +56,12 @@ const HelpScreen = {
   },
 
   openWhatsApp(number) {
-    const msg = encodeURIComponent('Hi SparkWash Support! I need help with my booking.');
+    const msg = encodeURIComponent('Hi Pitbay Support! I need help with my booking.');
     window.open('https://wa.me/' + number + '?text=' + msg, '_blank');
   },
 
   openEmail() {
-    window.location.href = 'mailto:support@sparkwash.in?subject=Help%20Request&body=Hi%20SparkWash%20Team%2C%0A%0A';
+    window.location.href = 'mailto:support@pitbay.in?subject=Help%20Request&body=Hi%20Pitbay%20Team%2C%0A%0A';
   },
 
   toggleFaq(el) {
@@ -149,7 +149,7 @@ const ChatScreen = {
   _setHeader(type, bookingRef) {
     const name = document.getElementById('chat-header-name');
     const sub  = document.getElementById('chat-header-sub');
-    if (name) name.textContent = 'SparkWash Support';
+    if (name) name.textContent = 'Pitbay Support';
     if (sub)  sub.textContent  = type === 'booking' ? `About booking ${bookingRef}` : 'General support';
   },
 

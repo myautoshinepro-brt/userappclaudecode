@@ -1,5 +1,5 @@
 // ============================================================
-// SparkWash Admin App — components.js
+// Pitbay Admin App — components.js
 // Reusable UI: Privacy (mask/reveal) + Collapsible sections + BookingDetail screen
 // ============================================================
 
@@ -205,7 +205,7 @@ const BookingDetail = {
     const pricing = `
       <div style="padding:12px 16px">
         ${this._kv('Package price', '₹' + b.package_price)}
-        ${b.app_discount    ? this._kv('SparkWash discount', '-₹' + b.app_discount)    : ''}
+        ${b.app_discount    ? this._kv('Pitbay discount', '-₹' + b.app_discount)    : ''}
         ${b.center_discount ? this._kv('Center discount',    '-₹' + b.center_discount) : ''}
         <div style="border-top:.5px solid var(--border);padding-top:8px;margin-top:8px;display:flex;justify-content:space-between">
           <span style="font-size:13px;font-weight:800">Customer pays</span>

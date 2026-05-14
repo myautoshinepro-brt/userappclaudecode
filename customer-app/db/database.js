@@ -85,9 +85,9 @@ const deleteOldOtps  = db.prepare(
 // ── SEED demo users (idempotent) ─────────────────────────────
 const _demoInsert = db.prepare('INSERT OR IGNORE INTO users (full_name, mobile, email) VALUES (?, ?, ?)');
 [
-  ['Ravi Teja',   '9999000001', 'demo1@sparkwash.in'],
-  ['Priya Singh', '9999000002', 'demo2@sparkwash.in'],
-  ['Amit Kumar',  '9999000003', 'demo3@sparkwash.in'],
+  ['Ravi Teja',   '9999000001', 'demo1@pitbay.in'],
+  ['Priya Singh', '9999000002', 'demo2@pitbay.in'],
+  ['Amit Kumar',  '9999000003', 'demo3@pitbay.in'],
 ].forEach(u => _demoInsert.run(...u));
 
 module.exports = {

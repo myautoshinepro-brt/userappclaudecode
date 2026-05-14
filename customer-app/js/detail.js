@@ -1,5 +1,5 @@
 // ============================================================
-// SparkWash — detail.js
+// Pitbay — detail.js
 // Center detail: wash tabs, package cards, slot picker, bottom bar
 // ============================================================
 

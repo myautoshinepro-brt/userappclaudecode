@@ -1,4 +1,4 @@
-// SparkWash Center App — ui.js
+// Pitbay Center App — ui.js
 
 const UI = {
   _toastTimer: null,

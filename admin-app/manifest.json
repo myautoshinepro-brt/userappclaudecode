@@ -1,7 +1,7 @@
 {
-  "name": "SparkWash Admin",
+  "name": "Pitbay Admin",
   "short_name": "SW Admin",
-  "description": "SparkWash platform administration — centers, bookings, settlements, reports.",
+  "description": "Pitbay platform administration — centers, bookings, settlements, reports.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

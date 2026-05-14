@@ -1,4 +1,4 @@
-// SparkWash Center App — slots.js
+// Pitbay Center App — slots.js
 
 const SlotsScreen = {
   // Slot being edited: { washType, time, capacity, is_blocked, booked_count }

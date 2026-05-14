@@ -1,5 +1,5 @@
 // ============================================================
-// SparkWash — sms.js
+// Pitbay — sms.js
 // Sends OTP messages via SMS. Supports MSG91 (recommended for India) and
 // Twilio. When neither is configured, logs the OTP to console and returns
 // success so dev/test flows keep working — the route handler will also
@@ -40,7 +40,7 @@ async function _sendViaTwilio(e164, otp, minutes) {
   const from = process.env.TWILIO_FROM;
   if (!sid || !auth || !from) throw new Error('Twilio not configured');
 
-  const body = `Your SparkWash verification code is ${otp}. Valid for ${minutes || 5} minutes. Do not share with anyone.`;
+  const body = `Your Pitbay verification code is ${otp}. Valid for ${minutes || 5} minutes. Do not share with anyone.`;
   const r = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`, {
     method:  'POST',
     headers: {

@@ -1,4 +1,4 @@
-// SparkWash Center App — router.js
+// Pitbay Center App — router.js
 
 const Router = {
   screens: {},

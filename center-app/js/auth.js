@@ -1,4 +1,4 @@
-// SparkWash Center App — auth.js
+// Pitbay Center App — auth.js
 
 const Auth = {
   _mobile: '',
@@ -30,11 +30,11 @@ const Auth = {
         <div style="font-size:36px;margin-bottom:8px">🏪</div>
         <div style="font-weight:700;font-size:16px;margin-bottom:6px">Number not registered</div>
         <div style="font-size:12px;color:var(--muted);margin-bottom:16px">
-          No SparkWash center is linked to <strong>${mobile}</strong>.
+          No Pitbay center is linked to <strong>${mobile}</strong>.
           Want to onboard your center?
         </div>
         <button class="btn btn-primary btn-full" onclick="Onboarding.start('${mobile}')">
-          🚀 Apply to Join SparkWash
+          🚀 Apply to Join Pitbay
         </button>
         <button class="btn btn-ghost btn-full" style="margin-top:8px" onclick="Auth.renderLogin()">
           ← Try a different number
@@ -62,7 +62,7 @@ const Auth = {
         <div style="font-size:11px;color:#166534;font-weight:600;margin-bottom:8px">🧪 Demo centers (tap to fill)</div>
         <div style="display:flex;flex-wrap:wrap;gap:6px">
           <button onclick="Auth._fillDemo('9876543210')" style="background:#fff;border:1px solid #86efac;border-radius:20px;padding:4px 10px;font-size:11px;color:#166534;font-weight:600;cursor:pointer">Shine Auto Wash</button>
-          <button onclick="Auth._fillDemo('9876543211')" style="background:#fff;border:1px solid #86efac;border-radius:20px;padding:4px 10px;font-size:11px;color:#166534;font-weight:600;cursor:pointer">SparkWash Bandra</button>
+          <button onclick="Auth._fillDemo('9876543211')" style="background:#fff;border:1px solid #86efac;border-radius:20px;padding:4px 10px;font-size:11px;color:#166534;font-weight:600;cursor:pointer">Pitbay Bandra</button>
           <button onclick="Auth._fillDemo('9876543212')" style="background:#fff;border:1px solid #86efac;border-radius:20px;padding:4px 10px;font-size:11px;color:#166534;font-weight:600;cursor:pointer">QuickWash Thane</button>
         </div>
       </div>

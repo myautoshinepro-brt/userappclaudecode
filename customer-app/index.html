@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>SparkWash — Car Wash Booking</title>
+  <title>Pitbay — Car Wash Booking</title>
 
   <!-- PWA -->
   <link rel="manifest" href="/manifest.json">
@@ -12,7 +12,7 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="SparkWash">
+  <meta name="apple-mobile-web-app-title" content="Pitbay">
   <link rel="apple-touch-icon" href="/icon.svg">
   <meta name="description" content="Book your car wash in seconds. Choose a center, pick a slot, done.">
 
@@ -51,7 +51,7 @@
 <div class="phone">
   <!-- Status bar -->
   <div class="status-bar" style="flex-shrink:0">
-    <span>9:41</span><span>✨ SparkWash</span><span>▲▲▲ 98%</span>
+    <span>9:41</span><span>✨ Pitbay</span><span>▲▲▲ 98%</span>
   </div>
 
   <!-- Screens container -->
@@ -442,7 +442,7 @@
           <div class="summary-card transparent">
             <div class="summary-row"><span class="summary-label">Package price</span><span class="summary-value" id="sum-base-price">—</span></div>
             <div class="summary-row" id="sum-app-discount-row" style="display:none">
-              <span class="summary-label" style="color:var(--green)">🎁 SparkWash offer</span>
+              <span class="summary-label" style="color:var(--green)">🎁 Pitbay offer</span>
               <span class="summary-value" style="color:var(--green)" id="sum-app-discount-val">—</span>
             </div>
             <div class="summary-row" id="sum-center-discount-row" style="display:none">
@@ -460,10 +460,10 @@
             <div style="font-size:22px;font-weight:900;color:#fff" id="sum-collect-amount">—</div>
           </div>
 
-          <!-- Settlement note (shown only when SparkWash promo applied) -->
+          <!-- Settlement note (shown only when Pitbay promo applied) -->
           <div id="sum-settlement-note" style="display:none;align-items:center;gap:6px;background:#f0fdf4;border-radius:10px;padding:9px 12px;margin-bottom:6px;font-size:11px;color:var(--green)">
             <span>✅</span>
-            <span>SparkWash promo credited to center within 24 hrs of wash completion</span>
+            <span>Pitbay promo credited to center within 24 hrs of wash completion</span>
           </div>
 
           <button class="btn btn-green" id="confirm-pay-btn" onclick="SummaryScreen.confirmAndPay()">✅ Confirm Booking →</button>
@@ -874,7 +874,7 @@
           <div class="help-icon-wrap" style="background:#fefce8">📧</div>
           <div style="flex:1">
             <div class="help-card-title">Email us</div>
-            <div class="help-card-sub">support@sparkwash.in</div>
+            <div class="help-card-sub">support@pitbay.in</div>
           </div>
           <span class="help-card-arrow">›</span>
         </div>
@@ -899,7 +899,7 @@
           </div>
           <div class="help-faq-item" onclick="HelpScreen.toggleFaq(this)">
             <div class="help-faq-q"><span>🔒</span> Is my payment secure?</div>
-            <div class="help-faq-a">Yes. All payments are processed via PCI-DSS compliant gateways. SparkWash never stores your card details.</div>
+            <div class="help-faq-a">Yes. All payments are processed via PCI-DSS compliant gateways. Pitbay never stores your card details.</div>
           </div>
         </div>
 
@@ -908,7 +908,7 @@
           <span style="color:var(--text-tertiary);margin:0 8px">·</span>
           <a href="terms.html" target="_blank" style="color:var(--blue);text-decoration:none">Terms of Service</a>
         </div>
-        <div style="text-align:center;padding:4px 0 8px;font-size:10px;color:var(--text-tertiary)">SparkWash v1.0.0 · Made with ❤️ in India</div>
+        <div style="text-align:center;padding:4px 0 8px;font-size:10px;color:var(--text-tertiary)">Pitbay v1.0.0 · Made with ❤️ in India</div>
       </div></div>
 
       <!-- ── Call sheet overlay ── -->
@@ -970,7 +970,7 @@
         <div class="chat-header-info">
           <div class="chat-header-avatar">SW</div>
           <div>
-            <div class="chat-header-name" id="chat-header-name">SparkWash Support</div>
+            <div class="chat-header-name" id="chat-header-name">Pitbay Support</div>
             <div class="chat-header-status" id="chat-header-sub"><span class="chat-online-dot"></span> Online · usually replies instantly</div>
           </div>
         </div>
@@ -1008,7 +1008,7 @@
         <!-- Brand header -->
         <div class="auth-brand">
           <div class="auth-brand-logo">🚿</div>
-          <div class="auth-brand-name">SparkWash</div>
+          <div class="auth-brand-name">Pitbay</div>
           <div class="auth-brand-tagline">India's smartest car wash booking</div>
         </div>
 
@@ -1045,7 +1045,7 @@
             <div class="auth-demo-chips">
               <button class="auth-demo-chip" onclick="LoginScreen.fillDemoIdentifier('9999000001')">📱 9999000001</button>
               <button class="auth-demo-chip" onclick="LoginScreen.fillDemoIdentifier('9999000002')">📱 9999000002</button>
-              <button class="auth-demo-chip" onclick="LoginScreen.fillDemoIdentifier('demo1@sparkwash.in')">✉️ demo1@sparkwash.in</button>
+              <button class="auth-demo-chip" onclick="LoginScreen.fillDemoIdentifier('demo1@pitbay.in')">✉️ demo1@pitbay.in</button>
             </div>
           </div>
         </div>
@@ -1097,7 +1097,7 @@
         <!-- Brand header -->
         <div class="auth-brand">
           <div class="auth-brand-logo">🚿</div>
-          <div class="auth-brand-name">SparkWash</div>
+          <div class="auth-brand-name">Pitbay</div>
           <div class="auth-brand-tagline">Create your account</div>
         </div>
 

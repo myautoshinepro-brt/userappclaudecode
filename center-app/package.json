@@ -1,7 +1,7 @@
 {
-  "name": "sparkwash-center-app",
+  "name": "pitbay-center",
   "version": "1.0.0",
-  "description": "SparkWash — Center Owner/Staff Mobile App",
+  "description": "Pitbay — Center Owner/Staff Mobile App",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

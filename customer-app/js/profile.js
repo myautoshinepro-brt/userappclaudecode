@@ -1,5 +1,5 @@
 // ============================================================
-// SparkWash — profile.js
+// Pitbay — profile.js
 // Profile screen + all sub-screens
 // ============================================================
 
@@ -359,7 +359,7 @@ const ProfileScreen = {
   // ── LOGOUT ──
 
   logout() {
-    if (confirm('Log out of SparkWash?')) {
+    if (confirm('Log out of Pitbay?')) {
       Auth.logout();
     }
   },

@@ -1,11 +1,11 @@
 // ============================================================
-// SparkWash Admin App — data.js
+// Pitbay Admin App — data.js
 // ============================================================
 
 let ADMINS = [
-  { id:'a1', name:'Rajiv Sharma',    email:'rajiv@sparkwash.in',   phone:'+91 98765 00001', role:'admin',      centers:['c1','c2'], initials:'RS', active:true  },
-  { id:'a2', name:'Sneha Kulkarni',  email:'sneha@sparkwash.in',   phone:'+91 98765 00002', role:'admin',      centers:['c3','c4'], initials:'SK', active:true  },
-  { id:'sa1',name:'Arjun Mehta',     email:'arjun@sparkwash.in',   phone:'+91 98765 00000', role:'superadmin', centers:'all',       initials:'AM', active:true  },
+  { id:'a1', name:'Rajiv Sharma',    email:'rajiv@pitbay.in',   phone:'+91 98765 00001', role:'admin',      centers:['c1','c2'], initials:'RS', active:true  },
+  { id:'a2', name:'Sneha Kulkarni',  email:'sneha@pitbay.in',   phone:'+91 98765 00002', role:'admin',      centers:['c3','c4'], initials:'SK', active:true  },
+  { id:'sa1',name:'Arjun Mehta',     email:'arjun@pitbay.in',   phone:'+91 98765 00000', role:'superadmin', centers:'all',       initials:'AM', active:true  },
 ];
 
 let CITIES = [

@@ -28,6 +28,6 @@ app.get(/^(?!\/api).*$/, (_req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`\n🚿 SparkWash Center App running at http://localhost:${PORT}`);
+  console.log(`\n🚿 Pitbay Center App running at http://localhost:${PORT}`);
   console.log('   OTPs will be printed here in development mode.\n');
 });

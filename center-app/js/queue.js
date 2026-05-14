@@ -1,4 +1,4 @@
-// SparkWash Center App — queue.js
+// Pitbay Center App — queue.js
 
 const QueueScreen = {
   async render() {

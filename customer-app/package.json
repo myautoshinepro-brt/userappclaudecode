@@ -1,7 +1,7 @@
 {
-  "name": "sparkwash",
+  "name": "pitbay-customer",
   "version": "1.0.0",
-  "description": "SparkWash — Car Wash Booking App",
+  "description": "Pitbay — Car Wash Booking App",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

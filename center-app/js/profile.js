@@ -1,4 +1,4 @@
-// SparkWash Center App — profile.js
+// Pitbay Center App — profile.js
 
 const ProfileScreen = {
   render() {
@@ -19,7 +19,7 @@ const ProfileScreen = {
     if (bankSub) {
       bankSub.textContent = c.bank_account
         ? `${c.bank_name ? c.bank_name + ' · ' : ''}····${c.bank_account.slice(-4)} · ${c.ifsc || ''}`
-        : 'Add account for SparkWash settlements';
+        : 'Add account for Pitbay settlements';
       bankSub.style.color = c.bank_account ? 'var(--green)' : '';
     }
   },
@@ -90,14 +90,14 @@ const ProfileScreen = {
           <span style="font-size:24px">✅</span>
           <div>
             <div style="font-weight:700;font-size:13px;color:var(--green)">Bank Account Linked</div>
-            <div style="font-size:11px;color:#166534;margin-top:2px">SparkWash will credit settlements to this account</div>
+            <div style="font-size:11px;color:#166534;margin-top:2px">Pitbay will credit settlements to this account</div>
           </div>
         </div>` : `
         <div style="background:#fef9c3;border-radius:12px;padding:14px 16px;margin-bottom:16px;display:flex;align-items:center;gap:12px">
           <span style="font-size:24px">⚠️</span>
           <div>
             <div style="font-weight:700;font-size:13px;color:#92400e">No Bank Account Added</div>
-            <div style="font-size:11px;color:#78350f;margin-top:2px">Add your bank account to receive SparkWash promo settlements</div>
+            <div style="font-size:11px;color:#78350f;margin-top:2px">Add your bank account to receive Pitbay promo settlements</div>
           </div>
         </div>`}
 
@@ -160,7 +160,7 @@ const ProfileScreen = {
         💾 Save Bank Details
       </button>
       <div style="font-size:10px;color:var(--muted);text-align:center;margin-top:10px;line-height:1.5">
-        🔒 Your bank details are stored securely and only used for SparkWash promo credit settlements
+        🔒 Your bank details are stored securely and only used for Pitbay promo credit settlements
       </div>
     `;
   },
