@@ -38,6 +38,19 @@
       line-height: 1.75;
       opacity: 0.92;
     }
+    .star {
+      position: fixed;
+      pointer-events: none;
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      animation: star-fade 0.8s ease-out forwards;
+      z-index: 9999;
+    }
+
+    @keyframes star-fade {
+      0%   { opacity: 1; transform: translate(-50%, -50%) scale(1) rotate(0deg); }
+      100% { opacity: 0; transform: translate(-50%, -50%) scale(0) rotate(180deg); }
+    }
   </style>
 </head>
 <body>
@@ -45,6 +58,40 @@
     <h1>Building in progress</h1>
     <p>Please don't wait — we are working on something great and will be back soon.</p>
   </div>
+
+  <script>
+    const STAR_CHARS = ['★', '✦', '✧', '✨', '⭐', '✵', '⚡'];
+    const COLORS = ['#f7c948', '#ff6b6b', '#48b8f7', '#a78bfa', '#34d399', '#fb923c', '#f472b6'];
+    let lastX = 0, lastY = 0;
+
+    document.addEventListener('mousemove', (e) => {
+      const dx = e.clientX - lastX;
+      const dy = e.clientY - lastY;
+      if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
+      lastX = e.clientX;
+      lastY = e.clientY;
+
+      const star = document.createElement('span');
+      star.className = 'star';
+      star.textContent = STAR_CHARS[Math.floor(Math.random() * STAR_CHARS.length)];
+
+      const size = 14 + Math.random() * 18;
+      const offsetX = (Math.random() - 0.5) * 24;
+      const offsetY = (Math.random() - 0.5) * 24;
+
+      star.style.cssText = `
+        left: ${e.clientX + offsetX}px;
+        top: ${e.clientY + offsetY}px;
+        font-size: ${size}px;
+        color: ${COLORS[Math.floor(Math.random() * COLORS.length)]};
+        text-shadow: 0 0 6px currentColor;
+        animation-duration: ${0.6 + Math.random() * 0.5}s;
+      `;
+
+      document.body.appendChild(star);
+      star.addEventListener('animationend', () => star.remove());
+    });
+  </script>
 </body>
 </html>
 
