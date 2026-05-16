@@ -60,9 +60,10 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_addresses_user   ON addresses(user_id);
 `);
 
-// Migrate: add lat/lng to addresses (safe to run multiple times — fails silently if columns exist)
-try { db.exec('ALTER TABLE addresses ADD COLUMN lat REAL'); } catch (_) {}
-try { db.exec('ALTER TABLE addresses ADD COLUMN lng REAL'); } catch (_) {}
+// Migrate: add columns to addresses (safe to run multiple times — fails silently if columns exist)
+try { db.exec('ALTER TABLE addresses ADD COLUMN lat  REAL'); } catch (_) {}
+try { db.exec('ALTER TABLE addresses ADD COLUMN lng  REAL'); } catch (_) {}
+try { db.exec('ALTER TABLE addresses ADD COLUMN city TEXT'); } catch (_) {}
 
 // ── HELPERS ─────────────────────────────────────────────────
 
@@ -152,17 +153,29 @@ module.exports = {
   listAddresses(userId) {
     return db.prepare("SELECT * FROM addresses WHERE user_id=? ORDER BY is_default DESC, id ASC").all(userId);
   },
-  addAddress(userId, { label, icon, address, pincode, lat, lng }) {
+  addAddress(userId, { label, icon, address, pincode, lat, lng, city }) {
     if (!label?.trim())   throw new Error('Label is required');
     if (!address?.trim()) throw new Error('Address is required');
     const existingDefault = db.prepare("SELECT id FROM addresses WHERE user_id=? AND is_default=1").get(userId);
     const isDefault = existingDefault ? 0 : 1;
     const info = db.prepare(`
-      INSERT INTO addresses (user_id, label, icon, address, pincode, is_default, lat, lng)
-      VALUES (?,?,?,?,?,?,?,?)
+      INSERT INTO addresses (user_id, label, icon, address, pincode, is_default, lat, lng, city)
+      VALUES (?,?,?,?,?,?,?,?,?)
     `).run(userId, label.trim(), icon || '📍', address.trim(), (pincode || '').trim() || null, isDefault,
-           lat != null ? parseFloat(lat) : null, lng != null ? parseFloat(lng) : null);
+           lat != null ? parseFloat(lat) : null, lng != null ? parseFloat(lng) : null, city || null);
     return db.prepare("SELECT * FROM addresses WHERE id=?").get(info.lastInsertRowid);
+  },
+  updateAddress(userId, addrId, { label, icon, address, pincode, lat, lng, city }) {
+    if (!label?.trim())   throw new Error('Label is required');
+    if (!address?.trim()) throw new Error('Address is required');
+    const info = db.prepare(`
+      UPDATE addresses SET label=?, icon=?, address=?, pincode=?, lat=?, lng=?, city=?
+      WHERE id=? AND user_id=?
+    `).run(label.trim(), icon || '📍', address.trim(), (pincode || '').trim() || null,
+           lat != null ? parseFloat(lat) : null, lng != null ? parseFloat(lng) : null,
+           city || null, addrId, userId);
+    if (!info.changes) return null;
+    return db.prepare("SELECT * FROM addresses WHERE id=?").get(addrId);
   },
   removeAddress(userId, addrId) {
     const info = db.prepare("DELETE FROM addresses WHERE id=? AND user_id=?").run(addrId, userId);

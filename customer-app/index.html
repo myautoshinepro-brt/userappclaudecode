@@ -40,8 +40,9 @@
 
     /* Full screen on actual mobile */
     @media (max-width: 480px) {
-      .phone { width:100vw; height:100vh; border-radius:0; border:none; position: relative; display: flex; flex-direction: column; overflow: hidden; }
-      [data-screen] { position:absolute; inset:0; display:flex; flex-direction:column; background:#fff; visibility:hidden; pointer-events:none; height: 100%; width: 100%; }
+      .phone { width:100vw; height:100vh; border-radius:0; border:none; position: relative; display: flex; flex-direction: column; overflow: hidden; background: #fff; }
+      [data-screen] { position:absolute; inset:0; display:flex; flex-direction:column; background:#fff; visibility:hidden; pointer-events:none; height: 100%; width: 100%; opacity: 0; transition: opacity 0.2s; }
+      [data-screen].screen-active { visibility:visible; pointer-events:all; z-index:1; opacity: 1; }
       .status-bar { display: none; } /* Use native status bar */
     }
 
@@ -711,7 +712,7 @@
 
     <!-- ══ ADD ADDRESS ══ -->
     <div data-screen="add-address" id="sc-add-address">
-      <div class="header-sub" style="background:var(--blue)"><button class="header-back" onclick="Router.back()">← Back</button><div class="header-title">Add new address</div></div>
+      <div class="header-sub" style="background:var(--blue)"><button class="header-back" onclick="Router.back()">← Back</button><div class="header-title" id="add-addr-title">Add new address</div></div>
       <div class="scroll-area"><div style="padding:14px 13px 0">
         <!-- GPS detect -->
         <button id="addr-gps-btn" onclick="ProfileScreen.detectAddressGPS()"
@@ -720,18 +721,19 @@
         </button>
         <!-- hidden lat/lng filled by GPS detect or pincode geocode -->
         <input type="hidden" id="addr-lat"><input type="hidden" id="addr-lng">
+        <label class="form-label">City</label>
+        <select class="form-input" id="addr-city" onchange="ProfileScreen.checkCityServiceability()">
+          <option value="" disabled selected>Select city</option>
+          <!-- Cities will be loaded dynamically from SERVICEABLE_CITIES -->
+        </select>
+        <div id="city-service-msg" style="display:none; font-size:11px; color:var(--red); margin-bottom:12px; padding: 8px; background: #fff1f2; border-radius: 8px; border: 0.5px solid #fecaca;"></div>
+
         <label class="form-label">Label</label>
         <div style="display:flex;gap:8px;margin-bottom:12px">
           <div id="lbl-home2" onclick="ProfileScreen.pickAddressLabel('home2')" style="padding:7px 14px;border-radius:20px;font-size:11px;font-weight:600;border:1.5px solid var(--blue);background:var(--blue);color:#fff;cursor:pointer">🏠 Home</div>
           <div id="lbl-work" onclick="ProfileScreen.pickAddressLabel('work')" style="padding:7px 14px;border-radius:20px;font-size:11px;font-weight:600;border:1.5px solid var(--border-medium);color:var(--text-secondary);cursor:pointer">🏢 Work</div>
           <div id="lbl-other" onclick="ProfileScreen.pickAddressLabel('other')" style="padding:7px 14px;border-radius:20px;font-size:11px;font-weight:600;border:1.5px solid var(--border-medium);color:var(--text-secondary);cursor:pointer">📍 Other</div>
         </div>
-        <label class="form-label">City</label>
-        <select class="form-input" id="addr-city" onchange="ProfileScreen.checkCityServiceability()">
-          <option value="" disabled selected>Select city</option>
-          <!-- Cities will be loaded dynamically -->
-        </select>
-        <div id="city-service-msg" style="display:none; font-size:11px; color:var(--red); margin-bottom:12px; padding: 8px; background: #fff1f2; border-radius: 8px; border: 0.5px solid #fecaca;"></div>
         <label class="form-label">Area / locality</label>
         <input class="form-input" id="addr-area" placeholder="e.g. Andheri West, Juhu, Powai"
                oninput="if(!this.value){document.getElementById('addr-lat').value='';document.getElementById('addr-lng').value=''}">
@@ -740,7 +742,7 @@
         <label class="form-label">Pincode <span style="font-size:10px;color:var(--text-tertiary)">(auto-fills area)</span></label>
         <input class="form-input" id="addr-pincode" placeholder="6-digit pincode" maxlength="6" type="tel"
                onblur="ProfileScreen.geocodePincodeField()">
-        <button class="btn btn-green" onclick="ProfileScreen.saveAddress()">Save address</button>
+        <button class="btn btn-green" id="add-addr-save-btn" onclick="ProfileScreen.saveAddress()">Save address</button>
         <div style="height:16px"></div>
       </div></div>
     </div>
@@ -1202,9 +1204,10 @@
     if (StatusBar) {
       StatusBar.setOverlaysWebView({ overlay: false });
       StatusBar.setBackgroundColor({ color: '#1a73e8' });
+      StatusBar.setStyle({ style: 'DARK' });
     }
     if (SplashScreen) {
-      SplashScreen.hide();
+      setTimeout(() => SplashScreen.hide(), 500);
     }
   }
 

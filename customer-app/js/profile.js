@@ -111,6 +111,8 @@ const ProfileScreen = {
 
   // ── ADDRESSES ──
 
+  editingAddressId: null,
+
   renderAddresses() {
     const list = document.getElementById('addr-list');
     if (!list) return;
@@ -130,9 +132,48 @@ const ProfileScreen = {
           </div>
           <div style="font-size:10px;color:var(--text-secondary);margin-top:1px">${a.address}${a.pincode ? ' · ' + a.pincode : ''}</div>
         </div>
-        <span onclick="event.stopPropagation();ProfileScreen.removeAddress(${a.id})" style="font-size:14px;color:var(--red);cursor:pointer;padding:0 6px">🗑️</span>
+        <div style="display:flex;gap:2px;flex-shrink:0">
+          <span onclick="event.stopPropagation();ProfileScreen.editAddress(${a.id})" style="font-size:14px;color:var(--blue);cursor:pointer;padding:4px 6px">✏️</span>
+          <span onclick="event.stopPropagation();ProfileScreen.removeAddress(${a.id})" style="font-size:14px;color:var(--red);cursor:pointer;padding:4px 6px">🗑️</span>
+        </div>
       </div>
     `).join('');
+  },
+
+  editAddress(id) {
+    const a = SAVED_ADDRESSES.find(x => x.id === id);
+    if (!a) return;
+    this.editingAddressId = id;
+
+    // Pre-populate the city dropdown
+    const cityEl = document.getElementById('addr-city');
+    if (cityEl && a.city) cityEl.value = a.city;
+
+    // Pre-populate address into area field
+    const areaEl = document.getElementById('addr-area');
+    if (areaEl) areaEl.value = a.address || '';
+
+    // Pre-populate pincode
+    const pinEl = document.getElementById('addr-pincode');
+    if (pinEl) pinEl.value = a.pincode || '';
+
+    // Pre-populate lat/lng
+    const latEl = document.getElementById('addr-lat');
+    const lngEl = document.getElementById('addr-lng');
+    if (latEl) latEl.value = a.lat || '';
+    if (lngEl) lngEl.value = a.lng || '';
+
+    // Set label chip
+    const iconToLabel = { '🏠': 'home2', '🏢': 'work' };
+    this.pickAddressLabel(iconToLabel[a.icon] || 'other');
+
+    // Update screen title and button text
+    const titleEl = document.getElementById('add-addr-title');
+    const btnEl   = document.getElementById('add-addr-save-btn');
+    if (titleEl) titleEl.textContent = 'Edit address';
+    if (btnEl)   btnEl.textContent   = 'Update address';
+
+    Router.go('add-address');
   },
 
   async setDefaultAddress(id) {
@@ -303,22 +344,30 @@ const ProfileScreen = {
 
     const LABELS = { home2: { label: 'Home', icon: '🏠' }, work: { label: 'Office', icon: '🏢' }, other: { label: 'Other', icon: '📍' } };
     const choice = LABELS[this.addrLabelActive] || LABELS.other;
-    const fullAddress = [flat, area, landmark, city].filter(Boolean).join(', ');
+    const fullAddress = [flat, area, landmark].filter(Boolean).join(', ');
+    const isEditing = this.editingAddressId != null;
 
     try {
-      const r = await fetch('/api/profile/addresses', {
-        method: 'POST',
+      const url    = isEditing ? `/api/profile/addresses/${this.editingAddressId}` : '/api/profile/addresses';
+      const method = isEditing ? 'PUT' : 'POST';
+      const r = await fetch(url, {
+        method,
         headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (Auth.getToken() || '') },
-        body: JSON.stringify({ label: choice.label, icon: choice.icon, address: fullAddress, pincode, lat, lng }),
+        body: JSON.stringify({ label: choice.label, icon: choice.icon, address: fullAddress, pincode, lat, lng, city }),
       });
       const j = await r.json();
       if (!r.ok || !j.success) throw new Error(j.error || 'Save failed');
+      this.editingAddressId = null;
+      const titleEl = document.getElementById('add-addr-title');
+      const btnEl   = document.getElementById('add-addr-save-btn');
+      if (titleEl) titleEl.textContent = 'Add new address';
+      if (btnEl)   btnEl.textContent   = 'Save address';
       await UserData.loadAddresses();
       ['addr-area','addr-flat','addr-landmark','addr-pincode'].forEach(id => {
         const inp = document.getElementById(id);
         if (inp) inp.value = '';
       });
-      UI.toast('✅ Address saved!');
+      UI.toast(isEditing ? '✅ Address updated!' : '✅ Address saved!');
       // If user came from summary (booking flow), bounce them straight back there.
       // Otherwise route to the addresses list as before.
       const cameFromSummary = Router.history.includes('summary');

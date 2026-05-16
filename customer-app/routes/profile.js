@@ -45,10 +45,23 @@ router.get('/addresses', requireAuth, (req, res) => {
 });
 
 router.post('/addresses', requireAuth, (req, res) => {
-  const { label, icon, address, pincode, lat, lng } = req.body || {};
+  const { label, icon, address, pincode, lat, lng, city } = req.body || {};
   try {
-    const a = db.addAddress(req.user.id, { label, icon, address, pincode, lat, lng });
+    const a = db.addAddress(req.user.id, { label, icon, address, pincode, lat, lng, city });
     res.status(201).json({ success: true, data: a });
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
+
+router.put('/addresses/:id', requireAuth, (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (!id) return res.status(400).json({ error: 'Invalid id' });
+  const { label, icon, address, pincode, lat, lng, city } = req.body || {};
+  try {
+    const a = db.updateAddress(req.user.id, id, { label, icon, address, pincode, lat, lng, city });
+    if (!a) return res.status(404).json({ error: 'Address not found' });
+    res.json({ success: true, data: a });
   } catch (e) {
     res.status(400).json({ error: e.message });
   }

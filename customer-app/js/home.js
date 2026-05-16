@@ -31,7 +31,18 @@ const HomeScreen = {
     if (!container) return;
 
     container.innerHTML = centers.map(c => this._centerCardHTML(c)).join('');
-    noResults.style.display = centers.length === 0 ? 'block' : 'none';
+
+    if (centers.length === 0) {
+      const city = AppState.user?.city || '';
+      if (CENTERS.length === 0) {
+        noResults.innerHTML = `🌆 No centers in <b>${city || 'your area'}</b> yet<br><span style="font-size:11px">We're expanding! Please check back soon.</span>`;
+      } else {
+        noResults.innerHTML = `😕 No centers match this filter<br><span style="font-size:11px">Try a different filter or search term.</span>`;
+      }
+      noResults.style.display = 'block';
+    } else {
+      noResults.style.display = 'none';
+    }
 
     document.getElementById('results-count').textContent = `${centers.length} found`;
     document.getElementById('results-title').textContent = 'Nearby centers';
@@ -118,20 +129,37 @@ const HomeScreen = {
     document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
     document.querySelector('.filter-chip[data-filter="all"]')?.classList.add('active');
     document.getElementById('results-title').textContent = 'Nearby centers';
-    document.getElementById('results-count').textContent = '5 found';
+    document.getElementById('results-count').textContent = `${CENTERS.length} found`;
   },
 
   _showDefaultDropdown() {
     const d = document.getElementById('search-dropdown');
-    d.innerHTML = `
-      <div style="padding:6px 13px 2px;font-size:10px;font-weight:700;color:var(--text-tertiary);text-transform:uppercase;background:var(--bg-secondary)">Recent</div>
-      <div class="dropdown-item" onmousedown="HomeScreen.selectCenter('Shine Auto Wash','c1')">
-        <span>🕐</span><div><div>Shine Auto Wash</div><div style="font-size:10px;color:var(--text-secondary);margin-top:1px">Andheri West · Last visited</div></div>
-      </div>
-      <div style="padding:6px 13px 2px;font-size:10px;font-weight:700;color:var(--text-tertiary);text-transform:uppercase;background:var(--bg-secondary)">Quick filters</div>
-      <div class="dropdown-item" onmousedown="HomeScreen.quickFilter('d2d')"><span>🚗</span><div><div>Door-to-door service</div><div style="font-size:10px;color:var(--text-secondary);margin-top:1px">3 available now</div></div></div>
-      <div class="dropdown-item" onmousedown="HomeScreen.quickFilter('steam')"><span>💨</span><div><div>Steam wash near me</div><div style="font-size:10px;color:var(--text-secondary);margin-top:1px">2 centers</div></div></div>
-      <div class="dropdown-item" onmousedown="HomeScreen.quickFilter('open')"><span>🟢</span><div><div>Open right now</div><div style="font-size:10px;color:var(--text-secondary);margin-top:1px">4 open</div></div></div>`;
+    const d2dCount   = CENTERS.filter(c => c.hasD2D).length;
+    const steamCount = CENTERS.filter(c => c.hasSteam).length;
+    const openCount  = CENTERS.filter(c => c.open).length;
+
+    const nearbySection = CENTERS.length
+      ? `<div style="padding:6px 13px 2px;font-size:10px;font-weight:700;color:var(--text-tertiary);text-transform:uppercase;background:var(--bg-secondary)">Nearby</div>`
+        + CENTERS.slice(0, 2).map(c => `
+          <div class="dropdown-item" onmousedown="HomeScreen.selectCenter('${c.name.replace(/'/g,"\\'")}','${c.id}')">
+            <span>🚗</span>
+            <div><div>${c.name}</div>
+            <div style="font-size:10px;color:var(--text-secondary);margin-top:1px">${c.area} · <span style="color:${c.open ? '#2e7d32' : '#c62828'}">${c.open ? 'Open' : 'Closed'}</span></div></div>
+          </div>`).join('')
+      : '';
+
+    const filterItems = [
+      d2dCount   ? `<div class="dropdown-item" onmousedown="HomeScreen.quickFilter('d2d')"><span>🚗</span><div><div>Door-to-door service</div><div style="font-size:10px;color:var(--text-secondary);margin-top:1px">${d2dCount} available</div></div></div>` : '',
+      steamCount ? `<div class="dropdown-item" onmousedown="HomeScreen.quickFilter('steam')"><span>💨</span><div><div>Steam wash near me</div><div style="font-size:10px;color:var(--text-secondary);margin-top:1px">${steamCount} center${steamCount !== 1 ? 's' : ''}</div></div></div>` : '',
+      openCount  ? `<div class="dropdown-item" onmousedown="HomeScreen.quickFilter('open')"><span>🟢</span><div><div>Open right now</div><div style="font-size:10px;color:var(--text-secondary);margin-top:1px">${openCount} open</div></div></div>` : '',
+    ].filter(Boolean);
+
+    const quickSection = filterItems.length
+      ? `<div style="padding:6px 13px 2px;font-size:10px;font-weight:700;color:var(--text-tertiary);text-transform:uppercase;background:var(--bg-secondary)">Quick filters</div>`
+        + filterItems.join('')
+      : '';
+
+    d.innerHTML = (nearbySection + quickSection) || `<div style="padding:14px 13px;text-align:center;font-size:12px;color:var(--text-secondary)">No centers available in your city yet.</div>`;
     d.style.display = 'block';
   },
 
@@ -181,9 +209,18 @@ const HomeScreen = {
       card.classList.toggle('hidden', !match);
       if (match) visible++;
     });
+    const noResults = document.getElementById('no-results');
     document.getElementById('results-count').textContent = `${visible} found`;
     document.getElementById('results-title').textContent = query ? 'Search results' : 'Nearby centers';
-    document.getElementById('no-results').style.display = visible === 0 ? 'block' : 'none';
+    if (visible === 0) {
+      const city = AppState.user?.city || '';
+      noResults.innerHTML = CENTERS.length === 0
+        ? `🌆 No centers in <b>${city || 'your area'}</b> yet<br><span style="font-size:11px">We're expanding! Please check back soon.</span>`
+        : `😕 No results for "<b>${query}</b>"<br><span style="font-size:11px">Try a different search term.</span>`;
+      noResults.style.display = 'block';
+    } else {
+      noResults.style.display = 'none';
+    }
     if (query) document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
   },
 

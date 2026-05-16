@@ -16,7 +16,32 @@ const Router = {
     document.querySelectorAll('[data-screen]').forEach(el => {
       this.screens[el.dataset.screen] = el;
     });
+    this._initEdgeSwipe();
     // Don't call go() here — boot sequence in index.html handles the initial screen
+  },
+
+  _initEdgeSwipe() {
+    let touchStartX = 0;
+    let touchStartY = 0;
+    const EDGE_ZONE = 30; // px from either edge
+    const MIN_SWIPE = 60; // minimum horizontal travel
+
+    document.addEventListener('touchstart', e => {
+      touchStartX = e.touches[0].clientX;
+      touchStartY = e.touches[0].clientY;
+    }, { passive: true });
+
+    document.addEventListener('touchend', e => {
+      const dx = e.changedTouches[0].clientX - touchStartX;
+      const dy = e.changedTouches[0].clientY - touchStartY;
+      const screenW = window.innerWidth;
+      // Must start from edge zone, travel far enough, and be more horizontal than vertical
+      const fromLeftEdge  = touchStartX < EDGE_ZONE;
+      const fromRightEdge = touchStartX > screenW - EDGE_ZONE;
+      if ((fromLeftEdge || fromRightEdge) && Math.abs(dx) >= MIN_SWIPE && Math.abs(dx) > Math.abs(dy)) {
+        Router.back();
+      }
+    }, { passive: true });
   },
 
   go(screenId, pushHistory = true) {
@@ -106,13 +131,18 @@ const Router = {
         if (typeof ProfileScreen !== 'undefined' && ProfileScreen.renderAddresses) ProfileScreen.renderAddresses();
         break;
       case 'add-address': {
-        // Reset form fields and hidden coords on every visit
+        // Skip reset when editAddress() pre-populated the form for editing
+        if (typeof ProfileScreen !== 'undefined' && ProfileScreen.editingAddressId != null) break;
         ['addr-area','addr-flat','addr-landmark','addr-pincode'].forEach(id => {
           const el = document.getElementById(id); if (el) el.value = '';
         });
         const latEl = document.getElementById('addr-lat'); if (latEl) latEl.value = '';
         const lngEl = document.getElementById('addr-lng'); if (lngEl) lngEl.value = '';
         const btn = document.getElementById('addr-gps-btn'); if (btn) btn.textContent = '📍 Detect GPS location';
+        const titleEl = document.getElementById('add-addr-title');
+        const btnEl   = document.getElementById('add-addr-save-btn');
+        if (titleEl) titleEl.textContent = 'Add new address';
+        if (btnEl)   btnEl.textContent   = 'Save address';
         if (typeof ProfileScreen !== 'undefined') ProfileScreen.pickAddressLabel('home2');
         break;
       }
