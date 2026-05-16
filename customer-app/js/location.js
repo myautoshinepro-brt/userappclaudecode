@@ -259,8 +259,26 @@ const LocationModal = {
     this._selectedId = id;
     this._setLocation(label, area, lat, lng);
     if (lat && lng) this._updateCenterDistances(lat, lng);
+
+    // Apply the address's city to filter the home screen centers
+    const addr = typeof SAVED_ADDRESSES !== 'undefined' ? SAVED_ADDRESSES.find(a => a.id === id) : null;
+    if (addr && addr.city) {
+      AppState.user.city = addr.city;
+      this._applyCityFilter(addr.city);
+    }
+
     UI.toast(emoji + ' ' + label + ' selected');
     setTimeout(() => this.close(), 380);
+  },
+
+  // ── CITY FILTER ───────────────────────────────────────────
+
+  _applyCityFilter(city) {
+    if (!city || typeof ALL_CENTERS === 'undefined') return;
+    const cityLc   = city.toLowerCase();
+    const filtered = ALL_CENTERS.filter(c => (c.city || '').toLowerCase() === cityLc);
+    CENTERS = filtered.length ? filtered : [...ALL_CENTERS];
+    if (typeof HomeScreen !== 'undefined') HomeScreen.renderCenterCards(CENTERS);
   },
 
   _deselect() {

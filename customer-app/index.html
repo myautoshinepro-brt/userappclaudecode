@@ -1194,12 +1194,13 @@
     };
   })();
 
-  // Global CENTERS fallback if API fails
-  if (typeof CENTERS === 'undefined') window.CENTERS = [];
+  // Global fallbacks if API fails (data.js declares these but they need window references too)
+  if (typeof ALL_CENTERS === 'undefined') window.ALL_CENTERS = [];
+  if (typeof CENTERS === 'undefined')     window.CENTERS = [];
 
-  // Fix Android status bar: stop it overlaying the WebView so the OS
-  // pushes content down by exactly the right amount — no CSS guessing.
-  if (window.Capacitor && window.Capacitor.getPlatform() === 'android') {
+  // Fix mobile status bar: stop it overlaying the WebView so the OS
+  // pushes content down by exactly the right amount — applies to Android + iOS.
+  if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) {
     const { StatusBar, SplashScreen } = window.Capacitor.Plugins;
     if (StatusBar) {
       StatusBar.setOverlaysWebView({ overlay: false });
@@ -1219,7 +1220,10 @@
     try {
       const r = await fetch(window.API_URL + '/api/centers');
       const j = await r.json();
-      if (j && j.success && Array.isArray(j.data)) window.CENTERS = j.data;
+      if (j && j.success && Array.isArray(j.data)) {
+        window.ALL_CENTERS = j.data;
+        window.CENTERS     = j.data;
+      }
     } catch (e) {
       console.warn('Could not load centers:', e);
     }
@@ -1240,6 +1244,24 @@
       await UserData.loadAll();
       ProfileScreen.updateMenuCounts();
       BookingScreen.renderBookings();
+
+      // Apply user's default saved address to the home header
+      const defAddr = SAVED_ADDRESSES.find(a => a.isDefault) || SAVED_ADDRESSES[0];
+      if (defAddr) {
+        AppState.user.city = defAddr.city || AppState.user.city;
+        // Show "<label> — <city>" in the location header
+        LocationModal._setLocation(defAddr.label, defAddr.city || defAddr.label, defAddr.lat, defAddr.lng);
+        LocationModal._selectedId = defAddr.id;
+      }
+
+      // Filter centers to the user's city (case-insensitive)
+      if (AppState.user.city && typeof ALL_CENTERS !== 'undefined' && ALL_CENTERS.length) {
+        const cityLc   = AppState.user.city.toLowerCase();
+        const filtered = ALL_CENTERS.filter(c => (c.city || '').toLowerCase() === cityLc);
+        if (filtered.length) CENTERS = filtered;
+      }
+      HomeScreen.renderCenterCards(CENTERS);
+
       Router.go('home', false);
     } else {
       Router.go('login', false);

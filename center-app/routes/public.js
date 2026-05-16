@@ -31,6 +31,7 @@ function shapeForCustomer(c) {
     id:        'c' + c.id,
     name:      c.name,
     area,
+    city:      c.city || '',
     distance:  0,
     rating:    stats && stats.avg_rating ? stats.avg_rating : DEFAULT_RATING,
     reviews:   stats && stats.total     ? stats.total     : 0,

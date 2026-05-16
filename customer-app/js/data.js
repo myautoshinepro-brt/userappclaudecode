@@ -4,6 +4,8 @@
 // ============================================================
 
 // Loaded from GET /api/centers on boot (see index.html). Empty until then.
+// ALL_CENTERS = full list from API (never mutated); CENTERS = city-filtered view the UI uses.
+let ALL_CENTERS = [];
 let CENTERS = [];
 
 // Wash type priority order (LOCKED): Water → Dry → Steam → D2D

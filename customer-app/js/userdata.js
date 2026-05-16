@@ -32,6 +32,9 @@ const UserData = (() => {
   }
 
   function _mapAddress(a) {
+    // Derive city from the stored city column; fall back to last comma-segment of address
+    const parts = (a.address || '').split(',').map(s => s.trim()).filter(Boolean);
+    const city  = a.city || parts[parts.length - 1] || '';
     return {
       id:        a.id,
       label:     a.label,
@@ -42,6 +45,7 @@ const UserData = (() => {
       color:     '#dbeafe',
       lat:       a.lat  != null ? parseFloat(a.lat)  : null,
       lng:       a.lng  != null ? parseFloat(a.lng)  : null,
+      city,
     };
   }
 
