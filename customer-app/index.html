@@ -163,7 +163,7 @@
             </div>
             <div class="hd-loc-row" onclick="LocationModal.open()">
               <div class="hd-loc-dot" id="location-dot"></div>
-              <span class="hd-loc-label" id="location-label">Home — Andheri West</span>
+              <span class="hd-loc-label" id="location-label">Tap to select location</span>
               <span class="hd-loc-arrow">▼</span>
             </div>
           </div>
@@ -1246,9 +1246,13 @@
         LocationModal._setLocation(defAddr.label, defAddr.city || defAddr.label, defAddr.lat, defAddr.lng);
         LocationModal._selectedId = defAddr.id;
       } else {
-        // No saved address — clear the hardcoded 'Mumbai' default so all centers show
+        // No saved address — clear city so all centers show; prompt user to pick a location
         AppState.user.city = '';
         LocationModal._applyCityFilter('');
+        const locLabel = document.getElementById('location-label');
+        if (locLabel) locLabel.textContent = 'Tap to select location';
+        const locDot = document.getElementById('location-dot');
+        if (locDot) locDot.style.background = '#f59e0b'; // amber = location not set
       }
 
       Router.go('home', false);
