@@ -1,7 +1,7 @@
 {
   "appId": "com.pitbay.customer",
   "appName": "Pitbay",
-  "webDir": "www",
+  "webDir": ".",
   "server": {
     "androidScheme": "https"
   },
