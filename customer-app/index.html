@@ -1242,13 +1242,14 @@
       const defAddr = SAVED_ADDRESSES.find(a => a.isDefault) || SAVED_ADDRESSES[0];
       if (defAddr) {
         AppState.user.city = defAddr.city || '';
-        // _setLocation will also auto-detect city and call _applyCityFilter
         LocationModal._setLocation(defAddr.label, defAddr.city || defAddr.label, defAddr.lat, defAddr.lng);
         LocationModal._selectedId = defAddr.id;
+        // Fetch city-specific centers from API (await so home renders with correct data)
+        await LocationModal._applyCityFilter(defAddr.city || '');
       } else {
-        // No saved address — clear city so all centers show; prompt user to pick a location
+        // No saved address — all centers already loaded at boot; just reset UI
         AppState.user.city = '';
-        LocationModal._applyCityFilter('');
+        if (typeof HomeScreen !== 'undefined') HomeScreen.renderCenterCards(CENTERS);
         const locLabel = document.getElementById('location-label');
         if (locLabel) locLabel.textContent = 'Tap to select location';
         const locDot = document.getElementById('location-dot');

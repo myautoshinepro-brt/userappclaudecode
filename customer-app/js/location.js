@@ -276,17 +276,32 @@ const LocationModal = {
   },
 
   // ── CITY FILTER ───────────────────────────────────────────
+  // Fetches centers from the API filtered by city, with client-side fallback.
 
-  _applyCityFilter(city) {
-    if (typeof ALL_CENTERS === 'undefined') return;
-    if (!city) {
-      CENTERS = [...ALL_CENTERS];
-    } else {
-      const cityLc      = city.trim().toLowerCase();
-      const cityMatched = ALL_CENTERS.filter(c => c.city && c.city.trim().toLowerCase() === cityLc);
-      // If there are centers tagged to this city → show only those.
-      // If none are tagged (e.g. demo / legacy data) → show all as fallback.
-      CENTERS = cityMatched.length ? cityMatched : [...ALL_CENTERS];
+  async _applyCityFilter(city) {
+    const cityParam = (city || '').trim();
+    const base = (typeof window !== 'undefined' && window.API_URL) ? window.API_URL : '';
+    const url  = cityParam
+      ? `${base}/api/centers?city=${encodeURIComponent(cityParam)}`
+      : `${base}/api/centers`;
+    try {
+      const r = await fetch(url);
+      const j = await r.json();
+      if (j && j.success && Array.isArray(j.data)) {
+        CENTERS = j.data;
+        // When no city filter, refresh ALL_CENTERS too (keeps fallback in sync)
+        if (!cityParam) window.ALL_CENTERS = [...j.data];
+      }
+    } catch (e) {
+      console.warn('_applyCityFilter API call failed, using client-side filter:', e.message);
+      if (typeof ALL_CENTERS === 'undefined') return;
+      if (!cityParam) {
+        CENTERS = [...ALL_CENTERS];
+      } else {
+        const cityLc  = cityParam.toLowerCase();
+        const matched = ALL_CENTERS.filter(c => (c.city || '').trim().toLowerCase() === cityLc);
+        CENTERS = matched.length ? matched : [...ALL_CENTERS];
+      }
     }
     if (typeof HomeScreen !== 'undefined') HomeScreen.renderCenterCards(CENTERS);
   },

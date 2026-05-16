@@ -46,9 +46,15 @@ function shapeForCustomer(c) {
   };
 }
 
-router.get('/centers', (_req, res) => {
+router.get('/centers', (req, res) => {
+  const cityFilter = (req.query.city || '').trim().toLowerCase();
   // Hide centers the super admin has flipped off; order is already DESC by display_order from the DB.
-  const visible = db.getAllCenters().filter(c => c.visible !== 0);
+  let visible = db.getAllCenters().filter(c => c.visible !== 0);
+  if (cityFilter) {
+    const matched = visible.filter(c => (c.city || '').trim().toLowerCase() === cityFilter);
+    // Only narrow to the city if we actually have centers there; otherwise return all (safe fallback).
+    if (matched.length) visible = matched;
+  }
   res.json({ success: true, data: visible.map(shapeForCustomer) });
 });
 

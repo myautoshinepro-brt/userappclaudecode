@@ -62,9 +62,11 @@ async function relayJson(res, url, init = {}) {
   }
 }
 
-// Public: list & lookup centers
-app.get('/api/centers', (_req, res) =>
-  relayJson(res, `${CENTER_APP_URL}/api/public/centers`));
+// Public: list & lookup centers — pass optional ?city= through to center-app
+app.get('/api/centers', (req, res) => {
+  const city = req.query.city ? `?city=${encodeURIComponent(req.query.city)}` : '';
+  relayJson(res, `${CENTER_APP_URL}/api/public/centers${city}`);
+});
 
 app.get('/api/centers/:id/packages', (req, res) =>
   relayJson(res, `${CENTER_APP_URL}/api/public/centers/${encodeURIComponent(req.params.id)}/packages`));
