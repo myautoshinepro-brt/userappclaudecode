@@ -175,15 +175,15 @@ router.delete('/centers/:id/packages/:pkgId', adminAuth, (req, res) => {
   res.json({ success: true });
 });
 
-// PATCH /api/admin/centers/:id  Body: { name?, owner_name?, mobile?, email?, address?, gstin?, wash_types?, open_time?, close_time?, lat?, lng? }
+// PATCH /api/admin/centers/:id  Body: { name?, owner_name?, mobile?, email?, address?, city?, pincode?, gstin?, wash_types?, open_time?, close_time?, lat?, lng? }
 router.patch('/centers/:id', adminAuth, (req, res) => {
   const id = parseInt(req.params.id, 10);
   if (!id) return res.status(400).json({ error: 'Invalid id' });
   const b = req.body || {};
-  // Use the existing updateCenterInfo path for the common fields; bank fields stay on a separate endpoint.
-  if (b.name || b.owner_name || b.email != null || b.address != null || b.gstin != null || b.wash_types != null || b.open_time != null || b.close_time != null) {
-    const cur = db.findCenterById(id);
-    if (!cur) return res.status(404).json({ error: 'Center not found' });
+  const cur = db.findCenterById(id);
+  if (!cur) return res.status(404).json({ error: 'Center not found' });
+
+  if (b.name || b.owner_name || b.email != null || b.address != null || b.gstin != null || b.wash_types != null || b.open_time != null || b.close_time != null || b.pincode != null) {
     db.updateCenterInfo(id, {
       name:       b.name        ?? cur.name,
       owner_name: b.owner_name  ?? cur.owner_name,
@@ -193,7 +193,13 @@ router.patch('/centers/:id', adminAuth, (req, res) => {
       wash_types: b.wash_types  ?? cur.wash_types,
       open_time:  b.open_time   ?? cur.open_time,
       close_time: b.close_time  ?? cur.close_time,
+      pincode:    b.pincode     ?? cur.pincode,
     });
+  }
+  // Admin can change city directly (no approval needed) — normalize to Title Case.
+  if (b.city != null) {
+    const normalized = String(b.city).trim().replace(/\S+/g, w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+    db.prepare("UPDATE centers SET city=?, city_pending=NULL WHERE id=?").run(normalized, id);
   }
   // Optional bank patch in the same call.
   if (b.bank_account != null || b.ifsc != null || b.account_name != null || b.bank_name != null) {
@@ -205,6 +211,47 @@ router.patch('/centers/:id', adminAuth, (req, res) => {
     });
   }
   res.json({ success: true, data: db.findCenterById(id) });
+});
+
+// ── CITY CHANGE APPROVALS ──────────────────────────────────
+
+// GET /api/admin/cities/pending — list centers with a pending city change request
+router.get('/cities/pending', adminAuth, (_req, res) => {
+  res.json({ success: true, data: db.getPendingCityChanges() });
+});
+
+// POST /api/admin/cities/:id/approve
+router.post('/cities/:id/approve', adminAuth, (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (!id) return res.status(400).json({ error: 'Invalid id' });
+  const center = db.findCenterById(id);
+  if (!center)             return res.status(404).json({ error: 'Center not found' });
+  if (!center.city_pending) return res.status(400).json({ error: 'No pending city change for this center' });
+  const updated = db.approveCityChange(id);
+  db.appendAuditLog({
+    source: 'superadmin', actor: 'Super Admin', center_id: id,
+    action: 'City change approved',
+    detail: `${center.name}: ${center.city} → ${center.city_pending}`,
+  });
+  console.log(`✅ City change approved for center #${id}: ${center.city} → ${center.city_pending}`);
+  res.json({ success: true, data: updated });
+});
+
+// POST /api/admin/cities/:id/reject
+router.post('/cities/:id/reject', adminAuth, (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (!id) return res.status(400).json({ error: 'Invalid id' });
+  const center = db.findCenterById(id);
+  if (!center)             return res.status(404).json({ error: 'Center not found' });
+  if (!center.city_pending) return res.status(400).json({ error: 'No pending city change for this center' });
+  db.rejectCityChange(id);
+  db.appendAuditLog({
+    source: 'superadmin', actor: 'Super Admin', center_id: id,
+    action: 'City change rejected',
+    detail: `${center.name}: requested "${center.city_pending}" (kept "${center.city}")`,
+  });
+  console.log(`❌ City change rejected for center #${id} (requested: ${center.city_pending})`);
+  res.json({ success: true });
 });
 
 // PATCH /api/admin/centers/:id/visibility  Body: { visible: true | false }

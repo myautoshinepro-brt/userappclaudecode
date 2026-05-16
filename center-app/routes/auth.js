@@ -106,6 +106,8 @@ router.post('/verify-otp', (req, res) => {
     center: {
       id: center.id, name: center.name, owner_name: center.owner_name,
       mobile: center.mobile, email: center.email, address: center.address,
+      city: center.city || null, pincode: center.pincode || null,
+      city_pending: center.city_pending || null,
       wash_types: center.wash_types, open_time: center.open_time,
       close_time: center.close_time, is_open: center.is_open,
       bank_account: center.bank_account || null,
@@ -123,6 +125,8 @@ router.get('/me', requireAuth, (req, res) => {
   res.json({
     id: c.id, name: c.name, owner_name: c.owner_name,
     mobile: c.mobile, email: c.email, address: c.address,
+    city: c.city || null, pincode: c.pincode || null,
+    city_pending: c.city_pending || null,
     wash_types: c.wash_types, open_time: c.open_time,
     close_time: c.close_time, is_open: c.is_open,
     bank_account: c.bank_account || null,
@@ -167,14 +171,28 @@ router.patch('/open-status', requireAuth, (req, res) => {
   res.json({ success: true, is_open: !!is_open });
 });
 
-// PATCH /api/auth/center  { name, owner_name, email, address, gstin, wash_types, open_time, close_time }
+// PATCH /api/auth/center  { name, owner_name, email, address, gstin, wash_types, open_time, close_time, city?, pincode? }
 router.patch('/center', requireAuth, (req, res) => {
-  const { name, owner_name, email, address, gstin, wash_types, open_time, close_time } = req.body || {};
+  const { name, owner_name, email, address, gstin, wash_types, open_time, close_time, city, pincode } = req.body || {};
   if (!name?.trim()) return res.status(400).json({ error: 'Center name is required.' });
-  db.updateCenterInfo(req.center.id, { name, owner_name, email, address, gstin, wash_types, open_time, close_time });
+
+  let cityChangePending = null;
+  if (city?.trim()) {
+    const normalizedCity = city.trim().replace(/\S+/g, w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+    if (normalizedCity.toLowerCase() !== (req.center.city || '').toLowerCase()) {
+      db.requestCityChange(req.center.id, normalizedCity);
+      cityChangePending = normalizedCity;
+    }
+  }
+
+  db.updateCenterInfo(req.center.id, { name, owner_name, email, address, gstin, wash_types, open_time, close_time, pincode });
   const updated = db.findCenterById(req.center.id);
   console.log(`✅ Center info updated: ${updated.name}`);
-  res.json({ success: true, center: updated });
+  res.json({
+    success: true,
+    center: updated,
+    ...(cityChangePending ? { cityChangePending, cityChangeMessage: 'City change submitted for super admin approval.' } : {}),
+  });
 });
 
 // POST /api/auth/logout

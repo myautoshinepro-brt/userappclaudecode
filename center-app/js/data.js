@@ -3,6 +3,8 @@
 
 const WASH_TYPES = ['water', 'dry', 'steam', 'd2d'];
 
+const SERVICEABLE_CITIES = ['Mumbai', 'Delhi', 'Bangalore', 'Pune', 'Hyderabad'];
+
 const WASH_LABELS = {
   water: { label: 'Water Wash', icon: '💧' },
   dry:   { label: 'Dry Wash',   icon: '🌬️' },

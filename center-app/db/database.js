@@ -10,6 +10,11 @@ const db      = new Database(DB_PATH);
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
 
+function toTitleCase(str) {
+  if (!str) return str;
+  return String(str).trim().replace(/\S+/g, w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+}
+
 // Day-grid slot times (30-min granularity). Used for fan-out math when computing
 // how many slot windows a booking with a given duration_minutes occupies.
 const SLOT_TIMES = [
@@ -150,6 +155,26 @@ try { db.exec("ALTER TABLE centers ADD COLUMN display_order INTEGER NOT NULL DEF
 try {
   db.prepare("UPDATE centers SET display_order = id WHERE display_order IS NULL OR display_order = 999").run();
 } catch { /* table empty or no-op */ }
+
+// ── Migration: pincode and pending city change approval ──
+try { db.exec("ALTER TABLE centers ADD COLUMN pincode      TEXT"); } catch { /* exists */ }
+try { db.exec("ALTER TABLE centers ADD COLUMN city_pending TEXT"); } catch { /* exists */ }
+
+// ── Data fix: normalize all existing city names to Title Case ──
+try {
+  const _cityRows = db.prepare("SELECT id, city FROM centers WHERE city IS NOT NULL").all();
+  for (const r of _cityRows) {
+    const norm = toTitleCase(r.city);
+    if (norm !== r.city) db.prepare("UPDATE centers SET city=? WHERE id=?").run(norm, r.id);
+  }
+} catch { /* no-op if table empty */ }
+try {
+  const _appRows = db.prepare("SELECT id, city FROM applications WHERE city IS NOT NULL").all();
+  for (const r of _appRows) {
+    const norm = toTitleCase(r.city);
+    if (norm !== r.city) db.prepare("UPDATE applications SET city=? WHERE id=?").run(norm, r.id);
+  }
+} catch { /* applications table may not exist yet on first run */ }
 
 // ── Migration: enhanced application fields ──
 try { db.exec("ALTER TABLE applications ADD COLUMN geo_lat       REAL"); } catch { /* exists */ }
@@ -504,7 +529,7 @@ const centerByMobile = db.prepare('SELECT * FROM centers WHERE mobile = ?');
 const centerById     = db.prepare('SELECT * FROM centers WHERE id = ?');
 const updateCenter   = db.prepare(`
   UPDATE centers SET name=?, owner_name=?, email=?, address=?, gstin=?,
-    wash_types=?, open_time=?, close_time=?
+    wash_types=?, open_time=?, close_time=?, pincode=?
   WHERE id=?
 `);
 const setOpenStatus = db.prepare("UPDATE centers SET is_open=? WHERE id=?");
@@ -636,8 +661,28 @@ module.exports = {
   updateCenterInfo(id, data) {
     return updateCenter.run(
       data.name, data.owner_name, data.email, data.address,
-      data.gstin, data.wash_types, data.open_time, data.close_time, id
+      data.gstin, data.wash_types, data.open_time, data.close_time,
+      data.pincode || null, id
     );
+  },
+
+  requestCityChange(id, newCity) {
+    const normalized = toTitleCase(newCity);
+    db.prepare("UPDATE centers SET city_pending=? WHERE id=?").run(normalized, id);
+    return normalized;
+  },
+  approveCityChange(id) {
+    db.prepare("UPDATE centers SET city=city_pending, city_pending=NULL WHERE id=? AND city_pending IS NOT NULL").run(id);
+    return db.prepare('SELECT * FROM centers WHERE id=?').get(id);
+  },
+  rejectCityChange(id) {
+    db.prepare("UPDATE centers SET city_pending=NULL WHERE id=?").run(id);
+  },
+  getPendingCityChanges() {
+    return db.prepare(`
+      SELECT id, name, owner_name, mobile, city, city_pending, created_at
+      FROM centers WHERE city_pending IS NOT NULL ORDER BY id
+    `).all();
   },
   setCenterOpenStatus(id, isOpen) { return setOpenStatus.run(isOpen ? 1 : 0, id); },
   updateBankDetails(id, data) {
@@ -814,7 +859,7 @@ module.exports = {
       INSERT INTO applications (name, owner_name, mobile, email, city, address, gstin, bank_account, ifsc, account_name, bank_name, geo_lat, geo_lng, center_images, certificates, wash_types)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
-      data.name, data.owner_name, data.mobile, data.email || null, data.city, data.address,
+      data.name, data.owner_name, data.mobile, data.email || null, toTitleCase(data.city) || data.city, data.address,
       data.gstin || null, data.bank_account || null, data.ifsc || null, data.account_name || null,
       data.bank_name || null, data.geo_lat || null, data.geo_lng || null,
       data.center_images ? JSON.stringify(data.center_images) : null,
@@ -835,7 +880,7 @@ module.exports = {
         status='pending', notes=NULL, updated_at=datetime('now')
       WHERE id=?
     `).run(
-      data.name, data.owner_name, data.email || null, data.city, data.address,
+      data.name, data.owner_name, data.email || null, toTitleCase(data.city) || data.city, data.address,
       data.gstin || null, data.bank_account || null, data.ifsc || null,
       data.account_name || null, data.bank_name || null,
       data.geo_lat || null, data.geo_lng || null,
@@ -847,12 +892,13 @@ module.exports = {
   approveApplication(id) {
     const app = db.prepare('SELECT * FROM applications WHERE id=?').get(id);
     if (!app) return null;
+    const normalizedCity = toTitleCase(app.city) || app.city;
     const info = db.prepare(`
       INSERT INTO centers (name, owner_name, mobile, email, address, city, gstin, wash_types, bank_account, ifsc, account_name, bank_name, lat, lng)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       app.name, app.owner_name, app.mobile, app.email,
-      app.address, app.city, app.gstin || null,
+      app.address, normalizedCity, app.gstin || null,
       app.wash_types || 'water,dry',
       app.bank_account || null, app.ifsc || null,
       app.account_name || null, app.bank_name || null,
@@ -868,8 +914,8 @@ module.exports = {
   },
   getAllCenters() {
     return db.prepare(`
-      SELECT id, name, owner_name, mobile, email, address, city, gstin, wash_types,
-             open_time, close_time, is_open, lat, lng, visible, display_order, created_at
+      SELECT id, name, owner_name, mobile, email, address, city, pincode, gstin, wash_types,
+             open_time, close_time, is_open, lat, lng, visible, display_order, city_pending, created_at
       FROM centers
       ORDER BY display_order ASC, id ASC
     `).all();

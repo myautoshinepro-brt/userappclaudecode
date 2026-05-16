@@ -31,6 +31,22 @@ const ProfileScreen = {
 
     const washTypes = ['water','dry','steam','d2d'];
     const selected  = (c.wash_types || '').split(',').map(w => w.trim());
+    const cities = typeof SERVICEABLE_CITIES !== 'undefined' ? SERVICEABLE_CITIES : ['Mumbai'];
+    const hasPendingCity = !!c.city_pending;
+
+    const cityField = hasPendingCity
+      ? `<input class="input-field" value="${c.city || ''}" disabled style="opacity:0.6;cursor:not-allowed">
+         <div style="display:flex;align-items:center;gap:6px;margin-top:6px;background:#fef3c7;border-radius:8px;padding:8px 10px">
+           <span style="font-size:14px">⏳</span>
+           <div style="font-size:11px;color:#92400e;line-height:1.4">
+             Change to <strong>${c.city_pending}</strong> is awaiting super admin approval.
+             You cannot change city again until this is resolved.
+           </div>
+         </div>`
+      : `<select id="ec-city" class="input-field">
+           ${cities.map(city => `<option value="${city}" ${(c.city || '') === city ? 'selected' : ''}>${city}</option>`).join('')}
+         </select>
+         <div style="font-size:10px;color:var(--muted);margin-top:4px">City changes require super admin approval before going live on the customer app.</div>`;
 
     el.innerHTML = `
       <div class="input-group">
@@ -44,6 +60,14 @@ const ProfileScreen = {
       <div class="input-group">
         <div class="input-label">Email</div>
         <input id="ec-email" class="input-field" type="email" value="${c.email || ''}" placeholder="Email address">
+      </div>
+      <div class="input-group">
+        <div class="input-label">City</div>
+        ${cityField}
+      </div>
+      <div class="input-group">
+        <div class="input-label">Pincode</div>
+        <input id="ec-pincode" class="input-field" value="${c.pincode || ''}" placeholder="6-digit pincode" inputmode="numeric" maxlength="6">
       </div>
       <div class="input-group">
         <div class="input-label">Address</div>
@@ -207,6 +231,9 @@ const ProfileScreen = {
       .join(',');
     if (!washTypes) { UI.toast('Select at least one wash type'); return; }
 
+    const pincode = document.getElementById('ec-pincode')?.value?.trim();
+    if (pincode && !/^\d{6}$/.test(pincode)) { UI.toast('Pincode must be 6 digits'); return; }
+
     const body = {
       name:       document.getElementById('ec-name')?.value?.trim(),
       owner_name: document.getElementById('ec-owner')?.value?.trim(),
@@ -216,7 +243,11 @@ const ProfileScreen = {
       open_time:  document.getElementById('ec-open')?.value,
       close_time: document.getElementById('ec-close')?.value,
       wash_types: washTypes,
+      pincode:    pincode || null,
     };
+    const selectedCity = document.getElementById('ec-city')?.value;
+    if (selectedCity) body.city = selectedCity;
+
     if (!body.name) { UI.toast('Center name is required'); return; }
 
     const btn = document.getElementById('save-center-btn');
@@ -231,8 +262,16 @@ const ProfileScreen = {
       if (!res.ok) { UI.toast(data.error || 'Failed to save'); return; }
 
       Object.assign(AppState.center, body);
+      if (data.cityChangePending) {
+        AppState.center.city_pending = data.cityChangePending;
+      }
       localStorage.setItem('sw_center_data', JSON.stringify(AppState.center));
-      UI.toast('✅ Center info saved');
+
+      if (data.cityChangePending) {
+        UI.toast(`✅ Info saved. City change to "${data.cityChangePending}" pending admin approval.`);
+      } else {
+        UI.toast('✅ Center info saved');
+      }
       Router.back();
     } catch { UI.toast('Network error'); }
     finally  { UI.setLoading(btn, false); }
