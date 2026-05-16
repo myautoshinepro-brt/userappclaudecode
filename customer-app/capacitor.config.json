@@ -1,11 +1,9 @@
 {
   "appId": "com.pitbay.customer",
   "appName": "Pitbay",
-  "webDir": ".",
+  "webDir": "www",
   "server": {
-    "androidScheme": "https",
-    "cleartext": true,
-    "url": "https://YOUR_DEPLOYED_URL_HERE"
+    "androidScheme": "https"
   },
   "plugins": {
     "SplashScreen": {
