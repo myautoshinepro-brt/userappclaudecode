@@ -25,7 +25,8 @@ let SETTLEMENTS = [];
 const CENTER_APP_URL = localStorage.getItem('sw_center_app_url') || 'https://userappclaudecode-production-7ece.up.railway.app';
 const ADMIN_API_KEY   = localStorage.getItem('sw_admin_api_key')  || 'sparkwash-admin-2026';
 
-let APPLICATIONS = []; // loaded from real API by ApplicationsScreen
+let APPLICATIONS  = []; // loaded from real API by ApplicationsScreen
+let CITY_CHANGES  = []; // loaded from real API by ApplicationsScreen (pending city change requests)
 
 const WASH_LABELS = {
   water: { label:'💧 Water Wash',    color:'#1e40af', bg:'#dbeafe' },

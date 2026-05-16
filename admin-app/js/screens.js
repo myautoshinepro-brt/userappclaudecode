@@ -2497,15 +2497,22 @@ const ApplicationsScreen = {
   },
 
   async _load() {
-    setHtml('apps-list', `<div style="text-align:center;padding:40px;color:var(--muted)">⏳ Loading applications…</div>`);
+    setHtml('apps-list', `<div style="text-align:center;padding:40px;color:var(--muted)">⏳ Loading…</div>`);
     try {
-      const res  = await fetch(`${CENTER_APP_URL}/api/admin/applications`, {
-        headers: { 'x-admin-key': ADMIN_API_KEY },
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to load');
-      APPLICATIONS  = data.data;
-      this._loaded  = true;
+      const [appsRes, cityRes] = await Promise.all([
+        fetch(`${CENTER_APP_URL}/api/admin/applications`,   { headers: { 'x-admin-key': ADMIN_API_KEY } }),
+        fetch(`${CENTER_APP_URL}/api/admin/cities/pending`, { headers: { 'x-admin-key': ADMIN_API_KEY } }),
+      ]);
+      const appsData = await appsRes.json();
+      if (!appsRes.ok) throw new Error(appsData.error || 'Failed to load applications');
+      APPLICATIONS = appsData.data;
+
+      if (cityRes.ok) {
+        const cityData = await cityRes.json();
+        CITY_CHANGES = cityData.data || [];
+      }
+
+      this._loaded = true;
       this._renderFilterChips();
       this._renderList();
     } catch (err) {
@@ -2519,22 +2526,63 @@ const ApplicationsScreen = {
   },
 
   _renderFilterChips() {
+    const pendingApps = APPLICATIONS.filter(a => a.status === 'pending').length;
     const filters = [
-      { key:'all',      label:'All',         count: APPLICATIONS.length },
-      { key:'pending',  label:'⏳ Pending',   count: APPLICATIONS.filter(a => a.status === 'pending').length },
-      { key:'approved', label:'✅ Approved',  count: APPLICATIONS.filter(a => a.status === 'approved').length },
-      { key:'rejected', label:'❌ Rejected',  count: APPLICATIONS.filter(a => a.status === 'rejected').length },
+      { key:'all',          label:'All',              count: APPLICATIONS.length },
+      { key:'pending',      label:'⏳ Pending',        count: pendingApps },
+      { key:'approved',     label:'✅ Approved',       count: APPLICATIONS.filter(a => a.status === 'approved').length },
+      { key:'rejected',     label:'❌ Rejected',       count: APPLICATIONS.filter(a => a.status === 'rejected').length },
+      { key:'city-changes', label:'🏙️ City Changes',  count: CITY_CHANGES.length },
     ];
     setHtml('apps-filter-chips', filters.map(f => `
       <div class="chip ${this._filter === f.key ? 'chip-on' : ''}" onclick="ApplicationsScreen._setFilter('${f.key}')">
         ${f.label} ${f.count > 0 ? `<span class="chip-badge">${f.count}</span>` : ''}
       </div>`).join(''));
-    setText('apps-sub', `${APPLICATIONS.filter(a => a.status === 'pending').length} pending review`);
+    const totalPending = pendingApps + CITY_CHANGES.length;
+    setText('apps-sub', totalPending > 0 ? `${totalPending} pending review` : 'All caught up');
   },
 
   _setFilter(key) { this._filter = key; this._renderFilterChips(); this._renderList(); },
 
   _renderList() {
+    // ── City change requests ──────────────────────────────────
+    if (this._filter === 'city-changes') {
+      if (!CITY_CHANGES.length) {
+        setHtml('apps-list', `<div class="empty-state"><div class="empty-ico">🏙️</div><div class="empty-title">No pending city changes</div><div class="empty-sub">Centers that request a city change will appear here</div></div>`);
+        return;
+      }
+      setHtml('apps-list', CITY_CHANGES.map(c => `
+        <div class="card card-pad" style="margin-bottom:10px;border-left:3px solid #f59e0b">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px">
+            <div>
+              <div style="font-weight:700;font-size:14px">${c.name}</div>
+              <div style="font-size:11px;color:var(--muted)">${c.owner_name} · ${c.mobile}</div>
+            </div>
+            <span class="badge" style="background:#fef3c7;color:#92400e;flex-shrink:0">⏳ Pending</span>
+          </div>
+          <div style="background:#fffbeb;border-radius:10px;padding:12px;margin-bottom:12px">
+            <div style="font-size:10px;color:var(--muted);font-weight:600;margin-bottom:6px">CITY CHANGE REQUEST</div>
+            <div style="display:flex;align-items:center;gap:10px;font-size:13px">
+              <div style="flex:1;text-align:center">
+                <div style="font-size:10px;color:var(--muted);margin-bottom:3px">Current City</div>
+                <div style="font-weight:700;color:#1e40af;background:#dbeafe;padding:4px 10px;border-radius:8px">${c.city || '—'}</div>
+              </div>
+              <div style="font-size:18px;color:var(--muted)">→</div>
+              <div style="flex:1;text-align:center">
+                <div style="font-size:10px;color:var(--muted);margin-bottom:3px">Requested City</div>
+                <div style="font-weight:700;color:#065f46;background:#d1fae5;padding:4px 10px;border-radius:8px">${c.city_pending}</div>
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-sm btn-red" style="flex:1" onclick="ApplicationsScreen.rejectCityChange(${c.id})">✕ Reject</button>
+            <button class="btn btn-sm btn-green" style="flex:1" onclick="ApplicationsScreen.approveCityChange(${c.id})">✓ Approve City</button>
+          </div>
+        </div>`).join(''));
+      return;
+    }
+
+    // ── Onboarding applications ───────────────────────────────
     const list = this._filter === 'all' ? APPLICATIONS : APPLICATIONS.filter(a => a.status === this._filter);
     if (!list.length) {
       setHtml('apps-list', `<div class="empty-state"><div class="empty-ico">🏪</div><div class="empty-title">No applications</div></div>`);
@@ -2638,6 +2686,44 @@ const ApplicationsScreen = {
       if (!res.ok) throw new Error(data.error || 'Failed');
       UI.toast(`Application rejected`);
       logChange(id, 'Application rejected', a.name);
+      this._loaded = false;
+      this.render();
+    } catch (err) {
+      UI.toast(`❌ ${err.message}`);
+    }
+  },
+
+  async approveCityChange(id) {
+    const c = CITY_CHANGES.find(x => x.id === id);
+    if (!c || !confirm(`Approve city change for ${c.name}?\n\n${c.city} → ${c.city_pending}\n\nThis will immediately update the city on the customer app.`)) return;
+    try {
+      const res  = await fetch(`${CENTER_APP_URL}/api/admin/cities/${id}/approve`, {
+        method:  'POST',
+        headers: { 'x-admin-key': ADMIN_API_KEY, 'Content-Type': 'application/json' },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed');
+      UI.toast(`✅ City changed: ${c.city} → ${c.city_pending}`);
+      logChange(id, 'City change approved', `${c.name}: ${c.city} → ${c.city_pending}`);
+      this._loaded = false;
+      this.render();
+    } catch (err) {
+      UI.toast(`❌ ${err.message}`);
+    }
+  },
+
+  async rejectCityChange(id) {
+    const c = CITY_CHANGES.find(x => x.id === id);
+    if (!c || !confirm(`Reject city change request from ${c.name}?\n\nRequested: ${c.city_pending}\n\nThe center will keep their current city: ${c.city}`)) return;
+    try {
+      const res  = await fetch(`${CENTER_APP_URL}/api/admin/cities/${id}/reject`, {
+        method:  'POST',
+        headers: { 'x-admin-key': ADMIN_API_KEY, 'Content-Type': 'application/json' },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed');
+      UI.toast(`City change rejected — ${c.name} stays in ${c.city}`);
+      logChange(id, 'City change rejected', `${c.name}: kept ${c.city}, rejected ${c.city_pending}`);
       this._loaded = false;
       this.render();
     } catch (err) {
