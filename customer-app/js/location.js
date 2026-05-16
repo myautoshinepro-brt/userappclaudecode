@@ -16,8 +16,10 @@ const LocationModal = {
       );
       const j = await r.json();
       const a = j.address || {};
-      return a.suburb || a.neighbourhood || a.city_district || a.town || a.village || a.city || 'Current location';
-    } catch { return 'Current location'; }
+      const suburb = a.suburb || a.neighbourhood || a.city_district || a.village || '';
+      const city   = a.city   || a.town || a.state_district || '';
+      return { area: suburb || city || 'Current location', city };
+    } catch { return { area: 'Current location', city: '' }; }
   },
 
   async _geocodePincode(pincode) {
@@ -138,14 +140,16 @@ const LocationModal = {
       });
 
       const { latitude: lat, longitude: lng } = pos.coords;
-      const area = await this._reverseGeocode(lat, lng);
+      const { area, city } = await this._reverseGeocode(lat, lng);
 
       if (subTxt) subTxt.textContent = '✅ ' + area;
       if (dot)    { dot.style.animation = ''; dot.style.background = '#22c55e'; }
 
       this._selectedId = null;
       this._deselect();
-      this._setLocation(area, area, lat, lng);
+      // Pass "suburb, city" so _setLocation can extract the city for filtering
+      const fullArea = city ? area + ', ' + city : area;
+      this._setLocation(area, fullArea, lat, lng);
       this._updateCenterDistances(lat, lng);
       setTimeout(() => this.close(), 1200);
 
@@ -274,10 +278,16 @@ const LocationModal = {
   // ── CITY FILTER ───────────────────────────────────────────
 
   _applyCityFilter(city) {
-    if (!city || typeof ALL_CENTERS === 'undefined') return;
-    const cityLc   = city.toLowerCase();
-    const filtered = ALL_CENTERS.filter(c => (c.city || '').toLowerCase() === cityLc);
-    CENTERS = filtered.length ? filtered : [...ALL_CENTERS];
+    if (typeof ALL_CENTERS === 'undefined') return;
+    if (!city) {
+      CENTERS = [...ALL_CENTERS];
+    } else {
+      const cityLc      = city.trim().toLowerCase();
+      const cityMatched = ALL_CENTERS.filter(c => c.city && c.city.trim().toLowerCase() === cityLc);
+      // If there are centers tagged to this city → show only those.
+      // If none are tagged (e.g. demo / legacy data) → show all as fallback.
+      CENTERS = cityMatched.length ? cityMatched : [...ALL_CENTERS];
+    }
     if (typeof HomeScreen !== 'undefined') HomeScreen.renderCenterCards(CENTERS);
   },
 
@@ -301,7 +311,6 @@ const LocationModal = {
 
   _setLocation(label, area, lat, lng) {
     AppState.setLocation(label, area);
-    // Store coords on AppState.location so distance calc works after selection
     AppState.location._lat = lat || null;
     AppState.location._lng = lng || null;
     _setText('location-label', label + ' — ' + area.split(',')[0]);
@@ -310,5 +319,19 @@ const LocationModal = {
     const mapLabel = document.getElementById('loc-map-label');
     if (mapLabel) mapLabel.textContent = area.split(',')[0] + ', India';
     UI.showAT(label + ' selected');
+
+    // Auto-detect city from the area string and re-filter centers
+    const detectedCity = this._detectCityFromText(area);
+    if (detectedCity && detectedCity !== AppState.user.city) {
+      AppState.user.city = detectedCity;
+      this._applyCityFilter(detectedCity);
+    }
+  },
+
+  // Match area text against SERVICEABLE_CITIES (case-insensitive substring)
+  _detectCityFromText(text) {
+    if (!text || typeof SERVICEABLE_CITIES === 'undefined') return null;
+    const lower = text.toLowerCase();
+    return SERVICEABLE_CITIES.find(c => lower.includes(c.toLowerCase())) || null;
   },
 };

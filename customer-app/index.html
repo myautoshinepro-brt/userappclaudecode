@@ -148,14 +148,7 @@
             <div class="loc-section-hd">SAVED ADDRESSES</div>
             <div class="loc-addr-list" id="loc-addr-list"></div>
 
-            <!-- Recent searches -->
-            <div class="loc-section-hd">RECENT SEARCHES</div>
-            <div class="loc-recent-row">
-              <div class="loc-recent-chip" onclick="LocationModal.selectRecent(this,'Andheri West, Mumbai')">🕐 Andheri West</div>
-              <div class="loc-recent-chip" onclick="LocationModal.selectRecent(this,'Juhu, Mumbai')">🕐 Juhu</div>
-              <div class="loc-recent-chip" onclick="LocationModal.selectRecent(this,'Bandra West, Mumbai')">🕐 Bandra West</div>
-              <div class="loc-recent-chip" onclick="LocationModal.selectRecent(this,'Powai, Mumbai')">🕐 Powai</div>
-            </div>
+    
 
           </div><!-- end loc-scroll -->
         </div><!-- end loc-sheet -->
@@ -1245,22 +1238,18 @@
       ProfileScreen.updateMenuCounts();
       BookingScreen.renderBookings();
 
-      // Apply user's default saved address to the home header
+      // Apply user's default saved address to the home header + city filter
       const defAddr = SAVED_ADDRESSES.find(a => a.isDefault) || SAVED_ADDRESSES[0];
       if (defAddr) {
-        AppState.user.city = defAddr.city || AppState.user.city;
-        // Show "<label> — <city>" in the location header
+        AppState.user.city = defAddr.city || '';
+        // _setLocation will also auto-detect city and call _applyCityFilter
         LocationModal._setLocation(defAddr.label, defAddr.city || defAddr.label, defAddr.lat, defAddr.lng);
         LocationModal._selectedId = defAddr.id;
+      } else {
+        // No saved address — clear the hardcoded 'Mumbai' default so all centers show
+        AppState.user.city = '';
+        LocationModal._applyCityFilter('');
       }
-
-      // Filter centers to the user's city (case-insensitive)
-      if (AppState.user.city && typeof ALL_CENTERS !== 'undefined' && ALL_CENTERS.length) {
-        const cityLc   = AppState.user.city.toLowerCase();
-        const filtered = ALL_CENTERS.filter(c => (c.city || '').toLowerCase() === cityLc);
-        if (filtered.length) CENTERS = filtered;
-      }
-      HomeScreen.renderCenterCards(CENTERS);
 
       Router.go('home', false);
     } else {
