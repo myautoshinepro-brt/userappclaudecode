@@ -39,65 +39,99 @@ const BookingScreen = {
   renderBookings() {
     this._renderUpcoming();
     this._renderPast();
+    if (typeof ProfileScreen !== 'undefined') ProfileScreen.updateMenuCounts();
   },
 
   _renderUpcoming() {
     const el = document.getElementById('bklist-upcoming');
     if (!el) return;
-    const b = AppState.confirmedBooking;
-    if (!b || !b.id) {
-      el.innerHTML = '<div style="padding:20px 14px;font-size:12px;color:var(--text-secondary);text-align:center">No upcoming bookings</div>';
+    const list = typeof UPCOMING_BOOKINGS !== 'undefined' ? UPCOMING_BOOKINGS : [];
+    if (!list.length) {
+      el.innerHTML = `
+        <div style="text-align:center;padding:28px 20px">
+          <div style="font-size:32px;margin-bottom:10px">📋</div>
+          <div style="font-size:13px;font-weight:700;color:var(--text-primary);margin-bottom:4px">No upcoming bookings</div>
+          <div style="font-size:11px;color:var(--text-secondary)">Book a car wash from the home screen</div>
+          <button onclick="Router.go('home')" style="margin-top:14px;padding:9px 20px;background:var(--blue);color:#fff;border:none;border-radius:22px;font-size:12px;font-weight:700;cursor:pointer">Book now</button>
+        </div>`;
       return;
     }
-    const v = AppState.getSelectedVehicle();
-    el.innerHTML = `
-      <div class="booking-item">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px">
-          <div style="font-size:12px;font-weight:700;color:var(--text-primary)">${b.centerName || '—'}</div>
-          <div class="badge badge-upcoming">Upcoming</div>
-        </div>
-        <div style="font-size:10px;color:var(--text-secondary)" id="bklist-pkg">${b.date} · ${b.slot} · ${b.packageName || '—'}</div>
-        <div style="font-size:10px;color:var(--text-secondary);margin-top:2px" id="bklist-meta">${b.id} · ₹${b.totalPaid} paid</div>
-        <div style="font-size:10px;color:var(--text-secondary);margin-top:2px">${v ? v.plate + ' · ' + v.model : '—'}</div>
-        <div class="action-btn-row">
-          <div class="action-btn primary" onclick="Router.go('manage')">📍 Track</div>
-          <div class="action-btn primary" onclick="BookingScreen.openModify();Router.go('manage')">✏️ Modify</div>
-          <div class="action-btn primary" onclick="ChatScreen.openForBooking('${b.id}')">💬 Chat</div>
-          <div class="action-btn danger" onclick="BookingScreen.cancelBooking()">✕ Cancel</div>
-        </div>
-      </div>`;
+    el.innerHTML = list.map(b => {
+      const statusLabel = { confirmed:'Confirmed', accepted:'Accepted', in_progress:'In Progress' }[b.rawStatus] || 'Upcoming';
+      return `
+        <div class="booking-item" style="border-left:3px solid var(--blue)">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
+            <div style="font-size:13px;font-weight:800;color:var(--text-primary);flex:1;margin-right:8px">${b.centerName}</div>
+            <div class="badge badge-upcoming">${statusLabel}</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
+            <span style="font-size:11px;color:var(--blue)">📦</span>
+            <span style="font-size:11px;color:var(--text-primary);font-weight:600">${b.packageName || '—'}</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
+            <span style="font-size:11px;color:var(--text-secondary)">📅</span>
+            <span style="font-size:11px;color:var(--text-secondary)">${b.date} · ${b.slot}</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+            <span style="font-size:11px;color:var(--text-secondary)">🚗</span>
+            <span style="font-size:11px;color:var(--text-secondary)">${b.vehiclePlate || '—'}${b.vehicleModel ? ' · ' + b.vehicleModel : ''}</span>
+          </div>
+          <div style="font-size:10px;color:var(--text-tertiary);margin-bottom:8px">${b.ref} · Pay at center</div>
+          <div class="action-btn-row">
+            <div class="action-btn primary" onclick="AppState.confirmedBooking.id='${b.ref}';AppState.confirmedBooking.centerId='${b.centerId}';Router.go('manage')">📍 Track</div>
+            <div class="action-btn primary" onclick="AppState.confirmedBooking.id='${b.ref}';BookingScreen.openModify();Router.go('manage')">✏️ Modify</div>
+            <div class="action-btn primary" onclick="ChatScreen.openForBooking('${b.ref}')">💬 Chat</div>
+            <div class="action-btn danger" onclick="AppState.confirmedBooking={id:'${b.ref}'};BookingScreen.cancelBooking()">✕ Cancel</div>
+          </div>
+        </div>`;
+    }).join('');
   },
 
   _renderPast() {
     const el = document.getElementById('bklist-past');
     if (!el) return;
     if (!PAST_BOOKINGS.length) {
-      el.innerHTML = '<div style="padding:12px 14px;font-size:12px;color:var(--text-secondary)">No past bookings</div>';
+      el.innerHTML = '<div style="padding:16px 14px;font-size:12px;color:var(--text-secondary);text-align:center">No past bookings yet</div>';
       return;
     }
-    const WASH_ICONS = { water:'💧', dry:'🧴', steam:'💨', d2d:'🚗' };
     el.innerHTML = PAST_BOOKINGS.map(b => {
       const isCompleted = b.status === 'completed';
-      const stars = b.rating
-        ? '★'.repeat(b.rating) + '☆'.repeat(5 - b.rating)
-        : null;
+      const ratingHtml = isCompleted
+        ? b.rating
+          ? `<div style="display:flex;align-items:center;gap:3px;margin-bottom:6px">
+               <span style="font-size:14px;color:#f9a825">${'★'.repeat(b.rating)}<span style="color:#d1d5db">${'★'.repeat(5-b.rating)}</span></span>
+             </div>`
+          : `<div style="display:flex;gap:4px;margin-bottom:6px" id="stars-${b.ref}">
+               ${[1,2,3,4,5].map(n=>`<span onclick="BookingScreen.rateBooking(${n},'${b.ref}')" style="font-size:20px;color:#d1d5db;cursor:pointer">★</span>`).join('')}
+             </div>`
+        : '';
       return `
-        <div class="booking-item">
-          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px">
-            <div style="font-size:12px;font-weight:700;color:var(--text-primary)">${b.centerName}</div>
-            <div class="badge ${isCompleted ? 'badge-completed' : 'badge-cancelled'}">${isCompleted ? 'Completed' : 'Cancelled'}</div>
+        <div class="booking-item" style="border-left:3px solid ${isCompleted ? '#2e7d32' : '#c62828'}">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
+            <div style="font-size:13px;font-weight:800;color:var(--text-primary);flex:1;margin-right:8px">${b.centerName}</div>
+            <div class="badge ${isCompleted ? 'badge-completed' : 'badge-cancelled'}">${isCompleted ? '✅ Completed' : '❌ Cancelled'}</div>
           </div>
-          <div style="font-size:10px;color:var(--text-secondary)">${b.date} · ${b.slot} · ${WASH_ICONS[b.washType] || ''} ${b.packageName}</div>
-          <div style="font-size:10px;color:var(--text-secondary);margin-top:2px">${b.id}${isCompleted ? ' · ₹' + b.totalPaid + ' paid' : ' · Cancelled'}</div>
-          <div style="font-size:10px;color:var(--text-secondary);margin-top:1px">${b.vehiclePlate} · ${b.vehicleModel}</div>
-          ${stars ? `<div style="display:flex;align-items:center;gap:3px;margin-top:5px"><span style="font-size:13px;color:#f9a825">${stars}</span></div>` : ''}
-          <div class="action-btn-row" style="margin-top:8px">
-            <div class="action-btn primary" style="flex:1;background:var(--blue);color:#fff;border-color:var(--blue)"
-                 onclick="BookingScreen.repeatBooking('${b.centerId}','${b.washType}','${b.packageName || ''}','${b.vehiclePlate || ''}')">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
+            <span style="font-size:11px;color:var(--text-secondary)">📦</span>
+            <span style="font-size:11px;color:var(--text-primary);font-weight:600">${b.packageName || '—'}</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
+            <span style="font-size:11px;color:var(--text-secondary)">📅</span>
+            <span style="font-size:11px;color:var(--text-secondary)">${b.date} · ${b.slot}</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:${ratingHtml ? '8px' : '6px'}">
+            <span style="font-size:11px;color:var(--text-secondary)">🚗</span>
+            <span style="font-size:11px;color:var(--text-secondary)">${b.vehiclePlate || '—'}${b.vehicleModel ? ' · ' + b.vehicleModel : ''}${isCompleted ? ' · ₹' + b.totalPaid + ' paid' : ''}</span>
+          </div>
+          ${ratingHtml}
+          ${isCompleted ? `
+          <div class="action-btn-row">
+            <div class="action-btn primary" style="flex:2;background:var(--blue);color:#fff;border-color:var(--blue)"
+                 onclick="BookingScreen.repeatBooking('${b.centerId}','${b.washType}','${b.packageName||''}','${b.vehiclePlate||''}')">
               🔁 Repeat this wash
             </div>
-            <div class="action-btn primary" onclick="ChatScreen.openForBooking('${b.id}')">💬 Chat</div>
-          </div>
+            <div class="action-btn primary" onclick="ChatScreen.openForBooking('${b.ref}')">💬 Chat</div>
+          </div>` : ''}
         </div>`;
     }).join('');
   },

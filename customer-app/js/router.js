@@ -105,6 +105,17 @@ const Router = {
       case 'addresses':
         if (typeof ProfileScreen !== 'undefined' && ProfileScreen.renderAddresses) ProfileScreen.renderAddresses();
         break;
+      case 'add-address': {
+        // Reset form fields and hidden coords on every visit
+        ['addr-area','addr-flat','addr-landmark','addr-pincode'].forEach(id => {
+          const el = document.getElementById(id); if (el) el.value = '';
+        });
+        const latEl = document.getElementById('addr-lat'); if (latEl) latEl.value = '';
+        const lngEl = document.getElementById('addr-lng'); if (lngEl) lngEl.value = '';
+        const btn = document.getElementById('addr-gps-btn'); if (btn) btn.textContent = '📍 Detect GPS location';
+        if (typeof ProfileScreen !== 'undefined') ProfileScreen.pickAddressLabel('home2');
+        break;
+      }
       case 'reviews':
         if (typeof ProfileScreen !== 'undefined' && ProfileScreen.renderMyReviews) ProfileScreen.renderMyReviews();
         break;

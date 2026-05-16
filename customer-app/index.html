@@ -3,7 +3,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Pitbay — Car Wash Booking</title>
 
   <!-- PWA -->
@@ -16,40 +16,45 @@
   <link rel="apple-touch-icon" href="/icon.svg">
   <meta name="description" content="Book your car wash in seconds. Choose a center, pick a slot, done.">
 
-  <!-- Leaflet maps (OpenStreetMap — no API key needed) -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <!-- Google Maps JS API -->
+  <script src="https://maps.googleapis.com/maps/api/js?key=YOUR_GOOGLE_MAPS_API_KEY&libraries=places"></script>
 
   <link rel="stylesheet" href="css/base.css">
   <link rel="stylesheet" href="css/components.css">
   <link rel="stylesheet" href="css/screens.css">
   <style>
-    /* Phone shell for desktop prototyping */
-    body { display:flex; flex-direction:column; align-items:center; padding:8px; gap:10px; min-height:100vh; background:#e5e7eb; }
-    .phone { width:375px; height:812px; background:#fff; border-radius:40px; overflow:hidden; display:flex; flex-direction:column; box-shadow:0 8px 40px rgba(0,0,0,.2); border:1.5px solid #d1d5db; position:relative; }
-    /* Remove phone shell on actual mobile */
-    @media (max-width:480px) { body { padding:0; } .phone { width:100vw; height:100dvh; border-radius:0; border:none; } }
-    /* Screen visibility */
-    [data-screen] { position:absolute; inset:0; display:flex; flex-direction:column; background:#fff; visibility:hidden; pointer-events:none; }
+    body {
+      margin: 0;
+      padding: 0;
+      background: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    /* Phone shell styling - only for desktop */
+    @media (min-width: 481px) {
+      body { display:flex; flex-direction:column; align-items:center; padding:8px; gap:10px; min-height:100vh; background:#e5e7eb; }
+      .phone { width:375px; height:812px; background:#fff; border-radius:40px; overflow:hidden; display:flex; flex-direction:column; box-shadow:0 8px 40px rgba(0,0,0,.2); border:1.5px solid #d1d5db; position:relative; }
+      /* Screen visibility on desktop */
+      [data-screen] { position:absolute; inset:0; display:flex; flex-direction:column; background:#fff; visibility:hidden; pointer-events:none; }
+    }
+
+    /* Full screen on actual mobile */
+    @media (max-width: 480px) {
+      .phone { width:100vw; height:100vh; border-radius:0; border:none; position: relative; display: flex; flex-direction: column; overflow: hidden; }
+      [data-screen] { position:absolute; inset:0; display:flex; flex-direction:column; background:#fff; visibility:hidden; pointer-events:none; height: 100%; width: 100%; }
+      .status-bar { display: none; } /* Use native status bar */
+    }
+
     [data-screen].screen-active { visibility:visible; pointer-events:all; z-index:1; }
+
+    /* Fix address modal overlaying issue */
+    .loc-overlay { z-index: 9999 !important; }
   </style>
 </head>
 <body>
 
-<!-- Dev nav pills (remove in production) -->
-<div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:center;max-width:375px">
-  <div class="nav-pill" data-screen="login"     onclick="Router.go('login')"     style="font-size:10px;padding:4px 10px;border-radius:18px;border:.5px solid #d1d5db;cursor:pointer">🔑 Login</div>
-  <div class="nav-pill" data-screen="signup"    onclick="Router.go('signup')"    style="font-size:10px;padding:4px 10px;border-radius:18px;border:.5px solid #d1d5db;cursor:pointer">📝 Signup</div>
-  <div class="nav-pill" data-screen="home"      onclick="Router.go('home')"      style="font-size:10px;padding:4px 10px;border-radius:18px;border:.5px solid #d1d5db;cursor:pointer;background:#1a73e8;color:#fff">🏠 Home</div>
-  <div class="nav-pill" data-screen="detail"    onclick="Router.go('detail')"    style="font-size:10px;padding:4px 10px;border-radius:18px;border:.5px solid #d1d5db;cursor:pointer">🔍 Center</div>
-  <div class="nav-pill" data-screen="summary"   onclick="Router.go('summary')"   style="font-size:10px;padding:4px 10px;border-radius:18px;border:.5px solid #d1d5db;cursor:pointer">📋 Summary</div>
-  <div class="nav-pill" data-screen="confirmed" onclick="Router.go('confirmed')" style="font-size:10px;padding:4px 10px;border-radius:18px;border:.5px solid #d1d5db;cursor:pointer">✅ Confirmed</div>
-  <div class="nav-pill" data-screen="manage"    onclick="Router.go('manage')"    style="font-size:10px;padding:4px 10px;border-radius:18px;border:.5px solid #d1d5db;cursor:pointer">📱 Manage</div>
-  <div class="nav-pill" data-screen="bookings"  onclick="Router.go('bookings')"  style="font-size:10px;padding:4px 10px;border-radius:18px;border:.5px solid #d1d5db;cursor:pointer">📋 Bookings</div>
-  <div class="nav-pill" data-screen="profile"   onclick="Router.go('profile')"   style="font-size:10px;padding:4px 10px;border-radius:18px;border:.5px solid #d1d5db;cursor:pointer">👤 Profile</div>
-</div>
-
 <div class="phone">
-  <!-- Status bar -->
+  <!-- Status bar (hidden on mobile) -->
   <div class="status-bar" style="flex-shrink:0">
     <span>9:41</span><span>✨ Pitbay</span><span>▲▲▲ 98%</span>
   </div>
@@ -138,50 +143,9 @@
               <span class="loc-gps-arrow">›</span>
             </div>
 
-            <!-- Saved addresses -->
+            <!-- Saved addresses — rendered dynamically by LocationModal._renderSavedAddresses() -->
             <div class="loc-section-hd">SAVED ADDRESSES</div>
-            <div class="loc-addr-list">
-
-              <div class="loc-addr-card" id="lac-h" onclick="LocationModal.selectSaved('h','Andheri West','Home','🏠')">
-                <div class="lac-icon" style="background:#dbeafe">🏠</div>
-                <div class="lac-body">
-                  <div class="lac-label">Home</div>
-                  <div class="lac-line">Flat 402, Sunshine Apt, Andheri West</div>
-                  <div class="lac-dist">📍 Current area · 0.2 km</div>
-                </div>
-                <div class="lac-radio"><div class="lac-radio-dot"></div></div>
-              </div>
-
-              <div class="loc-addr-card" id="lac-o" onclick="LocationModal.selectSaved('o','Bandra East','Office','🏢')">
-                <div class="lac-icon" style="background:#dcfce7">🏢</div>
-                <div class="lac-body">
-                  <div class="lac-label">Office</div>
-                  <div class="lac-line">WeWork, BKC, Bandra East</div>
-                  <div class="lac-dist">📍 8.4 km away</div>
-                </div>
-                <div class="lac-radio"><div class="lac-radio-dot"></div></div>
-              </div>
-
-              <div class="loc-addr-card" id="lac-p" onclick="LocationModal.selectSaved('p','Borivali West','Parents home','👨‍👩‍👦')">
-                <div class="lac-icon" style="background:#fef9c3">👨‍👩‍👦</div>
-                <div class="lac-body">
-                  <div class="lac-label">Parents home</div>
-                  <div class="lac-line">12B, Sai Nagar, Borivali West</div>
-                  <div class="lac-dist">📍 18.1 km away</div>
-                </div>
-                <div class="lac-radio"><div class="lac-radio-dot"></div></div>
-              </div>
-
-              <!-- Add new -->
-              <div class="loc-addr-add" onclick="LocationModal.focusSearch()">
-                <div class="lac-icon-add">＋</div>
-                <div class="lac-body">
-                  <div class="lac-label" style="color:var(--blue)">Add new address</div>
-                  <div class="lac-line">Home, office or any location</div>
-                </div>
-              </div>
-
-            </div>
+            <div class="loc-addr-list" id="loc-addr-list"></div>
 
             <!-- Recent searches -->
             <div class="loc-section-hd">RECENT SEARCHES</div>
@@ -632,11 +596,11 @@
         <div class="profile-phone" id="profile-phone">+91 98765 43210 · Mumbai</div>
       </div>
       <div class="scroll-area">
-        <div class="menu-row" onclick="Router.go('bookings')"><div class="menu-icon" style="background:#dbeafe">📋</div><div class="menu-label">My bookings<div class="menu-sublabel">2 upcoming · 9 completed</div></div><span class="menu-arrow">›</span></div>
-        <div class="menu-row" onclick="Router.go('reviews')"><div class="menu-icon" style="background:#fef9c3">⭐</div><div class="menu-label">My reviews<div class="menu-sublabel">5 centers rated</div></div><span class="menu-arrow">›</span></div>
-        <div class="menu-row" onclick="Router.go('promos')"><div class="menu-icon" style="background:#dcfce7">🎟️</div><div class="menu-label">Promo codes<div class="menu-sublabel">2 active codes</div></div><span class="menu-arrow">›</span></div>
-        <div class="menu-row" onclick="Router.go('addresses')"><div class="menu-icon" style="background:#ede9fe">📍</div><div class="menu-label">Saved addresses<div class="menu-sublabel">Home · Office · Parents</div></div><span class="menu-arrow">›</span></div>
-        <div class="menu-row" onclick="Router.go('vehicles')"><div class="menu-icon" style="background:#fee2e2">🚗</div><div class="menu-label">My vehicles<div class="menu-sublabel">MH-01-AB-1234 · Alto 800</div></div><span class="menu-arrow">›</span></div>
+        <div class="menu-row" onclick="Router.go('bookings')"><div class="menu-icon" style="background:#dbeafe">📋</div><div class="menu-label">My bookings<div class="menu-sublabel" id="menu-sub-bookings">Loading...</div></div><span class="menu-arrow">›</span></div>
+        <div class="menu-row" onclick="Router.go('reviews')"><div class="menu-icon" style="background:#fef9c3">⭐</div><div class="menu-label">My reviews<div class="menu-sublabel" id="menu-sub-reviews">Loading...</div></div><span class="menu-arrow">›</span></div>
+        <div class="menu-row" onclick="Router.go('promos')"><div class="menu-icon" style="background:#dcfce7">🎟️</div><div class="menu-label">Promo codes<div class="menu-sublabel" id="menu-sub-promos">Loading...</div></div><span class="menu-arrow">›</span></div>
+        <div class="menu-row" onclick="Router.go('addresses')"><div class="menu-icon" style="background:#ede9fe">📍</div><div class="menu-label">Saved addresses<div class="menu-sublabel" id="menu-sub-addresses">Loading...</div></div><span class="menu-arrow">›</span></div>
+        <div class="menu-row" onclick="Router.go('vehicles')"><div class="menu-icon" style="background:#fee2e2">🚗</div><div class="menu-label">My vehicles<div class="menu-sublabel" id="menu-sub-vehicles">Loading...</div></div><span class="menu-arrow">›</span></div>
         <div class="menu-row" onclick="Router.go('notifications')"><div class="menu-icon" style="background:#fff7ed">🔔</div><div class="menu-label">Notifications<div class="menu-sublabel">WhatsApp · Push · SMS</div></div><span class="menu-arrow">›</span></div>
         <div class="menu-row" onclick="Router.go('language')"><div class="menu-icon" style="background:#f0fdf4">🌐</div><div class="menu-label">Language<div class="menu-sublabel" id="lang-sub-label">English</div></div><span class="menu-arrow">›</span></div>
         <div class="menu-row" onclick="Router.go('help')"><div class="menu-icon" style="background:#fdf4ff">❓</div><div class="menu-label">Help & support<div class="menu-sublabel">Chat · Call · FAQ</div></div><span class="menu-arrow">›</span></div>
@@ -749,16 +713,33 @@
     <div data-screen="add-address" id="sc-add-address">
       <div class="header-sub" style="background:var(--blue)"><button class="header-back" onclick="Router.back()">← Back</button><div class="header-title">Add new address</div></div>
       <div class="scroll-area"><div style="padding:14px 13px 0">
+        <!-- GPS detect -->
+        <button id="addr-gps-btn" onclick="ProfileScreen.detectAddressGPS()"
+          style="width:100%;padding:11px;margin-bottom:14px;background:#eff6ff;border:1.5px solid var(--blue);border-radius:12px;font-size:12px;font-weight:700;color:var(--blue);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px">
+          📍 Detect GPS location
+        </button>
+        <!-- hidden lat/lng filled by GPS detect or pincode geocode -->
+        <input type="hidden" id="addr-lat"><input type="hidden" id="addr-lng">
         <label class="form-label">Label</label>
         <div style="display:flex;gap:8px;margin-bottom:12px">
           <div id="lbl-home2" onclick="ProfileScreen.pickAddressLabel('home2')" style="padding:7px 14px;border-radius:20px;font-size:11px;font-weight:600;border:1.5px solid var(--blue);background:var(--blue);color:#fff;cursor:pointer">🏠 Home</div>
           <div id="lbl-work" onclick="ProfileScreen.pickAddressLabel('work')" style="padding:7px 14px;border-radius:20px;font-size:11px;font-weight:600;border:1.5px solid var(--border-medium);color:var(--text-secondary);cursor:pointer">🏢 Work</div>
           <div id="lbl-other" onclick="ProfileScreen.pickAddressLabel('other')" style="padding:7px 14px;border-radius:20px;font-size:11px;font-weight:600;border:1.5px solid var(--border-medium);color:var(--text-secondary);cursor:pointer">📍 Other</div>
         </div>
-        <label class="form-label">Area / locality</label><input class="form-input" id="addr-area" placeholder="e.g. Andheri West, Juhu, Powai">
+        <label class="form-label">City</label>
+        <select class="form-input" id="addr-city" onchange="ProfileScreen.checkCityServiceability()">
+          <option value="" disabled selected>Select city</option>
+          <!-- Cities will be loaded dynamically -->
+        </select>
+        <div id="city-service-msg" style="display:none; font-size:11px; color:var(--red); margin-bottom:12px; padding: 8px; background: #fff1f2; border-radius: 8px; border: 0.5px solid #fecaca;"></div>
+        <label class="form-label">Area / locality</label>
+        <input class="form-input" id="addr-area" placeholder="e.g. Andheri West, Juhu, Powai"
+               oninput="if(!this.value){document.getElementById('addr-lat').value='';document.getElementById('addr-lng').value=''}">
         <label class="form-label">Flat / building</label><input class="form-input" id="addr-flat" placeholder="e.g. Flat 402, Sunshine Apt">
         <label class="form-label">Landmark (optional)</label><input class="form-input" id="addr-landmark" placeholder="e.g. Near D-Mart">
-        <label class="form-label">Pincode</label><input class="form-input" id="addr-pincode" placeholder="6-digit pincode" maxlength="6" type="tel">
+        <label class="form-label">Pincode <span style="font-size:10px;color:var(--text-tertiary)">(auto-fills area)</span></label>
+        <input class="form-input" id="addr-pincode" placeholder="6-digit pincode" maxlength="6" type="tel"
+               onblur="ProfileScreen.geocodePincodeField()">
         <button class="btn btn-green" onclick="ProfileScreen.saveAddress()">Save address</button>
         <div style="height:16px"></div>
       </div></div>
@@ -1172,6 +1153,10 @@
 <!-- Toast -->
 <div class="toast" id="toast"></div>
 
+<!-- Capacitor -->
+<script src="capacitor.js"></script>
+<script src="cordova.js"></script>
+
 <!-- Leaflet JS -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
@@ -1191,16 +1176,47 @@
 <script src="js/help.js"></script>
 <script src="js/profile.js"></script>
 <script src="js/map.js"></script>
+
 <script>
+  // Global API Configuration
+  window.API_URL = 'https://userappclaudecode-production.up.railway.app';
+
+  // Monkey-patch fetch to handle relative URLs in Capacitor
+  (function() {
+    const originalFetch = window.fetch;
+    window.fetch = function(resource, options) {
+      if (typeof resource === 'string' && resource.startsWith('/api/')) {
+        resource = (window.API_URL || '') + resource;
+      }
+      return originalFetch(resource, options);
+    };
+  })();
+
+  // Global CENTERS fallback if API fails
+  if (typeof CENTERS === 'undefined') window.CENTERS = [];
+
+  // Fix Android status bar: stop it overlaying the WebView so the OS
+  // pushes content down by exactly the right amount — no CSS guessing.
+  if (window.Capacitor && window.Capacitor.getPlatform() === 'android') {
+    const { StatusBar, SplashScreen } = window.Capacitor.Plugins;
+    if (StatusBar) {
+      StatusBar.setOverlaysWebView({ overlay: false });
+      StatusBar.setBackgroundColor({ color: '#1a73e8' });
+    }
+    if (SplashScreen) {
+      SplashScreen.hide();
+    }
+  }
+
   // Boot — check session before showing any screen
   document.addEventListener('DOMContentLoaded', async () => {
     Router.init();
 
-    // Load real centers from center-app (proxied via /api/centers).
+    // Load real centers from center-app
     try {
-      const r = await fetch('/api/centers');
+      const r = await fetch(window.API_URL + '/api/centers');
       const j = await r.json();
-      if (j && j.success && Array.isArray(j.data)) CENTERS = j.data;
+      if (j && j.success && Array.isArray(j.data)) window.CENTERS = j.data;
     } catch (e) {
       console.warn('Could not load centers:', e);
     }
@@ -1208,28 +1224,24 @@
     HomeScreen.init();
     ProfileScreen.init();
     SignupScreen.init();
-    NotifState.load();
-    NotificationScreen._updateBadge();
+
+    if (typeof NotifState !== 'undefined') {
+      NotifState.load();
+      NotificationScreen._updateBadge();
+    }
 
     // Check if user has a valid session
     const user = await Auth.checkSession();
     if (user) {
       AppState.setAuthUser(user);
       await UserData.loadAll();
+      ProfileScreen.updateMenuCounts();
+      BookingScreen.renderBookings();
       Router.go('home', false);
     } else {
       Router.go('login', false);
     }
   });
-</script>
-<script>
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('/sw.js')
-        .then(r => console.log('SW registered', r.scope))
-        .catch(e => console.warn('SW registration failed', e));
-    });
-  }
 </script>
 </body>
 </html>

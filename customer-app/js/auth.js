@@ -31,16 +31,35 @@ const Auth = (() => {
   // ── API HELPERS ──────────────────────────────────────────
 
   async function api(method, path, body, token) {
-    const headers = { 'Content-Type': 'application/json' };
+    const headers = {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json'
+    };
     if (token) headers['Authorization'] = `Bearer ${token}`;
-    const res  = await fetch(BASE + path, {
+
+    // In Capacitor, we must use absolute URLs.
+    // window.API_URL is defined in index.html
+    const baseUrl = window.API_URL || '';
+    const fullUrl = baseUrl + BASE + path;
+    console.log(`API Call: ${method} ${fullUrl}`, body);
+
+    const res  = await fetch(fullUrl, {
       method,
       headers,
       body: body ? JSON.stringify(body) : undefined,
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Something went wrong.');
-    return data;
+
+    // Debug logging for unexpected token errors
+    const contentType = res.headers.get('content-type');
+    if (contentType && contentType.includes('application/json')) {
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Something went wrong.');
+      return data;
+    } else {
+      const text = await res.text();
+      console.error('Non-JSON response received:', text);
+      throw new Error('Server returned an unexpected format. Please check logs.');
+    }
   }
 
   // ── SESSION CHECK ────────────────────────────────────────
@@ -176,7 +195,8 @@ const LoginScreen = (() => {
       if (res.devOtp) _showDevOtpHint(res.devOtp);
       showStep2(res.userName, res.deliveredVia);
     } catch (err) {
-      _showError('login-id-error', err.message);
+      console.error('Login error:', err);
+      _showError('login-id-error', 'Error: ' + err.message);
     } finally {
       _setBtnLoading('login-send-otp-btn', false);
     }

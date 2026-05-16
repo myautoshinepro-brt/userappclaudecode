@@ -40,6 +40,8 @@ const UserData = (() => {
       pincode:   a.pincode || '',
       isDefault: !!a.is_default,
       color:     '#dbeafe',
+      lat:       a.lat  != null ? parseFloat(a.lat)  : null,
+      lng:       a.lng  != null ? parseFloat(a.lng)  : null,
     };
   }
 
@@ -104,8 +106,9 @@ const UserData = (() => {
       const j = await _getJson('/api/bookings');
       if (!j || !j.success) return;
       const all = (j.data || []).map(_mapBooking);
-      PAST_BOOKINGS = all.filter(b => b.rawStatus === 'done' || b.rawStatus === 'cancelled');
-      const upcoming = all.find(b => !['done','cancelled'].includes(b.rawStatus));
+      PAST_BOOKINGS     = all.filter(b => b.rawStatus === 'done' || b.rawStatus === 'cancelled');
+      UPCOMING_BOOKINGS = all.filter(b => !['done','cancelled'].includes(b.rawStatus));
+      const upcoming = UPCOMING_BOOKINGS[0];
       if (upcoming) {
         AppState.confirmedBooking = {
           id:           upcoming.ref,
@@ -119,6 +122,8 @@ const UserData = (() => {
           collectAmount: upcoming.totalPaid,
           status:       upcoming.rawStatus,
         };
+      } else {
+        AppState.confirmedBooking = { id: null };
       }
       // Rebuild the notifications inbox from the fresh booking data.
       if (typeof NotifState !== 'undefined' && NotifState.rebuildFromData) {

@@ -4,14 +4,45 @@
 // ============================================================
 
 const LocationModal = {
-  // Key of the currently selected saved address ('h' | 'o' | 'p' | null)
-  _selectedKey: 'h',
+  _selectedId: null,   // id of the currently selected saved address (or null)
 
-  // Saved address data map
-  _addresses: {
-    h: { area: 'Andheri West', label: 'Home',         emoji: '🏠', full: 'Andheri West, Mumbai' },
-    o: { area: 'Bandra East',  label: 'Office',        emoji: '🏢', full: 'Bandra East, Mumbai'  },
-    p: { area: 'Borivali West',label: 'Parents home',  emoji: '👨‍👩‍👦', full: 'Borivali West, Mumbai'},
+  // ── GEOCODING HELPERS ─────────────────────────────────────
+
+  async _reverseGeocode(lat, lng) {
+    try {
+      const r = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`,
+        { headers: { 'User-Agent': 'PitbayApp/1.0' } }
+      );
+      const j = await r.json();
+      const a = j.address || {};
+      return a.suburb || a.neighbourhood || a.city_district || a.town || a.village || a.city || 'Current location';
+    } catch { return 'Current location'; }
+  },
+
+  async _geocodePincode(pincode) {
+    try {
+      const r = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&postalcode=${pincode}&country=India&limit=1`,
+        { headers: { 'User-Agent': 'PitbayApp/1.0' } }
+      );
+      const j = await r.json();
+      if (!j.length) return null;
+      const a = j[0];
+      return { lat: parseFloat(a.lat), lng: parseFloat(a.lon), name: a.display_name.split(',')[0].trim() };
+    } catch { return null; }
+  },
+
+  // ── DISTANCE HELPER (km) ──────────────────────────────────
+
+  _haversine(lat1, lng1, lat2, lng2) {
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLng = (lng2 - lng1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) ** 2
+            + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180)
+            * Math.sin(dLng / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   },
 
   // ── OPEN / CLOSE ──────────────────────────────────────────
@@ -20,17 +51,12 @@ const LocationModal = {
     const overlay = document.getElementById('location-modal');
     if (!overlay) return;
     overlay.style.display = 'flex';
-    // Force reflow so the transition fires
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => overlay.classList.add('open'));
-    });
-    this._restoreSelection();
+    requestAnimationFrame(() => requestAnimationFrame(() => overlay.classList.add('open')));
+    this._renderSavedAddresses();
     this._resetSearch();
     this._resetGps();
-    // Update map label to current location
     const mapLabel = document.getElementById('loc-map-label');
-    if (mapLabel) mapLabel.textContent = AppState.location.area + ', Mumbai';
-    // Re-trigger pin drop animation
+    if (mapLabel) mapLabel.textContent = AppState.location.area + ', India';
     const pin = document.getElementById('loc-map-pin');
     if (pin) { pin.style.animation = 'none'; requestAnimationFrame(() => { pin.style.animation = ''; }); }
   },
@@ -46,45 +72,87 @@ const LocationModal = {
     if (e.target.id === 'location-modal') this.close();
   },
 
-  // ── RESTORE SELECTION ON OPEN ────────────────────────────
+  // ── RENDER SAVED ADDRESSES (live from SAVED_ADDRESSES) ────
 
-  _restoreSelection() {
-    // Deselect all
-    ['h','o','p'].forEach(k => {
-      document.getElementById('lac-' + k)?.classList.remove('selected');
-    });
-    // Highlight the currently active key
-    if (this._selectedKey) {
-      document.getElementById('lac-' + this._selectedKey)?.classList.add('selected');
-    }
+  _renderSavedAddresses() {
+    const list = document.getElementById('loc-addr-list');
+    if (!list) return;
+
+    const addrs = typeof SAVED_ADDRESSES !== 'undefined' ? SAVED_ADDRESSES : [];
+    const ICON_BG = ['#dbeafe', '#dcfce7', '#fef9c3', '#ede9fe', '#fee2e2', '#fff7ed'];
+
+    const cards = addrs.map((a, i) => {
+      const isSelected = a.id === this._selectedId || (this._selectedId == null && a.isDefault);
+      const bg = ICON_BG[i % ICON_BG.length];
+      const distLabel = (AppState.location._lat && a.lat)
+        ? `📍 ${this._haversine(AppState.location._lat, AppState.location._lng, a.lat, a.lng).toFixed(1)} km away`
+        : `📍 ${a.address.split(',').slice(-1)[0].trim()}`;
+      return `
+        <div class="loc-addr-card ${isSelected ? 'selected' : ''}" id="lac-${a.id}"
+             onclick="LocationModal.selectSaved(${a.id},'${(a.address.split(',')[0] || a.label).replace(/'/g,"\\'")}','${a.label.replace(/'/g,"\\'")}','${a.icon}',${a.lat||'null'},${a.lng||'null'})">
+          <div class="lac-icon" style="background:${bg}">${a.icon}</div>
+          <div class="lac-body">
+            <div class="lac-label">${a.label}</div>
+            <div class="lac-line">${a.address}</div>
+            <div class="lac-dist">${distLabel}</div>
+          </div>
+          <div class="lac-radio"><div class="lac-radio-dot"></div></div>
+        </div>`;
+    }).join('');
+
+    list.innerHTML = cards + `
+      <div class="loc-addr-add" onclick="LocationModal.close();setTimeout(()=>Router.go('add-address'),320)">
+        <div class="lac-icon-add">＋</div>
+        <div class="lac-body">
+          <div class="lac-label" style="color:var(--blue)">Add new address</div>
+          <div class="lac-line">Home, office or any location</div>
+        </div>
+      </div>`;
   },
 
   // ── GPS ──────────────────────────────────────────────────
 
-  detectGPS() {
-    const row    = document.getElementById('gps-detecting');
+  async detectGPS() {
     const subTxt = document.getElementById('gps-status-text');
     const dot    = document.getElementById('gps-dot');
     if (subTxt) subTxt.textContent = 'Detecting your location…';
     if (dot)    { dot.style.animation = 'spin 1s linear infinite'; dot.style.background = '#f59e0b'; }
 
-    const done = (area) => {
-      if (subTxt) subTxt.textContent = '✅ ' + area + ', Mumbai';
-      if (dot)    { dot.style.animation = ''; dot.style.background = '#22c55e'; }
-      this._selectedKey = null;
-      this._deselect();
-      this._setLocation(area, area);
-      setTimeout(() => this.close(), 1200);
-    };
+    if (!window.Capacitor) {
+      if (subTxt) subTxt.textContent = '⚠️ GPS only on mobile';
+      if (dot)    dot.style.background = '#ef4444';
+      return;
+    }
 
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        () => done('Andheri West'),
-        ()  => done('Andheri West'),
-        { timeout: 6000 }
-      );
-    } else {
-      setTimeout(() => done('Andheri West'), 1400);
+    try {
+      const { Geolocation } = Capacitor.Plugins;
+
+      const permission = await Geolocation.checkPermissions();
+      if (permission.location !== 'granted') {
+        await Geolocation.requestPermissions();
+      }
+
+      const pos = await Geolocation.getCurrentPosition({
+        timeout: 10000,
+        enableHighAccuracy: true
+      });
+
+      const { latitude: lat, longitude: lng } = pos.coords;
+      const area = await this._reverseGeocode(lat, lng);
+
+      if (subTxt) subTxt.textContent = '✅ ' + area;
+      if (dot)    { dot.style.animation = ''; dot.style.background = '#22c55e'; }
+
+      this._selectedId = null;
+      this._deselect();
+      this._setLocation(area, area, lat, lng);
+      this._updateCenterDistances(lat, lng);
+      setTimeout(() => this.close(), 1200);
+
+    } catch (err) {
+      console.error('GPS Error:', err);
+      if (subTxt) subTxt.textContent = '⚠️ Could not get location.';
+      if (dot)    { dot.style.animation = ''; dot.style.background = '#ef4444'; }
     }
   },
 
@@ -95,17 +163,50 @@ const LocationModal = {
     if (dot)    { dot.style.animation = ''; dot.style.background = ''; }
   },
 
+  // ── UPDATE CENTER DISTANCES ───────────────────────────────
+
+  _updateCenterDistances(userLat, userLng) {
+    if (!userLat || !userLng || typeof CENTERS === 'undefined') return;
+    CENTERS = CENTERS.map(c => ({
+      ...c,
+      distance: c.lat && c.lng
+        ? parseFloat(this._haversine(userLat, userLng, c.lat, c.lng).toFixed(1))
+        : c.distance,
+    }));
+    if (typeof HomeScreen !== 'undefined') HomeScreen.renderCenterCards(CENTERS);
+  },
+
   // ── SEARCH / TYPE ─────────────────────────────────────────
 
-  filterAreas() {
-    const input   = document.getElementById('area-search-input');
-    const val     = (input?.value || '').trim().toLowerCase();
-    const sugl    = document.getElementById('area-suggestions');
-    const clearBtn= document.getElementById('loc-search-clear');
+  async filterAreas() {
+    const input    = document.getElementById('area-search-input');
+    const val      = (input?.value || '').trim();
+    const sugl     = document.getElementById('area-suggestions');
+    const clearBtn = document.getElementById('loc-search-clear');
     if (clearBtn) clearBtn.style.display = val ? 'block' : 'none';
     if (!val) { if (sugl) sugl.style.display = 'none'; return; }
 
-    const matches = MUMBAI_AREAS.filter(a => a.toLowerCase().includes(val)).slice(0, 6);
+    // 6-digit pincode → forward geocode
+    if (/^\d{6}$/.test(val)) {
+      if (sugl) sugl.innerHTML = `<div style="padding:10px 14px;font-size:11px;color:var(--text-secondary)">🔍 Looking up pincode…</div>`;
+      if (sugl) sugl.style.display = 'block';
+      const geo = await this._geocodePincode(val);
+      if (geo) {
+        sugl.innerHTML = `
+          <div class="loc-sug-item" onmousedown="LocationModal.pickArea('${geo.name}',${geo.lat},${geo.lng})">
+            <span style="font-size:14px">📮</span>
+            <div><div>${geo.name}</div><div class="loc-sug-area">Pincode ${val}</div></div>
+          </div>`;
+      } else {
+        sugl.innerHTML = `<div style="padding:10px 14px;font-size:11px;color:var(--text-secondary)">No results for pincode ${val}</div>`;
+      }
+      return;
+    }
+
+    // Text search against Mumbai areas list
+    const q       = val.toLowerCase();
+    const matches = (typeof MUMBAI_AREAS !== 'undefined' ? MUMBAI_AREAS : [])
+      .filter(a => a.toLowerCase().includes(q)).slice(0, 6);
     if (!sugl) return;
     sugl.innerHTML = matches.map(a =>
       `<div class="loc-sug-item" onmousedown="LocationModal.pickArea('${a}')">
@@ -129,46 +230,41 @@ const LocationModal = {
     document.getElementById('area-search-input')?.focus();
   },
 
-  _resetSearch() {
-    this.clearSearch();
-  },
+  _resetSearch() { this.clearSearch(); },
 
-  pickArea(area) {
+  pickArea(area, lat, lng) {
     this.clearSearch();
-    this._selectedKey = null;
+    this._selectedId = null;
     this._deselect();
-    this._setLocation(area.split(',')[0], area + ', Mumbai');
+    this._setLocation(area.split(',')[0], area, lat || null, lng || null);
+    if (lat && lng) this._updateCenterDistances(lat, lng);
     setTimeout(() => this.close(), 280);
   },
 
   confirmTyped() {
     const val = (document.getElementById('area-search-input')?.value || '').trim();
     if (!val) return;
-    this._selectedKey = null;
+    this._selectedId = null;
     this._deselect();
-    this._setLocation(val.split(',')[0], val);
+    this._setLocation(val.split(',')[0], val, null, null);
     setTimeout(() => this.close(), 200);
   },
 
   // ── SELECT SAVED ADDRESS ──────────────────────────────────
 
-  selectSaved(key, area, label, emoji) {
-    // Visual: deselect all, then select chosen card
+  selectSaved(id, area, label, emoji, lat, lng) {
     this._deselect();
-    const card = document.getElementById('lac-' + key);
+    const card = document.getElementById('lac-' + id);
     if (card) card.classList.add('selected');
-    this._selectedKey = key;
-
-    this._setLocation(label, area);
+    this._selectedId = id;
+    this._setLocation(label, area, lat, lng);
+    if (lat && lng) this._updateCenterDistances(lat, lng);
     UI.toast(emoji + ' ' + label + ' selected');
-    // Close after brief pause so user sees the selection
     setTimeout(() => this.close(), 380);
   },
 
   _deselect() {
-    ['h','o','p'].forEach(k => {
-      document.getElementById('lac-' + k)?.classList.remove('selected');
-    });
+    document.querySelectorAll('.loc-addr-card').forEach(c => c.classList.remove('selected'));
   },
 
   // ── SELECT RECENT ─────────────────────────────────────────
@@ -176,23 +272,25 @@ const LocationModal = {
   selectRecent(el, label) {
     document.querySelectorAll('.loc-recent-chip').forEach(c => c.classList.remove('active'));
     el.classList.add('active');
-    this._selectedKey = null;
+    this._selectedId = null;
     this._deselect();
-    this._setLocation(label.split(',')[0], label);
+    this._setLocation(label.split(',')[0], label, null, null);
     UI.toast('🕐 ' + label.split(',')[0] + ' selected');
     setTimeout(() => this.close(), 300);
   },
 
   // ── INTERNAL: apply location to AppState + header ─────────
 
-  _setLocation(label, area) {
+  _setLocation(label, area, lat, lng) {
     AppState.setLocation(label, area);
+    // Store coords on AppState.location so distance calc works after selection
+    AppState.location._lat = lat || null;
+    AppState.location._lng = lng || null;
     _setText('location-label', label + ' — ' + area.split(',')[0]);
     const dot = document.getElementById('location-dot');
     if (dot) dot.style.background = '#4ade80';
-    // Update map label
     const mapLabel = document.getElementById('loc-map-label');
-    if (mapLabel) mapLabel.textContent = area.split(',')[0] + ', Mumbai';
+    if (mapLabel) mapLabel.textContent = area.split(',')[0] + ', India';
     UI.showAT(label + ' selected');
   },
 };

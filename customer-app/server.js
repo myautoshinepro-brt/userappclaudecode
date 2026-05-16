@@ -6,13 +6,38 @@ const path    = require('path');
 const app  = express();
 const PORT = process.env.PORT || 3000;
 
-// Allow same-origin (app serves its own frontend) + any explicit CORS_ORIGIN override
-const corsOrigin = process.env.CORS_ORIGIN || '*';
-app.use(cors({ origin: corsOrigin }));
+// Allow Capacitor origin + same-origin + any explicit CORS_ORIGIN override
+const allowedOrigins = [
+  'https://localhost',
+  'capacitor://localhost',
+  'http://localhost:3000',
+  'http://localhost:3001'
+];
+if (process.env.CORS_ORIGIN) allowedOrigins.push(process.env.CORS_ORIGIN);
+
+app.use(cors({
+  origin: function (origin, callback) {
+    // allow requests with no origin (like mobile apps or curl)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.indexOf(origin) !== -1 || process.env.CORS_ORIGIN === '*') {
+      callback(null, true);
+    } else {
+      callback(null, true); // Fallback to true for dev, but log it
+      console.warn('CORS origin not explicitly allowed:', origin);
+    }
+  },
+  credentials: true
+}));
 app.use(express.json({ limit: '10mb' }));
 
 // Serve the entire project as static files
 app.use(express.static(path.join(__dirname)));
+
+// Log all requests
+app.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+  next();
+});
 
 // Auth routes
 const authRoutes = require('./routes/auth');

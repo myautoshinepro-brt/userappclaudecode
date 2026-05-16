@@ -7,6 +7,56 @@ const ProfileScreen = {
 
   init() {
     this.updateDisplay();
+    this.updateMenuCounts();
+    this.initCityDropdown();
+  },
+
+  initCityDropdown() {
+    const dropdown = document.getElementById('addr-city');
+    if (!dropdown) return;
+    dropdown.innerHTML = '<option value="" disabled selected>Select city</option>';
+    if (typeof SERVICEABLE_CITIES !== 'undefined') {
+      SERVICEABLE_CITIES.forEach(city => {
+        const opt = document.createElement('option');
+        opt.value = city;
+        opt.textContent = city;
+        dropdown.appendChild(opt);
+      });
+    }
+  },
+
+  checkCityServiceability() {
+    const dropdown = document.getElementById('addr-city');
+    const msgEl = document.getElementById('city-service-msg');
+    if (!dropdown || !msgEl) return;
+    const city = dropdown.value;
+    const isServiceable = typeof SERVICEABLE_CITIES !== 'undefined' && SERVICEABLE_CITIES.includes(city);
+    if (city && !isServiceable) {
+      msgEl.textContent = `There is no service in ${city} at present. We will try to launch soon!`;
+      msgEl.style.display = 'block';
+    } else {
+      msgEl.style.display = 'none';
+    }
+  },
+
+  updateMenuCounts() {
+    const upcoming  = typeof UPCOMING_BOOKINGS !== 'undefined' ? UPCOMING_BOOKINGS.length : 0;
+    const past      = typeof PAST_BOOKINGS !== 'undefined' ? PAST_BOOKINGS.length : 0;
+    const reviews   = (typeof PAST_BOOKINGS !== 'undefined' ? PAST_BOOKINGS : []).filter(b => b.rating).length;
+    const promos    = typeof PROMO_CODES !== 'undefined' ? PROMO_CODES.length : 0;
+    const vehicles  = typeof SAVED_VEHICLES !== 'undefined' ? SAVED_VEHICLES : [];
+    const addresses = typeof SAVED_ADDRESSES !== 'undefined' ? SAVED_ADDRESSES : [];
+
+    _setText('menu-sub-bookings',
+      upcoming ? `${upcoming} upcoming · ${past} past` : past ? `${past} completed` : 'No bookings yet');
+    _setText('menu-sub-reviews',
+      reviews ? `${reviews} center${reviews !== 1 ? 's' : ''} rated` : 'No reviews yet');
+    _setText('menu-sub-promos',
+      promos ? `${promos} active code${promos !== 1 ? 's' : ''}` : 'No active codes');
+    _setText('menu-sub-vehicles',
+      vehicles.length ? vehicles.map(v => v.plate).slice(0, 2).join(' · ') : 'No vehicles saved');
+    _setText('menu-sub-addresses',
+      addresses.length ? addresses.map(a => a.label).slice(0, 3).join(' · ') : 'No addresses saved');
   },
 
   updateDisplay() {
@@ -130,22 +180,136 @@ const ProfileScreen = {
     });
   },
 
+  async detectAddressGPS() {
+    const btn = document.getElementById('addr-gps-btn');
+    if (btn) btn.textContent = '📡 Detecting…';
+
+    if (!window.Capacitor) {
+      if (btn) btn.textContent = '📍 Detect GPS';
+      UI.toast('⚠️ GPS only available on mobile');
+      return;
+    }
+
+    try {
+      const { Geolocation } = Capacitor.Plugins;
+
+      const permission = await Geolocation.checkPermissions();
+      if (permission.location !== 'granted') {
+        await Geolocation.requestPermissions();
+      }
+
+      const pos = await Geolocation.getCurrentPosition({
+        timeout: 10000,
+        enableHighAccuracy: true
+      });
+
+      const { latitude: lat, longitude: lng } = pos.coords;
+
+      // Store coords in hidden inputs
+      const latInp = document.getElementById('addr-lat');
+      const lngInp = document.getElementById('addr-lng');
+      if (latInp) latInp.value = lat;
+      if (lngInp) lngInp.value = lng;
+
+      // Reverse geocode to fill area
+      try {
+        const r = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`,
+          { headers: { 'User-Agent': 'PitbayApp/1.0' } }
+        );
+        const j = await r.json();
+        const a = j.address || {};
+
+        const city = a.city || a.town || a.village || '';
+        const area = a.suburb || a.neighbourhood || a.city_district || '';
+        const pin  = a.postcode || '';
+        const road = a.road || '';
+        const houseNumber = a.house_number || '';
+
+        const areaInp = document.getElementById('addr-area');
+        if (areaInp) areaInp.value = area || city;
+
+        const flatInp = document.getElementById('addr-flat');
+        if (flatInp) flatInp.value = [houseNumber, road].filter(Boolean).join(', ');
+
+        const pinInp = document.getElementById('addr-pincode');
+        if (pinInp) pinInp.value = pin;
+
+        const cityInp = document.getElementById('addr-city');
+        if (cityInp) {
+          // If city not in list, add it temporarily to show serviceability message
+          if (city && !Array.from(cityInp.options).some(opt => opt.value === city)) {
+            const opt = document.createElement('option');
+            opt.value = city;
+            opt.textContent = city;
+            cityInp.appendChild(opt);
+          }
+          cityInp.value = city;
+          this.checkCityServiceability();
+        }
+
+        if (btn) btn.textContent = '✅ ' + (area || city);
+        UI.toast('📍 Location detected!');
+      } catch (err) {
+        console.warn('Geocode error:', err);
+        if (btn) btn.textContent = '📍 Detect GPS';
+        UI.toast('⚠️ Could not fetch details');
+      }
+
+    } catch (err) {
+      console.error('GPS Error:', err);
+      if (btn) btn.textContent = '📍 Detect GPS';
+      UI.toast('⚠️ GPS permission denied or error');
+    }
+  },
+
+  async geocodePincodeField() {
+    const pin = document.getElementById('addr-pincode')?.value.trim();
+    if (!/^\d{6}$/.test(pin)) return;
+    try {
+      const r = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&postalcode=${pin}&country=India&limit=1`,
+        { headers: { 'User-Agent': 'PitbayApp/1.0' } }
+      );
+      const j = await r.json();
+      if (!j.length) return;
+      const areaInp = document.getElementById('addr-area');
+      if (areaInp && !areaInp.value.trim()) {
+        areaInp.value = j[0].display_name.split(',')[0].trim();
+      }
+      const latInp = document.getElementById('addr-lat');
+      const lngInp = document.getElementById('addr-lng');
+      if (latInp) latInp.value = j[0].lat;
+      if (lngInp) lngInp.value = j[0].lon;
+    } catch { /* silent */ }
+  },
+
   async saveAddress() {
+    const city     = document.getElementById('addr-city')?.value;
     const area     = document.getElementById('addr-area')?.value.trim();
     const flat     = document.getElementById('addr-flat')?.value.trim();
     const landmark = document.getElementById('addr-landmark')?.value.trim();
     const pincode  = document.getElementById('addr-pincode')?.value.trim();
+    const lat      = document.getElementById('addr-lat')?.value || null;
+    const lng      = document.getElementById('addr-lng')?.value || null;
+
+    if (!city) { UI.toast('⚠️ Please select a city'); return; }
     if (!area) { UI.toast('⚠️ Please enter area / locality'); return; }
+
+    // Block saving if city is not serviceable
+    if (typeof SERVICEABLE_CITIES !== 'undefined' && !SERVICEABLE_CITIES.includes(city)) {
+       UI.toast('❌ No service in this city yet'); return;
+    }
 
     const LABELS = { home2: { label: 'Home', icon: '🏠' }, work: { label: 'Office', icon: '🏢' }, other: { label: 'Other', icon: '📍' } };
     const choice = LABELS[this.addrLabelActive] || LABELS.other;
-    const fullAddress = [flat, area, landmark].filter(Boolean).join(', ');
+    const fullAddress = [flat, area, landmark, city].filter(Boolean).join(', ');
 
     try {
       const r = await fetch('/api/profile/addresses', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (Auth.getToken() || '') },
-        body: JSON.stringify({ label: choice.label, icon: choice.icon, address: fullAddress, pincode }),
+        body: JSON.stringify({ label: choice.label, icon: choice.icon, address: fullAddress, pincode, lat, lng }),
       });
       const j = await r.json();
       if (!r.ok || !j.success) throw new Error(j.error || 'Save failed');

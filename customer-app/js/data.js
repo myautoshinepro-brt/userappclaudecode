@@ -171,6 +171,14 @@ let PROMO_CODES = [];
 // Loaded from GET /api/profile/addresses on login (see index.html).
 let SAVED_ADDRESSES = [];
 
+const SERVICEABLE_CITIES = [
+  'Mumbai',
+  'Delhi',
+  'Bangalore',
+  'Pune',
+  'Hyderabad'
+];
+
 const MUMBAI_AREAS = [
   'Andheri West', 'Andheri East', 'Bandra West', 'Bandra East',
   'Juhu', 'Versova', 'Powai', 'Goregaon East', 'Goregaon West',
@@ -190,6 +198,7 @@ const PAYMENT_METHODS = [
 let SAVED_VEHICLES = [];
 
 // Loaded from GET /api/bookings on login (see index.html).
+let UPCOMING_BOOKINGS = [];
 let PAST_BOOKINGS    = [];
 let CENTER_PACKAGES  = null;  // { water: [...], dry: [...], steam: [...], d2d: [...] } per center
 // Default per-wash-type fallback used while a center's packages haven't loaded yet.

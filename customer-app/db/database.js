@@ -60,6 +60,10 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_addresses_user   ON addresses(user_id);
 `);
 
+// Migrate: add lat/lng to addresses (safe to run multiple times — fails silently if columns exist)
+try { db.exec('ALTER TABLE addresses ADD COLUMN lat REAL'); } catch (_) {}
+try { db.exec('ALTER TABLE addresses ADD COLUMN lng REAL'); } catch (_) {}
+
 // ── HELPERS ─────────────────────────────────────────────────
 
 const userByMobile   = db.prepare('SELECT * FROM users WHERE mobile = ?');
@@ -148,15 +152,16 @@ module.exports = {
   listAddresses(userId) {
     return db.prepare("SELECT * FROM addresses WHERE user_id=? ORDER BY is_default DESC, id ASC").all(userId);
   },
-  addAddress(userId, { label, icon, address, pincode }) {
+  addAddress(userId, { label, icon, address, pincode, lat, lng }) {
     if (!label?.trim())   throw new Error('Label is required');
     if (!address?.trim()) throw new Error('Address is required');
     const existingDefault = db.prepare("SELECT id FROM addresses WHERE user_id=? AND is_default=1").get(userId);
     const isDefault = existingDefault ? 0 : 1;
     const info = db.prepare(`
-      INSERT INTO addresses (user_id, label, icon, address, pincode, is_default)
-      VALUES (?,?,?,?,?,?)
-    `).run(userId, label.trim(), icon || '📍', address.trim(), (pincode || '').trim() || null, isDefault);
+      INSERT INTO addresses (user_id, label, icon, address, pincode, is_default, lat, lng)
+      VALUES (?,?,?,?,?,?,?,?)
+    `).run(userId, label.trim(), icon || '📍', address.trim(), (pincode || '').trim() || null, isDefault,
+           lat != null ? parseFloat(lat) : null, lng != null ? parseFloat(lng) : null);
     return db.prepare("SELECT * FROM addresses WHERE id=?").get(info.lastInsertRowid);
   },
   removeAddress(userId, addrId) {

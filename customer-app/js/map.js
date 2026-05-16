@@ -1,60 +1,47 @@
 // Pitbay Customer App — map.js
-// Leaflet/OpenStreetMap integration for "Find centers near me"
+// Google Maps integration for "Find centers near me"
 
 const MapView = (() => {
-  let _map        = null;
-  let _userMarker = null;
+  let _map         = null;
+  let _userMarker  = null;
   let _initialized = false;
+  let _markers     = [];
 
-  const MUMBAI     = [19.076, 72.877];
-  const PIN_COLORS = ['#1a73e8', '#2e7d32', '#e65100', '#5e35b1', '#c62828'];
+  const MUMBAI     = { lat: 19.076, lng: 72.877 };
 
-  function init() {
+  async function init() {
     const el = document.getElementById('center-map');
     if (!el) return;
 
     if (_initialized) {
-      // Map already built — just fix size if container was hidden
-      setTimeout(() => _map?.invalidateSize(), 200);
+      // Re-trigger idle event to ensure map renders correctly if it was hidden
+      if (_map) google.maps.event.trigger(_map, 'resize');
       return;
     }
 
-    _map = L.map('center-map', {
-      zoomControl:       false,
-      attributionControl: false,
-    }).setView(MUMBAI, 12);
+    // Check if Google Maps is loaded
+    if (typeof google === 'undefined' || !google.maps) {
+      console.warn('Google Maps not loaded yet. Retrying...');
+      setTimeout(init, 500);
+      return;
+    }
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 18,
-    }).addTo(_map);
-
-    L.control.attribution({ prefix: '© <a href="https://www.openstreetmap.org/copyright">OSM</a>' })
-      .addTo(_map);
-
-    L.control.zoom({ position: 'bottomleft' }).addTo(_map);
+    _map = new google.maps.Map(el, {
+      center: MUMBAI,
+      zoom: 12,
+      disableDefaultUI: true,
+      zoomControl: true,
+      zoomControlOptions: {
+        position: google.maps.ControlPosition.LEFT_BOTTOM
+      },
+      styles: [
+        { "featureType": "poi", "stylers": [{ "visibility": "off" }] }
+      ]
+    });
 
     // Place markers for every center in CENTERS
     if (typeof CENTERS !== 'undefined') {
-      CENTERS.forEach((c, i) => {
-        const color = PIN_COLORS[i % PIN_COLORS.length];
-        const icon  = L.divIcon({
-          className: '',
-          html: `<div style="
-            background:${color};color:#fff;
-            padding:4px 8px;border-radius:10px;
-            font-size:10px;font-weight:700;
-            white-space:nowrap;cursor:pointer;
-            box-shadow:0 2px 6px rgba(0,0,0,.3)
-          ">${c.name}</div>`,
-          iconAnchor: [0, 16],
-        });
-        L.marker([c.lat, c.lng], { icon })
-          .addTo(_map)
-          .on('click', () => {
-            if (typeof HomeScreen !== 'undefined') HomeScreen.openCenter(c.id);
-          });
-      });
-
+      _renderCenterMarkers();
       const badge = document.getElementById('map-center-count');
       if (badge) badge.textContent = `${CENTERS.length} centers`;
     }
@@ -62,36 +49,104 @@ const MapView = (() => {
     _initialized = true;
   }
 
-  function locateUser() {
-    if (!navigator.geolocation) {
-      UI.toast('GPS not supported on this device');
+  function _renderCenterMarkers() {
+    // Clear old markers
+    _markers.forEach(m => m.setMap(null));
+    _markers = [];
+
+    CENTERS.forEach((c, i) => {
+      const marker = new google.maps.Marker({
+        position: { lat: c.lat, lng: c.lng },
+        map: _map,
+        title: c.name,
+        label: {
+          text: c.name,
+          color: 'white',
+          fontSize: '10px',
+          fontWeight: '700'
+        },
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          fillColor: '#1a73e8',
+          fillOpacity: 1,
+          strokeWeight: 2,
+          strokeColor: '#fff',
+          scale: 12,
+          labelOrigin: new google.maps.Point(0, 2)
+        }
+      });
+
+      marker.addListener('click', () => {
+        if (typeof HomeScreen !== 'undefined') HomeScreen.openCenter(c.id);
+      });
+
+      _markers.push(marker);
+    });
+  }
+
+  async function locateUser() {
+    if (!window.Capacitor) {
+      UI.toast('Native GPS only available on mobile');
       return;
     }
+
     UI.toast('📍 Detecting location…');
-    navigator.geolocation.getCurrentPosition(
-      pos => {
-        const { latitude: lat, longitude: lng } = pos.coords;
 
-        _map.setView([lat, lng], 14);
+    try {
+      const { Geolocation } = Capacitor.Plugins;
 
-        if (_userMarker) _userMarker.remove();
-        _userMarker = L.circleMarker([lat, lng], {
-          radius:      10,
-          fillColor:   '#1a73e8',
-          color:       '#fff',
-          weight:      3,
-          fillOpacity: 1,
-        }).addTo(_map)
-          .bindPopup('<b>You are here</b>')
-          .openPopup();
+      // Request permission first
+      const permission = await Geolocation.checkPermissions();
+      if (permission.location !== 'granted') {
+        const request = await Geolocation.requestPermissions();
+        if (request.location !== 'granted') {
+          throw new Error('Location permission denied');
+        }
+      }
 
-        UI.toast('Location found! Showing nearby centers.');
-      },
-      () => {
-        UI.toast('Could not get location — please allow GPS access in your browser');
-      },
-      { enableHighAccuracy: true, timeout: 10000 }
-    );
+      const pos = await Geolocation.getCurrentPosition({
+        enableHighAccuracy: true,
+        timeout: 10000
+      });
+
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
+
+      if (_map) {
+        const latLng = new google.maps.LatLng(lat, lng);
+        _map.setCenter(latLng);
+        _map.setZoom(14);
+
+        if (_userMarker) _userMarker.setMap(null);
+
+        _userMarker = new google.maps.Marker({
+          position: latLng,
+          map: _map,
+          icon: {
+            path: google.maps.SymbolPath.CIRCLE,
+            fillColor: '#1a73e8',
+            fillOpacity: 1,
+            strokeWeight: 4,
+            strokeColor: '#fff',
+            scale: 8
+          },
+          title: 'You are here'
+        });
+      }
+
+      UI.toast('Location found! Showing nearby centers.');
+
+      // Update app location state if needed
+      if (typeof LocationModal !== 'undefined' && LocationModal._reverseGeocode) {
+        const area = await LocationModal._reverseGeocode(lat, lng);
+        LocationModal._setLocation(area, area, lat, lng);
+        LocationModal._updateCenterDistances(lat, lng);
+      }
+
+    } catch (err) {
+      console.error('GPS Error:', err);
+      UI.toast('Could not get location: ' + err.message);
+    }
   }
 
   return { init, locateUser };

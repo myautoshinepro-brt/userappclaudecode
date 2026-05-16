@@ -45,9 +45,9 @@ router.get('/addresses', requireAuth, (req, res) => {
 });
 
 router.post('/addresses', requireAuth, (req, res) => {
-  const { label, icon, address, pincode } = req.body || {};
+  const { label, icon, address, pincode, lat, lng } = req.body || {};
   try {
-    const a = db.addAddress(req.user.id, { label, icon, address, pincode });
+    const a = db.addAddress(req.user.id, { label, icon, address, pincode, lat, lng });
     res.status(201).json({ success: true, data: a });
   } catch (e) {
     res.status(400).json({ error: e.message });
