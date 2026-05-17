@@ -1280,39 +1280,80 @@
     }
   }
 
+  // Global error trap — without this, an uncaught error early in boot
+  // leaves the WebView visibly blank because no screen is ever made visible.
+  // The toast/console line + forced navigation to login keeps the app usable
+  // (or at least debuggable from logcat) instead of "white screen of death".
+  window.addEventListener('error', (e) => {
+    console.error('[boot] uncaught error:', e.message, e.filename, e.lineno);
+    _bootFallback('Startup error: ' + (e.message || 'unknown'));
+  });
+  window.addEventListener('unhandledrejection', (e) => {
+    console.error('[boot] unhandled rejection:', e.reason);
+    _bootFallback('Network error during startup');
+  });
+  function _bootFallback(msg) {
+    // Only fire once, and only if no screen is showing yet.
+    if (window._bootFallbackFired) return;
+    if (typeof Router !== 'undefined' && Router.current) return;
+    window._bootFallbackFired = true;
+    try {
+      if (typeof Router !== 'undefined' && Router.go) Router.go('login', false);
+    } catch (_) { /* nothing we can do */ }
+    // Show a visible hint even if Router failed to register.
+    const root = document.querySelector('.phone') || document.body;
+    if (root && root.children.length === 0) {
+      root.innerHTML = `<div style="padding:24px;text-align:center;font:14px sans-serif;color:#444">
+        <div style="font-size:32px;margin-bottom:12px">⚠️</div>
+        <div style="font-weight:700;margin-bottom:6px">App failed to start</div>
+        <div style="font-size:12px;color:#888">${msg}</div>
+        <button onclick="location.reload()" style="margin-top:18px;padding:10px 22px;background:#1a73e8;color:#fff;border:none;border-radius:22px;font-size:13px;font-weight:700">Reload</button>
+      </div>`;
+    }
+  }
+
   // Boot — check session before showing any screen
   document.addEventListener('DOMContentLoaded', async () => {
-    Router.init();
-
-    // Load real centers from center-app
     try {
-      const r = await fetch(window.API_URL + '/api/centers');
-      const j = await r.json();
-      if (j && j.success && Array.isArray(j.data)) {
-        window.ALL_CENTERS = j.data;
-        window.CENTERS     = j.data;
+      Router.init();
+
+      // Load real centers from center-app
+      try {
+        const r = await fetch(window.API_URL + '/api/centers');
+        const j = await r.json();
+        if (j && j.success && Array.isArray(j.data)) {
+          window.ALL_CENTERS = j.data;
+          window.CENTERS     = j.data;
+        }
+      } catch (e) {
+        console.warn('Could not load centers:', e);
       }
-    } catch (e) {
-      console.warn('Could not load centers:', e);
-    }
 
-    HomeScreen.init();
-    ProfileScreen.init();
-    SignupScreen.init();
+      // Each .init() is wrapped — one screen's bug shouldn't deadlock the rest.
+      try { HomeScreen.init();    } catch (e) { console.error('HomeScreen.init:', e); }
+      try { ProfileScreen.init(); } catch (e) { console.error('ProfileScreen.init:', e); }
+      try { SignupScreen.init();  } catch (e) { console.error('SignupScreen.init:', e); }
 
-    if (typeof NotifState !== 'undefined') {
-      NotifState.load();
-      NotificationScreen._updateBadge();
-    }
+      if (typeof NotifState !== 'undefined') {
+        try {
+          NotifState.load();
+          NotificationScreen._updateBadge();
+        } catch (e) { console.error('NotifState boot:', e); }
+      }
 
-    // Check if user has a valid session
-    const user = await Auth.checkSession();
-    if (user) {
-      AppState.setAuthUser(user);
-      await UserData.initSession();
-      Router.go('home', false);
-    } else {
-      Router.go('login', false);
+      // Check if user has a valid session
+      const user = await Auth.checkSession();
+      if (user) {
+        AppState.setAuthUser(user);
+        try { await UserData.initSession(); }
+        catch (e) { console.error('UserData.initSession:', e); }
+        Router.go('home', false);
+      } else {
+        Router.go('login', false);
+      }
+    } catch (err) {
+      console.error('[boot] fatal:', err);
+      _bootFallback(err && err.message ? err.message : String(err));
     }
   });
 </script>
