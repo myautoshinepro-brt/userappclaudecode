@@ -153,6 +153,11 @@
 
     /* Leaflet pin glyphs — keep them tiny + tappable */
     .sw-center-pin, .sw-user-pin { background: transparent !important; border: none !important; }
+
+    /* Leaflet's default controls (zoom +/- and attribution) sit at z-index 1000
+       which covers our search dropdown (z-index 800). Push them below so the
+       dropdown stays usable. */
+    .leaflet-top, .leaflet-bottom { z-index: 100 !important; }
     .sw-pin-dot {
       width: 18px; height: 18px; border-radius: 50%;
       background: #1a73e8; border: 2px solid #fff;
@@ -551,7 +556,7 @@
         <div class="confirm-body">
           <div class="confirm-icon">✅</div>
           <div style="font-size:17px;font-weight:700;color:var(--text-primary);margin-bottom:4px;text-align:center">Booking confirmed!</div>
-          <div style="font-size:11px;color:var(--text-secondary);margin-bottom:12px;text-align:center">WhatsApp sent to +91 98765 43210</div>
+          <div style="font-size:11px;color:var(--text-secondary);margin-bottom:12px;text-align:center" id="conf-channel-note">Confirmation sent</div>
           <div class="confirm-card">
             <div class="confirm-row"><span class="confirm-label">Booking ID</span><span class="confirm-value" id="conf-booking-id">#SW20490</span></div>
             <div class="confirm-row"><span class="confirm-label">Center</span><span class="confirm-value ci-link" id="conf-center-name" onclick="CenterInfoModal.open(AppState.confirmedBooking?.centerId)">Shine Auto Wash</span></div>
@@ -701,6 +706,7 @@
         </div>
         <div class="profile-name" id="profile-name">Loading…</div>
         <div class="profile-phone" id="profile-phone"></div>
+        <div class="profile-email" id="profile-email" style="font-size:11px;color:rgba(255,255,255,0.85);margin-top:2px"></div>
       </div>
       <div class="scroll-area">
         <div class="menu-row" onclick="Router.go('bookings')"><div class="menu-icon" style="background:#dbeafe">📋</div><div class="menu-label">My bookings<div class="menu-sublabel" id="menu-sub-bookings">Loading...</div></div><span class="menu-arrow">›</span></div>
@@ -708,7 +714,7 @@
         <div class="menu-row" onclick="Router.go('promos')"><div class="menu-icon" style="background:#dcfce7">🎟️</div><div class="menu-label">Promo codes<div class="menu-sublabel" id="menu-sub-promos">Loading...</div></div><span class="menu-arrow">›</span></div>
         <div class="menu-row" onclick="Router.go('addresses')"><div class="menu-icon" style="background:#ede9fe">📍</div><div class="menu-label">Saved addresses<div class="menu-sublabel" id="menu-sub-addresses">Loading...</div></div><span class="menu-arrow">›</span></div>
         <div class="menu-row" onclick="Router.go('vehicles')"><div class="menu-icon" style="background:#fee2e2">🚗</div><div class="menu-label">My vehicles<div class="menu-sublabel" id="menu-sub-vehicles">Loading...</div></div><span class="menu-arrow">›</span></div>
-        <div class="menu-row" onclick="Router.go('notifications')"><div class="menu-icon" style="background:#fff7ed">🔔</div><div class="menu-label">Notifications<div class="menu-sublabel">WhatsApp · Push · SMS</div></div><span class="menu-arrow">›</span></div>
+        <div class="menu-row" onclick="Router.go('notifications')"><div class="menu-icon" style="background:#fff7ed">🔔</div><div class="menu-label">Notifications<div class="menu-sublabel">Push · SMS · Email</div></div><span class="menu-arrow">›</span></div>
         <div class="menu-row" onclick="Router.go('language')"><div class="menu-icon" style="background:#f0fdf4">🌐</div><div class="menu-label">Language<div class="menu-sublabel" id="lang-sub-label">English</div></div><span class="menu-arrow">›</span></div>
         <div class="menu-row" onclick="Router.go('help')"><div class="menu-icon" style="background:#fdf4ff">❓</div><div class="menu-label">Help & support<div class="menu-sublabel">Chat · Call · FAQ</div></div><span class="menu-arrow">›</span></div>
         <div class="menu-row" onclick="ProfileScreen.logout()"><div class="menu-icon" style="background:#fff1f2">🔐</div><div class="menu-label" style="color:var(--red)">Logout</div><span class="menu-arrow" style="color:var(--red)">›</span></div>
@@ -723,22 +729,18 @@
 
     <!-- ══ EDIT PROFILE ══ -->
     <div data-screen="edit-profile" id="sc-edit-profile">
-      <div class="header-sub" style="background:var(--blue)"><button class="header-back" onclick="Router.back()">← Back</button><div class="header-title">Edit profile</div><div class="header-subtitle">Update your name & phone number</div></div>
+      <div class="header-sub" style="background:var(--blue)"><button class="header-back" onclick="Router.back()">← Back</button><div class="header-title">Edit profile</div><div class="header-subtitle">Update your name and email</div></div>
       <div class="scroll-area"><div style="padding:16px 14px 0">
         <div style="text-align:center;margin-bottom:20px">
-          <div style="width:72px;height:72px;border-radius:50%;background:linear-gradient(135deg,var(--blue),var(--navy));margin:0 auto 10px;display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:700;color:#fff;position:relative;cursor:pointer" onclick="UI.toast('📷 Opening camera...')">
+          <div style="width:72px;height:72px;border-radius:50%;background:linear-gradient(135deg,var(--blue),var(--navy));margin:0 auto 10px;display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:700;color:#fff">
             <span id="edit-initials">…</span>
-            <div style="position:absolute;bottom:0;right:0;width:24px;height:24px;border-radius:50%;background:var(--blue);border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:12px">📷</div>
           </div>
-          <div style="font-size:11px;color:var(--text-secondary)">Tap to change photo</div>
         </div>
         <div class="section-label">Personal details</div>
         <label class="form-label">Full name</label><input class="form-input" id="inp-name" placeholder="Your full name">
         <label class="form-label">Email address</label><input class="form-input" id="inp-email" type="email" placeholder="you@email.com">
         <label class="form-label" style="display:flex;align-items:center;justify-content:space-between">Phone number<span style="font-size:10px;color:var(--blue);cursor:pointer;font-weight:600" onclick="Router.go('change-phone')">Change →</span></label>
         <input class="form-input readonly" id="inp-phone-readonly" readonly>
-        <label class="form-label">City</label>
-        <select class="form-input" style="cursor:pointer"><option selected>Mumbai</option><option>Delhi</option><option>Bangalore</option><option>Pune</option><option>Hyderabad</option><option>Chennai</option></select>
         <button class="btn btn-green" onclick="ProfileScreen.saveProfile()">Save changes</button>
         <div style="height:16px"></div>
       </div></div>
@@ -746,7 +748,7 @@
 
     <!-- ══ CHANGE PHONE ══ -->
     <div data-screen="change-phone" id="sc-change-phone">
-      <div class="header-sub" style="background:var(--blue)"><button class="header-back" onclick="Router.back()">← Back</button><div class="header-title">Change phone number</div><div class="header-subtitle">OTP via WhatsApp & SMS</div></div>
+      <div class="header-sub" style="background:var(--blue)"><button class="header-back" onclick="Router.back()">← Back</button><div class="header-title">Change phone number</div><div class="header-subtitle">We'll send an OTP by SMS</div></div>
       <div class="scroll-area"><div style="padding:16px 14px 0">
         <div style="text-align:center;margin-bottom:18px"><div style="font-size:36px;margin-bottom:8px">📱</div><div style="font-size:13px;font-weight:700;color:var(--text-primary)">Enter new phone number</div><div style="font-size:11px;color:var(--text-secondary);margin-top:4px">We'll verify with OTP</div></div>
         <label class="form-label">New phone number</label>
@@ -1022,18 +1024,6 @@
                 <div class="call-num-sub">Free call · Mon–Sat, 9 AM – 8 PM</div>
               </div>
               <button class="call-dial-btn" onclick="HelpScreen.dial('18005720001')">Call</button>
-            </div>
-            <div class="call-number-card">
-              <div class="call-num-icon" style="background:#dcfce7">💬</div>
-              <div class="call-num-body">
-                <div class="call-num-label">WhatsApp support</div>
-                <div class="call-num-display">+91 98100 00001</div>
-                <div class="call-num-sub">Message or call · replies in ~5 min</div>
-              </div>
-              <div style="display:flex;flex-direction:column;gap:5px">
-                <button class="call-dial-btn wa" onclick="HelpScreen.openWhatsApp('919810000001')">Chat</button>
-                <button class="call-dial-btn" onclick="HelpScreen.dial('919810000001')">Call</button>
-              </div>
             </div>
             <div class="call-number-card">
               <div class="call-num-icon" style="background:#fef9c3">📱</div>

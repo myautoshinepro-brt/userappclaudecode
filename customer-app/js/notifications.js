@@ -51,7 +51,9 @@ const NOTIF_INBOX_SEED = [
 ];
 
 const NOTIF_SETTINGS_DEFAULT = {
-  channels: { whatsapp: true, push: true, sms: true, email: false },
+  // WhatsApp channel intentionally omitted — not implemented yet. Re-add
+  // once the backend integration with WhatsApp Business API is live.
+  channels: { push: true, sms: true, email: true },
   events: {
     booking_confirmed: true,
     center_accepted:   true,
@@ -316,7 +318,6 @@ const NotificationScreen = {
 
         <div class="section-label">Channels</div>
         <div class="notif-ch-group">
-          ${this._chCard('whatsapp', '💬', '#dcfce7', 'WhatsApp', user.phone, ch.whatsapp)}
           ${this._chCard('sms',      '📱', '#dbeafe', 'SMS',       user.phone, ch.sms)}
           ${this._chCard('email',    '📧', '#fef3c7', 'Email',     user.email, ch.email)}
           <div class="toggle-row notif-push-row">

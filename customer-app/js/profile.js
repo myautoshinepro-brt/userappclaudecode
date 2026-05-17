@@ -63,6 +63,7 @@ const ProfileScreen = {
     const u = AppState.user;
     _setText('profile-name',    u.name || '');
     _setText('profile-phone',   [u.phone, u.city].filter(Boolean).join(' · '));
+    _setText('profile-email',   u.email || '');
     _setText('profile-initials', u.initials || '??');
     _setText('edit-initials',   u.initials || '??');
     const inp = document.getElementById('inp-name');

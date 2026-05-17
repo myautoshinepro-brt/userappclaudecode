@@ -11,17 +11,9 @@ const SUPPORT_NUMBERS = [
     sub:     'Free call · Mon–Sat, 9 AM – 8 PM',
     icon:    '📞',
     color:   '#dbeafe',
-    isWA:    false,
   },
-  {
-    label:   'WhatsApp support',
-    number:  '919810000001',
-    display: '+91 98100 00001',
-    sub:     'Message or call anytime · usually replies in 5 min',
-    icon:    '💬',
-    color:   '#dcfce7',
-    isWA:    true,
-  },
+  // WhatsApp support entry intentionally removed — add back once the
+  // WhatsApp Business integration is implemented.
   {
     label:   'Direct mobile',
     number:  '919810000002',
@@ -29,7 +21,6 @@ const SUPPORT_NUMBERS = [
     sub:     'Mon–Sat, 9 AM – 6 PM',
     icon:    '📱',
     color:   '#fef9c3',
-    isWA:    false,
   },
 ];
 
