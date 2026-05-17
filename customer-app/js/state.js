@@ -54,13 +54,14 @@ const AppState = {
     status: 'confirmed', // confirmed | accepted | in_progress | completed | cancelled
   },
 
-  // Profile
+  // Profile — empty defaults so the home greeting doesn't flash a
+  // hardcoded "Rahul Kumar" before the real user data arrives.
   user: {
-    name: 'Rahul Kumar',
-    phone: '+91 98765 43210',
-    email: 'rahul.kumar@gmail.com',
+    name: '',
+    phone: '',
+    email: '',
     city: '',
-    initials: 'RK',
+    initials: '??',
     language: 'English',
   },
 

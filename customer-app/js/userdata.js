@@ -4,6 +4,15 @@
 // Maps DB snake_case → camelCase that the UI screens expect.
 // ============================================================
 
+// Per-resource load status — used by the list screens to tell apart
+// "genuinely empty" from "load failed, show a retry CTA".
+window.LoadStatus = window.LoadStatus || {
+  addresses: { error: null },
+  vehicles:  { error: null },
+  bookings:  { error: null },
+  promos:    { error: null },
+};
+
 const UserData = (() => {
 
   const VEHICLE_BG = ['#dbeafe', '#dcfce7', '#fef9c3', '#fee2e2', '#ede9fe', '#fff7ed'];
@@ -95,20 +104,29 @@ const UserData = (() => {
     try {
       const j = await _getJson('/api/profile/vehicles');
       if (j && j.success) SAVED_VEHICLES = (j.data || []).map(_mapVehicle);
-    } catch (e) { console.warn('loadVehicles:', e.message); }
+      LoadStatus.vehicles.error = null;
+    } catch (e) {
+      console.warn('loadVehicles:', e.message);
+      LoadStatus.vehicles.error = e.message;
+    }
   }
 
   async function loadAddresses() {
     try {
       const j = await _getJson('/api/profile/addresses');
       if (j && j.success) SAVED_ADDRESSES = (j.data || []).map(_mapAddress);
-    } catch (e) { console.warn('loadAddresses:', e.message); }
+      LoadStatus.addresses.error = null;
+    } catch (e) {
+      console.warn('loadAddresses:', e.message);
+      LoadStatus.addresses.error = e.message;
+    }
   }
 
   async function loadBookings() {
     try {
       const j = await _getJson('/api/bookings');
-      if (!j || !j.success) return;
+      if (!j || !j.success) { LoadStatus.bookings.error = 'Could not load bookings'; return; }
+      LoadStatus.bookings.error = null;
       const all = (j.data || []).map(_mapBooking);
       PAST_BOOKINGS     = all.filter(b => b.rawStatus === 'done' || b.rawStatus === 'cancelled');
       UPCOMING_BOOKINGS = all.filter(b => !['done','cancelled'].includes(b.rawStatus));
@@ -136,7 +154,10 @@ const UserData = (() => {
           NotificationScreen._updateBadge();
         }
       }
-    } catch (e) { console.warn('loadBookings:', e.message); }
+    } catch (e) {
+      console.warn('loadBookings:', e.message);
+      LoadStatus.bookings.error = e.message;
+    }
   }
 
   async function loadPromos() {
@@ -144,6 +165,7 @@ const UserData = (() => {
       const r = await fetch('/api/promos');
       const j = await r.json();
       if (j && j.success && Array.isArray(j.data)) {
+        LoadStatus.promos.error = null;
         PROMO_CODES = j.data.map(p => ({
           code:               p.code,
           discount:           p.value,
@@ -156,7 +178,10 @@ const UserData = (() => {
           minOrder:           p.min_order || 0,
         }));
       }
-    } catch (e) { console.warn('loadPromos:', e.message); }
+    } catch (e) {
+      console.warn('loadPromos:', e.message);
+      LoadStatus.promos.error = e.message;
+    }
   }
 
   async function loadAll() {

@@ -46,6 +46,11 @@ const BookingScreen = {
     const el = document.getElementById('bklist-upcoming');
     if (!el) return;
     const list = typeof UPCOMING_BOOKINGS !== 'undefined' ? UPCOMING_BOOKINGS : [];
+    if (LoadStatus.bookings.error && !list.length) {
+      el.innerHTML = _loadErrorHTML(LoadStatus.bookings.error,
+        'UserData.loadBookings().then(()=>BookingScreen.renderBookings())');
+      return;
+    }
     if (!list.length) {
       el.innerHTML = `
         <div style="text-align:center;padding:28px 20px">

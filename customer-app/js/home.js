@@ -11,6 +11,34 @@ const HomeScreen = {
     this.bindSearch();
     this.bindFilterChips();
     this._updateGreeting();
+    this.refreshPromoBanner();
+  },
+
+  // Pick the best available promo and surface it on the home banner. Hide
+  // the banner entirely when nothing's available — beats showing a code the
+  // user can't actually redeem.
+  refreshPromoBanner() {
+    const banner = document.getElementById('home-promo-banner');
+    const titleEl = document.getElementById('home-promo-banner-title');
+    if (!banner || !titleEl) return;
+
+    const promos = (typeof PROMO_CODES !== 'undefined' ? PROMO_CODES : [])
+      .filter(p => p.applicable);
+    if (!promos.length) {
+      banner.style.display = 'none';
+      banner.onclick = null;
+      return;
+    }
+    // Prefer the highest-value percent promo, fall back to highest rupee promo.
+    const pick = promos.slice().sort((a, b) => {
+      const score = p => (p.type === 'percent' ? p.discount * 50 : p.discount);
+      return score(b) - score(a);
+    })[0];
+
+    const dl = pick.type === 'percent' ? `${pick.discount}% OFF` : `₹${pick.discount} OFF`;
+    titleEl.textContent = `${pick.code} — ${dl} · ${pick.title}`;
+    banner.style.display = '';
+    banner.onclick = () => this.tapPromoBanner(pick.code);
   },
 
   _updateGreeting() {

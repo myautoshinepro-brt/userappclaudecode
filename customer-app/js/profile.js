@@ -61,52 +61,119 @@ const ProfileScreen = {
 
   updateDisplay() {
     const u = AppState.user;
-    _setText('profile-name',    u.name);
-    _setText('profile-phone',   u.phone + ' · ' + u.city);
-    _setText('profile-initials', u.initials);
-    _setText('edit-initials',   u.initials);
+    _setText('profile-name',    u.name || '');
+    _setText('profile-phone',   [u.phone, u.city].filter(Boolean).join(' · '));
+    _setText('profile-initials', u.initials || '??');
+    _setText('edit-initials',   u.initials || '??');
     const inp = document.getElementById('inp-name');
-    if (inp) inp.value = u.name;
+    if (inp) inp.value = u.name || '';
     const inpEmail = document.getElementById('inp-email');
-    if (inpEmail) inpEmail.value = u.email;
+    if (inpEmail) inpEmail.value = u.email || '';
+    const phoneRO = document.getElementById('inp-phone-readonly');
+    if (phoneRO) phoneRO.value = u.phone || '';
   },
 
   // ── EDIT PROFILE ──
 
-  saveProfile() {
-    const name = document.getElementById('inp-name')?.value.trim();
-    if (!name) { UI.toast('⚠️ Please enter your name'); return; }
-    AppState.updateUserName(name);
-    this.updateDisplay();
-    UI.toast('✅ Profile updated!');
-    setTimeout(() => Router.go('profile'), 1200);
+  async saveProfile() {
+    const name  = document.getElementById('inp-name')?.value.trim();
+    const email = document.getElementById('inp-email')?.value.trim();
+    if (!name || name.length < 2) { UI.toast('⚠️ Enter your full name'); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email || '')) {
+      UI.toast('⚠️ Enter a valid email address'); return;
+    }
+    const btn = document.querySelector('#sc-edit-profile button.btn-green');
+    if (btn) { btn.disabled = true; btn.dataset._t = btn.textContent; btn.textContent = 'Saving…'; }
+
+    try {
+      const r = await fetch('/api/profile/me', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (Auth.getToken() || '') },
+        body: JSON.stringify({ full_name: name, email }),
+      });
+      const j = await r.json();
+      if (!r.ok || !j.success) throw new Error(j.error || 'Save failed');
+      AppState.setAuthUser(j.data);
+      this.updateDisplay();
+      UI.toast('✅ Profile updated!');
+      setTimeout(() => Router.back(), 900);
+    } catch (e) {
+      UI.toast('❌ ' + e.message);
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = btn.dataset._t || 'Save changes'; }
+    }
   },
 
   // ── CHANGE PHONE / OTP ──
 
-  sendOTP() {
+  _pendingPhone: null,
+
+  async sendOTP() {
     const ph = document.getElementById('inp-phone')?.value.trim();
-    if (!ph || ph.length !== 10 || isNaN(ph)) {
-      UI.toast('⚠️ Enter a valid 10-digit number'); return;
+    if (!/^[6-9]\d{9}$/.test(ph || '')) {
+      UI.toast('⚠️ Enter a valid 10-digit Indian mobile number'); return;
     }
-    _setText('otp-phone-display', ph);
-    document.getElementById('otp-section').style.display = 'block';
-    document.getElementById('otp1')?.focus();
-    UI.toast('📱 OTP sent to +91 ' + ph);
+    const btn = document.querySelector('#sc-change-phone .btn-primary');
+    if (btn) { btn.disabled = true; btn.dataset._t = btn.textContent; btn.textContent = 'Sending…'; }
+    try {
+      const r = await fetch('/api/profile/change-phone/send-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (Auth.getToken() || '') },
+        body: JSON.stringify({ mobile: ph }),
+      });
+      const j = await r.json();
+      if (!r.ok || !j.success) throw new Error(j.error || 'Could not send OTP');
+
+      this._pendingPhone = ph;
+      _setText('otp-phone-display', ph);
+      document.getElementById('otp-section').style.display = 'block';
+      // Clear any prior OTP digits
+      [1,2,3,4].forEach(i => { const el = document.getElementById('otp'+i); if (el) el.value = ''; });
+      document.getElementById('otp1')?.focus();
+
+      if (j.devOtp) UI.toast(`📱 OTP: ${j.devOtp}`);
+      else UI.toast(`📱 OTP sent to +91 ${ph}`);
+    } catch (e) {
+      UI.toast('❌ ' + e.message);
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = btn.dataset._t || 'Send OTP'; }
+    }
   },
 
   otpNext(el, nextId) {
-    if (el.value.length === 1 && nextId) document.getElementById(nextId)?.focus();
+    el.value = (el.value || '').replace(/\D/g, '').slice(0, 1);
+    if (el.value && nextId) document.getElementById(nextId)?.focus();
   },
 
-  verifyOTP() {
+  async verifyOTP() {
     const otp = [1,2,3,4].map(i => document.getElementById('otp'+i)?.value || '').join('');
     if (otp.length < 4) { UI.toast('⚠️ Enter complete OTP'); return; }
-    const ph = document.getElementById('inp-phone')?.value.trim();
-    AppState.updateUserPhone(ph);
-    this.updateDisplay();
-    UI.toast('✅ Phone number updated!');
-    setTimeout(() => Router.go('profile'), 1200);
+    if (!this._pendingPhone) { UI.toast('⚠️ Send OTP first'); return; }
+
+    const btn = document.querySelector('#sc-change-phone .btn-green');
+    if (btn) { btn.disabled = true; btn.dataset._t = btn.textContent; btn.textContent = 'Verifying…'; }
+    try {
+      const r = await fetch('/api/profile/change-phone/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (Auth.getToken() || '') },
+        body: JSON.stringify({ mobile: this._pendingPhone, otp }),
+      });
+      const j = await r.json();
+      if (!r.ok || !j.success) throw new Error(j.error || 'Could not verify OTP');
+
+      AppState.setAuthUser(j.data);
+      this.updateDisplay();
+      this._pendingPhone = null;
+      UI.toast('✅ Phone number updated!');
+      setTimeout(() => Router.back(), 900);
+    } catch (e) {
+      UI.toast('❌ ' + e.message);
+      // Clear OTP boxes so the user can re-enter
+      [1,2,3,4].forEach(i => { const el = document.getElementById('otp'+i); if (el) el.value = ''; });
+      document.getElementById('otp1')?.focus();
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = btn.dataset._t || 'Verify & update'; }
+    }
   },
 
   // ── ADDRESSES ──
@@ -116,6 +183,11 @@ const ProfileScreen = {
   renderAddresses() {
     const list = document.getElementById('addr-list');
     if (!list) return;
+    if (LoadStatus.addresses.error && !SAVED_ADDRESSES.length) {
+      list.innerHTML = _loadErrorHTML(LoadStatus.addresses.error,
+        'UserData.loadAddresses().then(()=>ProfileScreen.renderAddresses())');
+      return;
+    }
     if (!SAVED_ADDRESSES.length) {
       list.innerHTML = `<div style="padding:14px 12px;font-size:11px;color:var(--text-secondary);text-align:center">No saved addresses yet.</div>`;
       return;
@@ -361,6 +433,10 @@ const ProfileScreen = {
   },
 
   async saveAddress() {
+    // Re-entrancy guard — without this, an impatient double-tap creates two
+    // identical addresses on the server.
+    if (this._savingAddress) return;
+
     const city     = document.getElementById('addr-city')?.value;
     const area     = document.getElementById('addr-area')?.value.trim();
     const flat     = document.getElementById('addr-flat')?.value.trim();
@@ -381,6 +457,10 @@ const ProfileScreen = {
     const choice = LABELS[this.addrLabelActive] || LABELS.other;
     const fullAddress = [flat, area, landmark].filter(Boolean).join(', ');
     const isEditing = this.editingAddressId != null;
+
+    const saveBtn = document.getElementById('add-addr-save-btn');
+    if (saveBtn) { saveBtn.disabled = true; saveBtn.dataset._t = saveBtn.textContent; saveBtn.textContent = 'Saving…'; }
+    this._savingAddress = true;
 
     try {
       const url    = isEditing ? `/api/profile/addresses/${this.editingAddressId}` : '/api/profile/addresses';
@@ -411,6 +491,12 @@ const ProfileScreen = {
       }, 800);
     } catch (e) {
       UI.toast('❌ ' + e.message);
+    } finally {
+      this._savingAddress = false;
+      if (saveBtn) {
+        saveBtn.disabled = false;
+        saveBtn.textContent = saveBtn.dataset._t || (isEditing ? 'Update address' : 'Save address');
+      }
     }
   },
 
@@ -419,6 +505,11 @@ const ProfileScreen = {
   renderVehicles() {
     const list = document.getElementById('veh-list');
     if (!list) return;
+    if (LoadStatus.vehicles.error && !SAVED_VEHICLES.length) {
+      list.innerHTML = _loadErrorHTML(LoadStatus.vehicles.error,
+        'UserData.loadVehicles().then(()=>ProfileScreen.renderVehicles())');
+      return;
+    }
     if (!SAVED_VEHICLES.length) {
       list.innerHTML = `<div style="padding:14px 12px;font-size:11px;color:var(--text-secondary);text-align:center">No saved vehicles yet.</div>`;
       return;
@@ -524,6 +615,11 @@ const ProfileScreen = {
     if (!list) return;
     const promos = (typeof PROMO_CODES !== 'undefined' ? PROMO_CODES : []);
 
+    if (LoadStatus.promos.error && !promos.length) {
+      list.innerHTML = _loadErrorHTML(LoadStatus.promos.error,
+        'UserData.loadPromos().then(()=>ProfileScreen.renderMyPromos())');
+      return;
+    }
     if (!promos.length) {
       list.innerHTML = `
         <div style="padding:24px 16px;text-align:center;color:var(--text-secondary);font-size:11px">

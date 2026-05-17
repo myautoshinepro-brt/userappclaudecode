@@ -104,7 +104,64 @@ const Router = {
     this.go('home', false);
   },
 
+  // Pull-to-refresh: per-screen async handler. Each refresh re-fetches the
+  // data this screen depends on, then re-renders it.
+  REFRESH_HANDLERS: {
+    home:          async () => {
+      const tasks = [];
+      if (typeof UserData !== 'undefined') {
+        if (UserData.loadAddresses) tasks.push(UserData.loadAddresses());
+        if (UserData.loadPromos)    tasks.push(UserData.loadPromos());
+      }
+      await Promise.all(tasks);
+      if (typeof LocationModal !== 'undefined' && LocationModal._applyCityFilter) {
+        await LocationModal._applyCityFilter(AppState.user?.city || '');
+      }
+      if (typeof HomeScreen !== 'undefined' && HomeScreen.refreshPromoBanner) HomeScreen.refreshPromoBanner();
+    },
+    bookings:      async () => {
+      if (typeof UserData !== 'undefined') await UserData.loadBookings();
+      if (typeof BookingScreen !== 'undefined') BookingScreen.renderBookings();
+    },
+    notifications: async () => {
+      if (typeof UserData !== 'undefined') await UserData.loadBookings();
+      if (typeof NotifState !== 'undefined' && NotifState.rebuildFromData) NotifState.rebuildFromData();
+      if (typeof NotificationScreen !== 'undefined' && NotificationScreen._renderInbox) NotificationScreen._renderInbox();
+    },
+    addresses:     async () => {
+      if (typeof UserData !== 'undefined') await UserData.loadAddresses();
+      if (typeof ProfileScreen !== 'undefined') ProfileScreen.renderAddresses();
+    },
+    vehicles:      async () => {
+      if (typeof UserData !== 'undefined') await UserData.loadVehicles();
+      if (typeof ProfileScreen !== 'undefined') ProfileScreen.renderVehicles();
+    },
+    reviews:       async () => {
+      if (typeof UserData !== 'undefined') await UserData.loadBookings();
+      if (typeof ProfileScreen !== 'undefined') ProfileScreen.renderMyReviews();
+    },
+    promos:        async () => {
+      if (typeof UserData !== 'undefined') await UserData.loadPromos();
+      if (typeof ProfileScreen !== 'undefined') ProfileScreen.renderMyPromos();
+    },
+    // Chat polls on its own — no need for pull-to-refresh, and the gesture
+    // would conflict with the keyboard / message-list scroll on Android.
+  },
+
+  _attachPullRefresh(screenId) {
+    if (typeof PullRefresh === 'undefined') return;
+    const handler = this.REFRESH_HANDLERS[screenId];
+    if (!handler) return;
+    const screen = this.screens[screenId];
+    if (!screen) return;
+    const scrollEl = screen.querySelector('.scroll-area');
+    if (!scrollEl) return;
+    PullRefresh.attach(scrollEl, handler);
+  },
+
   _onEnter(screenId) {
+    this._attachPullRefresh(screenId);
+
     switch (screenId) {
       case 'home':
         if (typeof MapView !== 'undefined') MapView.init();

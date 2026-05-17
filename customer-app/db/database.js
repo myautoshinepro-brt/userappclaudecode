@@ -105,6 +105,28 @@ module.exports = {
     return userById.get(result.lastInsertRowid);
   },
 
+  updateUserProfile(userId, { full_name, email }) {
+    const sets = [];
+    const args = [];
+    if (full_name && full_name.trim()) {
+      sets.push('full_name = ?');
+      args.push(full_name.trim());
+    }
+    if (email && email.trim()) {
+      sets.push('email = ?');
+      args.push(email.toLowerCase().trim());
+    }
+    if (!sets.length) return userById.get(userId);
+    args.push(userId);
+    db.prepare(`UPDATE users SET ${sets.join(', ')} WHERE id = ?`).run(...args);
+    return userById.get(userId);
+  },
+
+  updateUserMobile(userId, mobile) {
+    db.prepare('UPDATE users SET mobile = ? WHERE id = ?').run(mobile.trim(), userId);
+    return userById.get(userId);
+  },
+
   saveOtp(identifier, otp, expiresMinutes = 5) {
     deleteOldOtps.run(identifier);
     const expiresAt = new Date(Date.now() + expiresMinutes * 60 * 1000)

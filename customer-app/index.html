@@ -237,11 +237,11 @@
 
       <!-- Scrollable content -->
       <div class="scroll-area">
-        <!-- Promo banner -->
-        <div class="promo-banner" onclick="HomeScreen.tapPromoBanner('SPARKFIRST10')">
+        <!-- Promo banner — rendered dynamically from PROMO_CODES; hidden when none available -->
+        <div class="promo-banner" id="home-promo-banner" style="display:none">
           <span style="font-size:18px">🎁</span>
           <div>
-            <div style="font-size:11px;font-weight:700;color:#5d4037">SPARKFIRST10 — 10% off first wash!</div>
+            <div style="font-size:11px;font-weight:700;color:#5d4037" id="home-promo-banner-title"></div>
             <div style="font-size:10px;color:#8d6e63;margin-top:1px">Tap to copy code — applies at checkout</div>
           </div>
         </div>
@@ -624,11 +624,11 @@
     <div data-screen="profile" id="sc-profile">
       <div class="profile-top">
         <div class="profile-avatar" onclick="Router.go('edit-profile')">
-          <span id="profile-initials">RK</span>
+          <span id="profile-initials">…</span>
           <div class="avatar-edit-btn">✏️</div>
         </div>
-        <div class="profile-name" id="profile-name">Rahul Kumar</div>
-        <div class="profile-phone" id="profile-phone">+91 98765 43210 · Mumbai</div>
+        <div class="profile-name" id="profile-name">Loading…</div>
+        <div class="profile-phone" id="profile-phone"></div>
       </div>
       <div class="scroll-area">
         <div class="menu-row" onclick="Router.go('bookings')"><div class="menu-icon" style="background:#dbeafe">📋</div><div class="menu-label">My bookings<div class="menu-sublabel" id="menu-sub-bookings">Loading...</div></div><span class="menu-arrow">›</span></div>
@@ -655,16 +655,16 @@
       <div class="scroll-area"><div style="padding:16px 14px 0">
         <div style="text-align:center;margin-bottom:20px">
           <div style="width:72px;height:72px;border-radius:50%;background:linear-gradient(135deg,var(--blue),var(--navy));margin:0 auto 10px;display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:700;color:#fff;position:relative;cursor:pointer" onclick="UI.toast('📷 Opening camera...')">
-            <span id="edit-initials">RK</span>
+            <span id="edit-initials">…</span>
             <div style="position:absolute;bottom:0;right:0;width:24px;height:24px;border-radius:50%;background:var(--blue);border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:12px">📷</div>
           </div>
           <div style="font-size:11px;color:var(--text-secondary)">Tap to change photo</div>
         </div>
         <div class="section-label">Personal details</div>
-        <label class="form-label">Full name</label><input class="form-input" id="inp-name" value="Rahul Kumar" placeholder="Your full name">
-        <label class="form-label">Email address</label><input class="form-input" id="inp-email" value="rahul.kumar@gmail.com" type="email">
+        <label class="form-label">Full name</label><input class="form-input" id="inp-name" placeholder="Your full name">
+        <label class="form-label">Email address</label><input class="form-input" id="inp-email" type="email" placeholder="you@email.com">
         <label class="form-label" style="display:flex;align-items:center;justify-content:space-between">Phone number<span style="font-size:10px;color:var(--blue);cursor:pointer;font-weight:600" onclick="Router.go('change-phone')">Change →</span></label>
-        <input class="form-input readonly" value="+91 98765 43210" readonly>
+        <input class="form-input readonly" id="inp-phone-readonly" readonly>
         <label class="form-label">City</label>
         <select class="form-input" style="cursor:pointer"><option selected>Mumbai</option><option>Delhi</option><option>Bangalore</option><option>Pune</option><option>Hyderabad</option><option>Chennai</option></select>
         <button class="btn btn-green" onclick="ProfileScreen.saveProfile()">Save changes</button>
@@ -691,7 +691,7 @@
             <input class="otp-box" id="otp3" maxlength="1" oninput="ProfileScreen.otpNext(this,'otp4')" type="tel">
             <input class="otp-box" id="otp4" maxlength="1" oninput="ProfileScreen.otpNext(this,null)" type="tel">
           </div>
-          <div style="text-align:center;font-size:11px;color:var(--text-secondary);margin-bottom:14px">Didn't receive? <span style="color:var(--blue);cursor:pointer;font-weight:600" onclick="UI.toast('📱 OTP resent!')">Resend</span></div>
+          <div style="text-align:center;font-size:11px;color:var(--text-secondary);margin-bottom:14px">Didn't receive? <span style="color:var(--blue);cursor:pointer;font-weight:600" onclick="ProfileScreen.sendOTP()">Resend</span></div>
           <button class="btn btn-green" onclick="ProfileScreen.verifyOTP()">Verify & update</button>
         </div>
         <div style="height:16px"></div>
@@ -1212,6 +1212,7 @@
 <script src="js/help.js"></script>
 <script src="js/profile.js"></script>
 <script src="js/map.js"></script>
+<script src="js/pull-refresh.js"></script>
 
 <script>
   // Global API Configuration
