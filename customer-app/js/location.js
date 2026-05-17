@@ -34,13 +34,24 @@ const LocationModal = {
   async _geocodePincode(pincode) {
     try {
       const r = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&postalcode=${pincode}&country=India&limit=1`,
-        { headers: { 'User-Agent': 'PitbayApp/1.0' } }
+        `https://nominatim.openstreetmap.org/search?format=json&postalcode=${pincode}&country=India&limit=1&addressdetails=1`
       );
       const j = await r.json();
       if (!j.length) return null;
-      const a = j[0];
-      return { lat: parseFloat(a.lat), lng: parseFloat(a.lon), name: a.display_name.split(',')[0].trim() };
+      const hit = j[0];
+      const a   = hit.address || {};
+      // Extract the cleanest "area" we can — colony / suburb / neighbourhood
+      // — and a city. Both are used for the home filter + map centering.
+      const area = a.suburb || a.neighbourhood || a.city_district
+                || a.hamlet || a.locality || hit.display_name.split(',')[0].trim();
+      const city = a.city || a.town || a.village || a.municipality
+                || a.county || a.state_district || '';
+      return {
+        lat:  parseFloat(hit.lat),
+        lng:  parseFloat(hit.lon),
+        area, city,
+        name: area, // back-compat alias for any older callers
+      };
     } catch { return null; }
   },
 
@@ -230,16 +241,21 @@ const LocationModal = {
     if (clearBtn) clearBtn.style.display = val ? 'block' : 'none';
     if (!val) { if (sugl) sugl.style.display = 'none'; return; }
 
-    // 6-digit pincode → forward geocode
+    // 6-digit pincode → forward geocode + show area + city
     if (/^\d{6}$/.test(val)) {
-      if (sugl) sugl.innerHTML = `<div style="padding:10px 14px;font-size:11px;color:var(--text-secondary)">🔍 Looking up pincode…</div>`;
+      if (sugl) sugl.innerHTML = `<div style="padding:10px 14px;font-size:11px;color:var(--text-secondary)">🔍 Looking up pincode ${val}…</div>`;
       if (sugl) sugl.style.display = 'block';
       const geo = await this._geocodePincode(val);
       if (geo) {
+        // Pack the city into the onmousedown call so pickArea can apply the
+        // city filter without re-geocoding.
+        const cityArg = (geo.city || '').replace(/'/g, "\\'");
+        const areaArg = (geo.area || '').replace(/'/g, "\\'");
+        const sub = [val, geo.city].filter(Boolean).join(' · ');
         sugl.innerHTML = `
-          <div class="loc-sug-item" onmousedown="LocationModal.pickArea('${geo.name}',${geo.lat},${geo.lng})">
+          <div class="loc-sug-item" onmousedown="LocationModal.pickArea('${areaArg}',${geo.lat},${geo.lng},'${cityArg}')">
             <span style="font-size:14px">📮</span>
-            <div><div>${geo.name}</div><div class="loc-sug-area">Pincode ${val}</div></div>
+            <div><div>${geo.area}${geo.city ? ', ' + geo.city : ''}</div><div class="loc-sug-area">Pincode ${sub}</div></div>
           </div>`;
       } else {
         sugl.innerHTML = `<div style="padding:10px 14px;font-size:11px;color:var(--text-secondary)">No results for pincode ${val}</div>`;
@@ -276,12 +292,18 @@ const LocationModal = {
 
   _resetSearch() { this.clearSearch(); },
 
-  pickArea(area, lat, lng) {
+  // Accepts an optional explicit city — the pincode flow uses this so the
+  // home filter runs against the actual returned city (e.g. "Hyderabad")
+  // even when the area string doesn't include it.
+  pickArea(area, lat, lng, city) {
     this.clearSearch();
     this._selectedId = null;
     this._deselect();
-    this._setLocation(area.split(',')[0], area, lat || null, lng || null);
+    // Build a location string that _setLocation can extract city from too.
+    const locationStr = city ? `${area}, ${city}` : area;
+    this._setLocation(area.split(',')[0], locationStr, lat || null, lng || null);
     if (lat && lng) this._updateCenterDistances(lat, lng);
+    if (city) UI.toast(`📮 Showing centers in ${city}`);
     setTimeout(() => this.close(), 280);
   },
 

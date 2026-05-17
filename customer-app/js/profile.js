@@ -458,6 +458,9 @@ const ProfileScreen = {
     const choice = LABELS[this.addrLabelActive] || LABELS.other;
     const fullAddress = [flat, area, landmark].filter(Boolean).join(', ');
     const isEditing = this.editingAddressId != null;
+    // Capture the editing id BEFORE we clear it later — needed when locating
+    // the just-saved row in SAVED_ADDRESSES after the reload.
+    const editingIdSnap = this.editingAddressId;
 
     const saveBtn = document.getElementById('add-addr-save-btn');
     if (saveBtn) { saveBtn.disabled = true; saveBtn.dataset._t = saveBtn.textContent; saveBtn.textContent = 'Saving…'; }
@@ -484,11 +487,45 @@ const ProfileScreen = {
         if (inp) inp.value = '';
       });
       UI.toast(isEditing ? '✅ Address updated!' : '✅ Address saved!');
-      // If user came from summary (booking flow), bounce them straight back there.
-      // Otherwise route to the addresses list as before.
+
+      // Activate the just-saved address on the home screen. The backend's
+      // addAddress() marks the FIRST address as default automatically, so a
+      // brand-new user gets their first address selected without an extra
+      // tap. For subsequent adds we still activate this address as the
+      // current location (without changing the server-side default — the
+      // user can promote it from the addresses list later if they want).
+      // SAVED_ADDRESSES is sorted by id ASC after loadAddresses(), so the
+      // just-saved row is the last one.
+      const target = isEditing
+        ? SAVED_ADDRESSES.find(a => a.id === editingIdSnap) || SAVED_ADDRESSES[SAVED_ADDRESSES.length - 1]
+        : (SAVED_ADDRESSES.find(a => a.isDefault) || SAVED_ADDRESSES[SAVED_ADDRESSES.length - 1]);
+      if (target && typeof LocationModal !== 'undefined') {
+        // Rename to targetCity to avoid shadowing the outer `city` from the form.
+        let targetCity = (target.city || '').trim();
+        if (!targetCity && target.lat != null && target.lng != null) {
+          try { targetCity = (await LocationModal._reverseGeocode(target.lat, target.lng)).city || ''; }
+          catch { /* keep empty */ }
+        }
+        AppState.user.city = targetCity;
+        LocationModal._setLocation(target.label, targetCity || target.label, target.lat, target.lng);
+        LocationModal._selectedId = target.id;
+        await LocationModal._applyCityFilter(targetCity || '');
+        if (typeof MapView !== 'undefined') {
+          if (target.lat != null && target.lng != null) MapView.centerOn(target.lat, target.lng);
+          else if (targetCity) MapView.centerOnCity(targetCity);
+        }
+      }
+
+      // Where to go next:
+      //  - mid-booking → back to summary so the booking flow keeps going
+      //  - first address (just created) → home so user sees centers near them
+      //  - subsequent add → addresses list so user can manage them
       const cameFromSummary = Router.history.includes('summary');
+      const isFirstAddress  = !isEditing && SAVED_ADDRESSES.length === 1;
       setTimeout(() => {
-        if (cameFromSummary) Router.back(); else Router.go('addresses');
+        if (cameFromSummary)     Router.back();
+        else if (isFirstAddress) Router.go('home', false);
+        else                     Router.go('addresses');
       }, 800);
     } catch (e) {
       UI.toast('❌ ' + e.message);
