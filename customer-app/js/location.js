@@ -129,44 +129,75 @@ const LocationModal = {
     if (subTxt) subTxt.textContent = 'Detecting your location…';
     if (dot)    { dot.style.animation = 'spin 1s linear infinite'; dot.style.background = '#f59e0b'; }
 
-    if (!window.Capacitor) {
-      if (subTxt) subTxt.textContent = '⚠️ GPS only on mobile';
-      if (dot)    dot.style.background = '#ef4444';
-      return;
-    }
-
     try {
-      const { Geolocation } = Capacitor.Plugins;
-
-      const permission = await Geolocation.checkPermissions();
-      if (permission.location !== 'granted') {
-        await Geolocation.requestPermissions();
-      }
-
-      const pos = await Geolocation.getCurrentPosition({
-        timeout: 10000,
-        enableHighAccuracy: true
-      });
-
+      const pos = await this._getPosition();
       const { latitude: lat, longitude: lng } = pos.coords;
-      const { area, city } = await this._reverseGeocode(lat, lng);
+      console.log('[GPS] coords:', lat, lng);
 
-      if (subTxt) subTxt.textContent = '✅ ' + area;
+      if (subTxt) subTxt.textContent = 'Looking up address…';
+      const { area, city } = await this._reverseGeocode(lat, lng);
+      console.log('[GPS] reverse-geocoded:', { area, city });
+
+      if (subTxt) subTxt.textContent = city ? `✅ ${area}, ${city}` : `✅ ${area}`;
       if (dot)    { dot.style.animation = ''; dot.style.background = '#22c55e'; }
 
       this._selectedId = null;
       this._deselect();
-      // Pass "suburb, city" so _setLocation can extract the city for filtering
+
+      // _setLocation kicks off _applyCityFilter as fire-and-forget — for the
+      // GPS path we need to actually wait for centers to load before closing
+      // the modal so the home doesn't briefly show stale results.
       const fullArea = city ? area + ', ' + city : area;
       this._setLocation(area, fullArea, lat, lng);
       this._updateCenterDistances(lat, lng);
+
+      if (city) {
+        if (subTxt) subTxt.textContent = `Fetching centers in ${city}…`;
+        await this._applyCityFilter(city);
+        const count = (typeof CENTERS !== 'undefined') ? CENTERS.length : 0;
+        console.log('[GPS] centers loaded for', city, '→', count);
+        if (subTxt) {
+          subTxt.textContent = count
+            ? `✅ ${count} center${count === 1 ? '' : 's'} near you`
+            : `⚠️ No service in ${city} yet`;
+        }
+      }
       setTimeout(() => this.close(), 1200);
 
     } catch (err) {
       console.error('GPS Error:', err);
-      if (subTxt) subTxt.textContent = '⚠️ Could not get location.';
-      if (dot)    { dot.style.animation = ''; dot.style.background = '#ef4444'; }
+      const msg = (err && err.message) || 'Could not get location';
+      const denied = /denied|permission/i.test(msg);
+      if (subTxt) {
+        subTxt.innerHTML = denied
+          ? `⚠️ Location blocked — enable it in <b>Settings → Apps → Pitbay → Permissions</b>`
+          : `⚠️ ${msg}`;
+      }
+      if (dot) { dot.style.animation = ''; dot.style.background = '#ef4444'; }
     }
+  },
+
+  // Shared GPS helper. Returns a Position. Throws "Location permission denied"
+  // if user has blocked it, or "Geolocation not supported" on desktop without
+  // the Web Geolocation API.
+  async _getPosition() {
+    if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Geolocation) {
+      const { Geolocation } = window.Capacitor.Plugins;
+      let perm = await Geolocation.checkPermissions();
+      if (perm.location !== 'granted') {
+        perm = await Geolocation.requestPermissions();
+        if (perm.location !== 'granted') {
+          throw new Error('Location permission denied');
+        }
+      }
+      return Geolocation.getCurrentPosition({ enableHighAccuracy: true, timeout: 10000 });
+    }
+    if (!navigator.geolocation) throw new Error('Geolocation not supported');
+    return new Promise((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(resolve, reject, {
+        enableHighAccuracy: true, timeout: 10000,
+      });
+    });
   },
 
   _resetGps() {
@@ -295,23 +326,35 @@ const LocationModal = {
     const url  = cityParam
       ? `${base}/api/centers?city=${encodeURIComponent(cityParam)}`
       : `${base}/api/centers`;
+    console.log('[centers] fetching for city=', JSON.stringify(cityParam), '→', url);
     try {
       const r = await fetch(url);
       const j = await r.json();
-      if (j && j.success && Array.isArray(j.data)) {
-        if (cityParam) {
-          CENTERS = j.data.filter(c => this._cityMatches(c.city, cityParam));
-        } else {
-          CENTERS = j.data;
-          window.ALL_CENTERS = [...j.data];
-        }
+      const raw = (j && j.success && Array.isArray(j.data)) ? j.data : [];
+      if (cityParam) {
+        const filtered = raw.filter(c => this._cityMatches(c.city, cityParam));
+        console.log('[centers] api returned', raw.length, '→ filtered to', filtered.length,
+                    'for', JSON.stringify(cityParam),
+                    '· cities in response:', [...new Set(raw.map(c => c.city))]);
+        // Assign both the script-level binding AND window.CENTERS — they are
+        // technically separate, and any reader using either form must see the
+        // same list.
+        CENTERS = filtered;
+        window.CENTERS = filtered;
+      } else {
+        CENTERS = raw;
+        window.CENTERS = raw;
+        window.ALL_CENTERS = [...raw];
+        console.log('[centers] api returned', raw.length, '(no city filter)');
       }
     } catch (e) {
-      console.warn('_applyCityFilter API call failed, using client-side filter:', e.message);
+      console.warn('[centers] api failed, using client-side fallback:', e.message);
       if (typeof ALL_CENTERS === 'undefined') return;
-      CENTERS = cityParam
+      const next = cityParam
         ? ALL_CENTERS.filter(c => this._cityMatches(c.city, cityParam))
         : [...ALL_CENTERS];
+      CENTERS = next;
+      window.CENTERS = next;
     }
     if (typeof HomeScreen !== 'undefined') HomeScreen.renderCenterCards(CENTERS);
     // Keep the map pins in sync with the (newly filtered) center list.

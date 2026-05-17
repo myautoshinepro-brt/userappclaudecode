@@ -208,6 +208,7 @@ const UserData = (() => {
       // ones saved before the city field was added). Try lat/lng reverse
       // geocode first, then the last comma-separated chunk of the address.
       let city = (defAddr.city || '').trim();
+      const citySource = city ? 'address.city' : null;
       if (!city && defAddr.lat != null && defAddr.lng != null && typeof LocationModal !== 'undefined') {
         try {
           const g = await LocationModal._reverseGeocode(defAddr.lat, defAddr.lng);
@@ -218,6 +219,8 @@ const UserData = (() => {
         const parts = (defAddr.address || '').split(',').map(s => s.trim()).filter(Boolean);
         if (parts.length) city = parts[parts.length - 1];
       }
+      console.log('[initSession] picked default address', JSON.stringify(defAddr.label),
+                  '→ city:', JSON.stringify(city), '(source:', citySource || 'derived', ')');
 
       AppState.user.city = city;
       if (typeof LocationModal !== 'undefined') {
@@ -230,6 +233,7 @@ const UserData = (() => {
         else if (city) MapView.centerOnCity(city);
       }
     } else {
+      console.log('[initSession] no saved addresses — showing pick-location prompt');
       AppState.user.city = '';
       if (typeof HomeScreen !== 'undefined') HomeScreen.renderCenterCards(CENTERS);
       const locLabel = document.getElementById('location-label');

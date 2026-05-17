@@ -511,7 +511,12 @@ const ProfileScreen = {
       return;
     }
     if (!SAVED_VEHICLES.length) {
-      list.innerHTML = `<div style="padding:14px 12px;font-size:11px;color:var(--text-secondary);text-align:center">No saved vehicles yet.</div>`;
+      list.innerHTML = `
+        <div style="padding:24px 16px;text-align:center;border:1px dashed var(--border-medium);border-radius:12px;margin-bottom:8px">
+          <div style="font-size:30px;margin-bottom:6px">🚗</div>
+          <div style="font-size:12px;font-weight:700;color:var(--text-primary);margin-bottom:3px">No vehicles saved yet</div>
+          <div style="font-size:11px;color:var(--text-secondary)">Add your first vehicle below.</div>
+        </div>`;
       return;
     }
     list.innerHTML = SAVED_VEHICLES.map(v => `
@@ -524,9 +529,29 @@ const ProfileScreen = {
             ? '<div style="font-size:9px;background:#e8f5e9;color:#2e7d32;padding:1px 7px;border-radius:7px;display:inline-block;margin-top:3px;font-weight:700">Primary</div>'
             : `<div onclick="ProfileScreen.makePrimaryVehicle(${v.id})" style="font-size:10px;color:var(--blue);cursor:pointer;font-weight:600;margin-top:3px;display:inline-block">Make primary</div>`}
         </div>
-        <div onclick="ProfileScreen.removeVehicle(${v.id})" style="font-size:18px;color:var(--red);cursor:pointer">🗑️</div>
+        <div style="display:flex;gap:6px;flex-shrink:0">
+          <span onclick="ProfileScreen.editVehicle(${v.id})" style="font-size:16px;color:var(--blue);cursor:pointer;padding:4px 6px">✏️</span>
+          <span onclick="ProfileScreen.removeVehicle(${v.id})" style="font-size:16px;color:var(--red);cursor:pointer;padding:4px 6px">🗑️</span>
+        </div>
       </div>
     `).join('');
+  },
+
+  editingVehicleId: null,
+
+  editVehicle(id) {
+    const v = SAVED_VEHICLES.find(x => String(x.id) === String(id));
+    if (!v) return;
+    this.editingVehicleId = id;
+    const set = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ''; };
+    set('inp-vreg',    v.plate);
+    set('inp-vmodel',  v.model);
+    set('inp-vcolour', v.colour);
+    const btn = document.querySelector('#sc-vehicles .btn-green');
+    if (btn) btn.textContent = 'Update vehicle';
+    // Scroll the form into view (the form is below the list).
+    document.getElementById('inp-vreg')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    UI.toast('✏️ Editing ' + v.plate);
   },
 
   async addVehicle() {
@@ -534,8 +559,24 @@ const ProfileScreen = {
     const model  = document.getElementById('inp-vmodel')?.value.trim();
     const colour = document.getElementById('inp-vcolour')?.value.trim();
     if (!plate) { UI.toast('⚠️ Enter registration number'); return; }
+    if (this._savingVehicle) return;
+
+    const isEditing = this.editingVehicleId != null;
+    const btn = document.querySelector('#sc-vehicles .btn-green');
+    if (btn) { btn.disabled = true; btn.dataset._t = btn.textContent; btn.textContent = isEditing ? 'Updating…' : 'Adding…'; }
+    this._savingVehicle = true;
 
     try {
+      // Backend only exposes POST + DELETE for vehicles today. For "edit" we
+      // delete the old row and add a new one so the user perceives an update
+      // without needing a new server endpoint right now.
+      if (isEditing) {
+        const delR = await fetch(`/api/profile/vehicles/${this.editingVehicleId}`, {
+          method: 'DELETE',
+          headers: { Authorization: 'Bearer ' + (Auth.getToken() || '') },
+        });
+        if (!delR.ok) throw new Error('Could not update vehicle');
+      }
       const r = await fetch('/api/profile/vehicles', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (Auth.getToken() || '') },
@@ -543,19 +584,28 @@ const ProfileScreen = {
       });
       const j = await r.json();
       if (!r.ok || !j.success) throw new Error(j.error || 'Save failed');
+
       await UserData.loadVehicles();
       this.renderVehicles();
       ['inp-vreg','inp-vmodel','inp-vcolour'].forEach(id => {
         const inp = document.getElementById(id);
         if (inp) inp.value = '';
       });
-      UI.toast('✅ Vehicle added: ' + plate);
-      // If user came from summary mid-booking, bounce back so they can keep going.
+      this.editingVehicleId = null;
+      UI.toast(isEditing ? '✅ Vehicle updated: ' + plate : '✅ Vehicle added: ' + plate);
       if (Router.history.includes('summary')) {
         setTimeout(() => Router.back(), 600);
       }
     } catch (e) {
       UI.toast('❌ ' + e.message);
+    } finally {
+      this._savingVehicle = false;
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = btn.dataset._t || (isEditing ? 'Update vehicle' : 'Add vehicle');
+        // Reset button label back to "Add vehicle" after a successful edit
+        if (!this.editingVehicleId) btn.textContent = 'Add vehicle';
+      }
     }
   },
 
