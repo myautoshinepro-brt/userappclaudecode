@@ -11,6 +11,7 @@ function isMobile(val) {
 router.post('/apply', (req, res) => {
   const {
     name, owner_name, mobile, email, city, address,
+    area, pincode,
     gstin, bank_account, ifsc, account_name, bank_name,
     geo_lat, geo_lng, center_images, certificates, wash_types,
   } = req.body || {};
@@ -20,10 +21,14 @@ router.post('/apply', (req, res) => {
   if (!isMobile(mobile))   return res.status(400).json({ error: 'Enter a valid 10-digit mobile number.' });
   if (!city?.trim())       return res.status(400).json({ error: 'City is required.' });
   if (!address?.trim())    return res.status(400).json({ error: 'Address is required.' });
+  if (pincode && !/^\d{6}$/.test(String(pincode).trim()))
+    return res.status(400).json({ error: 'Pincode must be 6 digits.' });
 
   const norm = mobile.replace(/\s+/g, '');
   const data = {
     name, owner_name, mobile: norm, email, city, address,
+    area:    area    ? String(area).trim()    : null,
+    pincode: pincode ? String(pincode).trim() : null,
     gstin, bank_account, ifsc, account_name, bank_name,
     geo_lat: geo_lat || null, geo_lng: geo_lng || null,
     center_images: Array.isArray(center_images) ? center_images : [],

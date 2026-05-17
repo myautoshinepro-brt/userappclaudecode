@@ -171,9 +171,10 @@ router.patch('/open-status', requireAuth, (req, res) => {
   res.json({ success: true, is_open: !!is_open });
 });
 
-// PATCH /api/auth/center  { name, owner_name, email, address, gstin, wash_types, open_time, close_time, city?, pincode? }
+// PATCH /api/auth/center  { name, owner_name, email, address, gstin, wash_types, open_time, close_time, city?, pincode?, area?, lat?, lng? }
 router.patch('/center', requireAuth, (req, res) => {
-  const { name, owner_name, email, address, gstin, wash_types, open_time, close_time, city, pincode } = req.body || {};
+  const { name, owner_name, email, address, gstin, wash_types, open_time, close_time,
+          city, pincode, area, lat, lng } = req.body || {};
   if (!name?.trim()) return res.status(400).json({ error: 'Center name is required.' });
 
   let cityChangePending = null;
@@ -185,7 +186,10 @@ router.patch('/center', requireAuth, (req, res) => {
     }
   }
 
-  db.updateCenterInfo(req.center.id, { name, owner_name, email, address, gstin, wash_types, open_time, close_time, pincode });
+  db.updateCenterInfo(req.center.id, {
+    name, owner_name, email, address, gstin, wash_types, open_time, close_time,
+    pincode, area, lat, lng,
+  });
   const updated = db.findCenterById(req.center.id);
   console.log(`✅ Center info updated: ${updated.name}`);
   res.json({

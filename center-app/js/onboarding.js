@@ -81,6 +81,28 @@ const Onboarding = {
     // ── Step 2: Location ───────────────────────────────────────
     if (step === 2) return `
       <div class="input-group">
+        <button class="btn btn-primary btn-full" onclick="Onboarding._getGeo()" id="ob-geo-btn"
+                style="display:flex;align-items:center;justify-content:center;gap:8px">
+          📡 Use my current location
+        </button>
+        <div id="ob-geo-status" style="font-size:11px;color:var(--muted);margin-top:6px;text-align:center">
+          ${d.geo_lat ? `✅ ${d.geo_lat.toFixed(4)}, ${d.geo_lng.toFixed(4)}` : 'GPS will auto-fill the fields below'}
+        </div>
+      </div>
+      <div id="ob-geo-map" style="height:180px;border-radius:10px;overflow:hidden;margin-bottom:14px;border:1px solid var(--border);display:${d.geo_lat ? 'block' : 'none'}"></div>
+      <div id="ob-geo-hint" style="font-size:10px;color:var(--muted);margin-bottom:14px;display:${d.geo_lat ? 'block' : 'none'};text-align:center">
+        Drag the pin to fine-tune your center's exact location
+      </div>
+      <div class="input-group">
+        <div class="input-label">Pincode *</div>
+        <div class="input-with-icon"><span class="input-ico">📮</span>
+          <input id="ob-pincode" class="input-field" type="tel" inputmode="numeric" maxlength="6"
+                 placeholder="6-digit pincode" value="${d.pincode || ''}"
+                 onblur="Onboarding._lookupPincode()">
+        </div>
+        <div id="ob-err-pincode" style="color:#dc2626;font-size:11px;margin-top:3px;display:none"></div>
+      </div>
+      <div class="input-group">
         <div class="input-label">City *</div>
         <div class="input-with-icon"><span class="input-ico">🏙️</span>
           <input id="ob-city" class="input-field" type="text" placeholder="e.g. Mumbai" value="${d.city || ''}">
@@ -88,23 +110,18 @@ const Onboarding = {
         <div id="ob-err-city" style="color:#dc2626;font-size:11px;margin-top:3px;display:none"></div>
       </div>
       <div class="input-group">
-        <div class="input-label">Full Address *</div>
-        <div class="input-with-icon"><span class="input-ico">📍</span>
-          <input id="ob-address" class="input-field" type="text" placeholder="Shop no, street, area, landmark" value="${d.address || ''}">
+        <div class="input-label">Area / Locality *</div>
+        <div class="input-with-icon"><span class="input-ico">🛣️</span>
+          <input id="ob-area" class="input-field" type="text" placeholder="e.g. Andheri West, Madeenaguda" value="${d.area || ''}">
         </div>
-        <div id="ob-err-address" style="color:#dc2626;font-size:11px;margin-top:3px;display:none"></div>
+        <div id="ob-err-area" style="color:#dc2626;font-size:11px;margin-top:3px;display:none"></div>
       </div>
       <div class="input-group">
-        <div class="input-label">Geo Location <span style="color:var(--muted);font-weight:400">(optional)</span></div>
-        <div style="display:flex;gap:8px;align-items:center">
-          <button class="btn btn-ghost" style="flex:1" onclick="Onboarding._getGeo()" id="ob-geo-btn">
-            📍 Detect My Location
-          </button>
-          <div id="ob-geo-status" style="font-size:10px;color:var(--muted);flex:1;text-align:right">
-            ${d.geo_lat ? `✅ ${d.geo_lat.toFixed(4)}, ${d.geo_lng.toFixed(4)}` : 'Not captured'}
-          </div>
+        <div class="input-label">Full Address *</div>
+        <div class="input-with-icon"><span class="input-ico">📍</span>
+          <input id="ob-address" class="input-field" type="text" placeholder="Shop no, street, landmark" value="${d.address || ''}">
         </div>
-        <div style="font-size:10px;color:var(--muted);margin-top:4px">Helps customers find your center on the map</div>
+        <div id="ob-err-address" style="color:#dc2626;font-size:11px;margin-top:3px;display:none"></div>
       </div>
       <div style="display:flex;gap:8px;margin-top:8px">
         <button class="btn btn-ghost" style="flex:1" onclick="Onboarding._prev()">← Back</button>
@@ -246,51 +263,166 @@ const Onboarding = {
   },
 
   // ── Geo location ────────────────────────────────────────────
-  _geoMap: null,
+  _geoMap:    null,
+  _geoMarker: null,
 
-  _getGeo() {
-    if (!navigator.geolocation) { UI.toast('Geolocation not supported on this device'); return; }
-    const btn    = document.getElementById('ob-geo-btn');
-    const status = document.getElementById('ob-geo-status');
-    if (btn) btn.textContent = '⏳ Detecting...';
-    navigator.geolocation.getCurrentPosition(
-      pos => {
-        const lat = pos.coords.latitude;
-        const lng = pos.coords.longitude;
-        this._data.geo_lat = lat;
-        this._data.geo_lng = lng;
-        if (status) status.textContent = `✅ ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
-        if (btn)    btn.textContent    = '✅ Location Captured';
-        UI.toast('Location captured!');
-        this._showGeoMap(lat, lng);
-      },
-      () => {
-        if (btn) btn.textContent = '📍 Detect My Location';
-        UI.toast('Could not get location — please allow location access');
-      },
-      { enableHighAccuracy: true, timeout: 10000 }
-    );
+  // Use Capacitor Geolocation when running natively (gets the OS permission
+  // prompt), browser geolocation when running on the web. Throws a clear
+  // error so the UI can show a "permission blocked" hint.
+  async _getPosition() {
+    if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Geolocation) {
+      const { Geolocation } = window.Capacitor.Plugins;
+      let perm = await Geolocation.checkPermissions();
+      if (perm.location !== 'granted') {
+        perm = await Geolocation.requestPermissions();
+        if (perm.location !== 'granted') throw new Error('Location permission denied');
+      }
+      return Geolocation.getCurrentPosition({ enableHighAccuracy: true, timeout: 10000 });
+    }
+    if (!navigator.geolocation) throw new Error('Geolocation not supported on this device');
+    return new Promise((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(resolve, reject,
+        { enableHighAccuracy: true, timeout: 10000 });
+    });
   },
 
-  _showGeoMap(lat, lng) {
-    // Insert map preview below the geo row if not already there
-    let container = document.getElementById('ob-geo-map');
-    if (!container) {
-      const status = document.getElementById('ob-geo-status');
-      if (!status) return;
-      container = document.createElement('div');
-      container.id = 'ob-geo-map';
-      container.style.cssText = 'height:150px;border-radius:10px;overflow:hidden;margin-top:10px;border:1px solid var(--border)';
-      status.parentNode.insertBefore(container, status.nextSibling);
+  async _getGeo() {
+    const btn    = document.getElementById('ob-geo-btn');
+    const status = document.getElementById('ob-geo-status');
+    const origBtn = btn?.textContent;
+    if (btn)    btn.textContent = '⏳ Detecting…';
+    if (status) status.textContent = 'Detecting your location…';
+
+    let pos;
+    try {
+      pos = await this._getPosition();
+    } catch (err) {
+      console.error('GPS error:', err);
+      if (btn) btn.textContent = origBtn || '📡 Use my current location';
+      const denied = /denied|permission/i.test(err.message || '');
+      if (status) {
+        status.innerHTML = denied
+          ? `⚠️ Location blocked — enable it in <b>Settings → Apps → Pitbay Center → Permissions</b>`
+          : `⚠️ ${err.message || 'Could not get location'}`;
+      }
+      return;
     }
+
+    const lat = pos.coords.latitude;
+    const lng = pos.coords.longitude;
+    this._data.geo_lat = lat;
+    this._data.geo_lng = lng;
+
+    if (status) status.textContent = 'Looking up address…';
+    await this._fillFromCoords(lat, lng);
+    this._renderMap(lat, lng);
+
+    if (btn)    btn.textContent    = '✅ Location captured';
+    if (status) status.textContent = `📍 ${lat.toFixed(4)}, ${lng.toFixed(4)} · drag pin to fine-tune`;
+  },
+
+  // Reverse-geocode the coords and populate the city / area / pincode fields
+  // when they're empty. We don't overwrite values the user has typed already.
+  async _fillFromCoords(lat, lng) {
+    try {
+      const r = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`
+      );
+      const j = await r.json();
+      const a = j.address || {};
+
+      const city = a.city || a.town || a.village || a.municipality || a.county || a.state_district || '';
+      const pin  = a.postcode || '';
+      const areaParts = [
+        a.neighbourhood, a.suburb, a.city_district, a.hamlet, a.locality, a.quarter,
+      ].map(x => (x || '').trim()).filter(Boolean);
+      const seen = new Set();
+      const area = areaParts.filter(p => {
+        const k = p.toLowerCase();
+        if (seen.has(k)) return false; seen.add(k); return true;
+      }).join(', ');
+
+      const cityInp = document.getElementById('ob-city');
+      const areaInp = document.getElementById('ob-area');
+      const pinInp  = document.getElementById('ob-pincode');
+      const addInp  = document.getElementById('ob-address');
+      if (cityInp && (!cityInp.value || !cityInp.value.trim())) cityInp.value = city;
+      if (areaInp && (!areaInp.value || !areaInp.value.trim())) areaInp.value = area || city;
+      if (pinInp  && (!pinInp.value  || !pinInp.value.trim()))  pinInp.value  = pin;
+      if (addInp  && (!addInp.value  || !addInp.value.trim())) {
+        const street = [a.house_number, a.road].filter(Boolean).join(', ');
+        if (street) addInp.value = street;
+      }
+    } catch (e) {
+      console.warn('reverse-geocode failed:', e.message);
+    }
+  },
+
+  // Pincode-only lookup: when the owner manually types a pincode, forward-
+  // geocode it to pre-fill city/area + drop the map pin if we don't have one.
+  async _lookupPincode() {
+    const pin = document.getElementById('ob-pincode')?.value.trim();
+    if (!/^\d{6}$/.test(pin)) return;
+    try {
+      const r = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&postalcode=${pin}&country=India&limit=1&addressdetails=1`
+      );
+      const j = await r.json();
+      if (!j.length) return;
+      const hit = j[0];
+      const a = hit.address || {};
+      const cityInp = document.getElementById('ob-city');
+      const areaInp = document.getElementById('ob-area');
+      if (cityInp && !cityInp.value.trim()) cityInp.value = a.city || a.town || a.state_district || '';
+      if (areaInp && !areaInp.value.trim()) {
+        areaInp.value = a.suburb || a.neighbourhood || hit.display_name.split(',')[0].trim();
+      }
+      const lat = parseFloat(hit.lat), lng = parseFloat(hit.lon);
+      if (!isNaN(lat) && !isNaN(lng) && (this._data.geo_lat == null)) {
+        this._data.geo_lat = lat;
+        this._data.geo_lng = lng;
+        this._renderMap(lat, lng);
+        const status = document.getElementById('ob-geo-status');
+        if (status) status.textContent = `📍 ${lat.toFixed(4)}, ${lng.toFixed(4)} · drag pin to fine-tune`;
+      }
+    } catch { /* silent */ }
+  },
+
+  // Render (or re-render) the map with a draggable pin. When the user drags
+  // the pin we update the stored coords AND reverse-geocode the new spot.
+  _renderMap(lat, lng) {
+    const container = document.getElementById('ob-geo-map');
+    const hint      = document.getElementById('ob-geo-hint');
+    if (!container) return;
+    container.style.display = 'block';
+    if (hint) hint.style.display = 'block';
+
     if (typeof L === 'undefined') return;
     if (this._geoMap) { this._geoMap.remove(); this._geoMap = null; }
-    this._geoMap = L.map('ob-geo-map', { zoomControl: false, attributionControl: false })
-      .setView([lat, lng], 15);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18 }).addTo(this._geoMap);
-    L.circleMarker([lat, lng], {
-      radius: 10, fillColor: '#1e40af', color: '#fff', weight: 3, fillOpacity: 1,
-    }).addTo(this._geoMap).bindPopup('Your center location').openPopup();
+
+    this._geoMap = L.map('ob-geo-map', { zoomControl: true, attributionControl: false })
+      .setView([lat, lng], 16);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(this._geoMap);
+
+    this._geoMarker = L.marker([lat, lng], { draggable: true }).addTo(this._geoMap);
+    this._geoMarker.on('dragend', async () => {
+      const p = this._geoMarker.getLatLng();
+      this._data.geo_lat = p.lat;
+      this._data.geo_lng = p.lng;
+      const status = document.getElementById('ob-geo-status');
+      if (status) status.textContent = `📍 ${p.lat.toFixed(4)}, ${p.lng.toFixed(4)} · pin updated`;
+      // Re-fill from the new position too (only into empty fields).
+      await this._fillFromCoords(p.lat, p.lng);
+    });
+
+    // Tap on the map = move the pin there.
+    this._geoMap.on('click', e => {
+      this._geoMarker.setLatLng(e.latlng);
+      this._geoMarker.fire('dragend');
+    });
+
+    // Leaflet inside a hidden flex container sometimes mis-measures; nudge it.
+    setTimeout(() => this._geoMap && this._geoMap.invalidateSize(), 80);
   },
 
   // ── Image helpers ───────────────────────────────────────────
@@ -378,13 +510,18 @@ const Onboarding = {
 
   _next2() {
     const city    = document.getElementById('ob-city')?.value.trim();
+    const area    = document.getElementById('ob-area')?.value.trim();
+    const pincode = document.getElementById('ob-pincode')?.value.trim();
     const address = document.getElementById('ob-address')?.value.trim();
-    this._obClear('ob-err-city','ob-err-address');
+    this._obClear('ob-err-city','ob-err-address','ob-err-area','ob-err-pincode');
     let valid = true;
-    if (!city)    { this._obErr('ob-err-city', 'City is required.'); valid = false; }
-    if (!address) { this._obErr('ob-err-address', 'Full address is required.'); valid = false; }
+    if (!pincode)                     { this._obErr('ob-err-pincode', 'Pincode is required.'); valid = false; }
+    else if (!/^\d{6}$/.test(pincode)) { this._obErr('ob-err-pincode', 'Pincode must be 6 digits.'); valid = false; }
+    if (!city)    { this._obErr('ob-err-city',    'City is required.');           valid = false; }
+    if (!area)    { this._obErr('ob-err-area',    'Area / locality is required.'); valid = false; }
+    if (!address) { this._obErr('ob-err-address', 'Full address is required.');   valid = false; }
     if (!valid) return;
-    Object.assign(this._data, { city, address });
+    Object.assign(this._data, { city, area, pincode, address });
     this._step = 3; this._renderStep(3);
   },
 

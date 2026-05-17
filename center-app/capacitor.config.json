@@ -1,11 +1,9 @@
 {
   "appId": "com.pitbay.center",
   "appName": "Pitbay Center",
-  "webDir": ".",
+  "webDir": "www",
   "server": {
-    "androidScheme": "https",
-    "cleartext": true,
-    "url": "https://YOUR_DEPLOYED_URL_HERE"
+    "androidScheme": "https"
   },
   "plugins": {
     "SplashScreen": {
@@ -17,7 +15,8 @@
     },
     "StatusBar": {
       "style": "LIGHT",
-      "backgroundColor": "#0f172a"
+      "backgroundColor": "#0f172a",
+      "overlaysWebView": false
     },
     "Camera": {
       "permissions": ["camera", "photos"]

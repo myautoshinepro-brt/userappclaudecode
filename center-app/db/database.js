@@ -159,6 +159,7 @@ try {
 // ── Migration: pincode and pending city change approval ──
 try { db.exec("ALTER TABLE centers ADD COLUMN pincode      TEXT"); } catch { /* exists */ }
 try { db.exec("ALTER TABLE centers ADD COLUMN city_pending TEXT"); } catch { /* exists */ }
+try { db.exec("ALTER TABLE centers ADD COLUMN area         TEXT"); } catch { /* exists */ }
 
 // ── Data fix: normalize all existing city names to Title Case ──
 try {
@@ -183,6 +184,8 @@ try { db.exec("ALTER TABLE applications ADD COLUMN center_images TEXT"); } catch
 try { db.exec("ALTER TABLE applications ADD COLUMN certificates  TEXT"); } catch { /* exists */ }
 try { db.exec("ALTER TABLE applications ADD COLUMN wash_types    TEXT"); } catch { /* exists */ }
 try { db.exec("ALTER TABLE applications ADD COLUMN bank_name     TEXT"); } catch { /* exists */ }
+try { db.exec("ALTER TABLE applications ADD COLUMN area          TEXT"); } catch { /* exists */ }
+try { db.exec("ALTER TABLE applications ADD COLUMN pincode       TEXT"); } catch { /* exists */ }
 
 // ── Chat tables ──
 db.exec(`
@@ -529,7 +532,7 @@ const centerByMobile = db.prepare('SELECT * FROM centers WHERE mobile = ?');
 const centerById     = db.prepare('SELECT * FROM centers WHERE id = ?');
 const updateCenter   = db.prepare(`
   UPDATE centers SET name=?, owner_name=?, email=?, address=?, gstin=?,
-    wash_types=?, open_time=?, close_time=?, pincode=?
+    wash_types=?, open_time=?, close_time=?, pincode=?, area=?, lat=?, lng=?
   WHERE id=?
 `);
 const setOpenStatus = db.prepare("UPDATE centers SET is_open=? WHERE id=?");
@@ -662,7 +665,11 @@ module.exports = {
     return updateCenter.run(
       data.name, data.owner_name, data.email, data.address,
       data.gstin, data.wash_types, data.open_time, data.close_time,
-      data.pincode || null, id
+      data.pincode || null,
+      data.area    || null,
+      data.lat != null ? parseFloat(data.lat) : null,
+      data.lng != null ? parseFloat(data.lng) : null,
+      id
     );
   },
 
@@ -856,15 +863,17 @@ module.exports = {
   },
   createApplication(data) {
     return db.prepare(`
-      INSERT INTO applications (name, owner_name, mobile, email, city, address, gstin, bank_account, ifsc, account_name, bank_name, geo_lat, geo_lng, center_images, certificates, wash_types)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO applications (name, owner_name, mobile, email, city, address, gstin, bank_account, ifsc, account_name, bank_name, geo_lat, geo_lng, center_images, certificates, wash_types, area, pincode)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       data.name, data.owner_name, data.mobile, data.email || null, toTitleCase(data.city) || data.city, data.address,
       data.gstin || null, data.bank_account || null, data.ifsc || null, data.account_name || null,
       data.bank_name || null, data.geo_lat || null, data.geo_lng || null,
       data.center_images ? JSON.stringify(data.center_images) : null,
       data.certificates  ? JSON.stringify(data.certificates)  : null,
-      data.wash_types || null
+      data.wash_types || null,
+      data.area    || null,
+      data.pincode || null
     );
   },
   updateApplicationStatus(id, status, notes) {
@@ -877,6 +886,7 @@ module.exports = {
         name=?, owner_name=?, email=?, city=?, address=?, gstin=?,
         bank_account=?, ifsc=?, account_name=?, bank_name=?,
         geo_lat=?, geo_lng=?, center_images=?, certificates=?, wash_types=?,
+        area=?, pincode=?,
         status='pending', notes=NULL, updated_at=datetime('now')
       WHERE id=?
     `).run(
@@ -886,7 +896,10 @@ module.exports = {
       data.geo_lat || null, data.geo_lng || null,
       data.center_images ? JSON.stringify(data.center_images) : null,
       data.certificates  ? JSON.stringify(data.certificates)  : null,
-      data.wash_types || null, id
+      data.wash_types || null,
+      data.area    || null,
+      data.pincode || null,
+      id
     );
   },
   approveApplication(id) {
@@ -894,11 +907,12 @@ module.exports = {
     if (!app) return null;
     const normalizedCity = toTitleCase(app.city) || app.city;
     const info = db.prepare(`
-      INSERT INTO centers (name, owner_name, mobile, email, address, city, gstin, wash_types, bank_account, ifsc, account_name, bank_name, lat, lng)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO centers (name, owner_name, mobile, email, address, area, pincode, city, gstin, wash_types, bank_account, ifsc, account_name, bank_name, lat, lng)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       app.name, app.owner_name, app.mobile, app.email,
-      app.address, normalizedCity, app.gstin || null,
+      app.address, app.area || null, app.pincode || null,
+      normalizedCity, app.gstin || null,
       app.wash_types || 'water,dry',
       app.bank_account || null, app.ifsc || null,
       app.account_name || null, app.bank_name || null,

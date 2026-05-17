@@ -48,6 +48,7 @@ const ProfileScreen = {
          </select>
          <div style="font-size:10px;color:var(--muted);margin-top:4px">City changes require super admin approval before going live on the customer app.</div>`;
 
+    const hasGeo = c.lat != null && c.lng != null;
     el.innerHTML = `
       <div class="input-group">
         <div class="input-label">Center Name</div>
@@ -61,13 +62,32 @@ const ProfileScreen = {
         <div class="input-label">Email</div>
         <input id="ec-email" class="input-field" type="email" value="${c.email || ''}" placeholder="Email address">
       </div>
+
+      <!-- ── Location section: GPS detect + draggable-pin map ── -->
+      <div class="input-group">
+        <div class="input-label">Center location</div>
+        <button class="btn btn-primary btn-full" id="ec-geo-btn" onclick="ProfileScreen.detectGeo()"
+                style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:4px">
+          📡 Use my current location
+        </button>
+        <div id="ec-geo-status" style="font-size:11px;color:var(--muted);margin-top:6px;text-align:center">
+          ${hasGeo ? `📍 ${Number(c.lat).toFixed(4)}, ${Number(c.lng).toFixed(4)} · drag pin to fine-tune` : 'Tap to capture GPS, or set pincode below'}
+        </div>
+        <div id="ec-geo-map" style="height:180px;border-radius:10px;overflow:hidden;margin-top:8px;border:1px solid var(--border);display:${hasGeo ? 'block' : 'none'}"></div>
+      </div>
+
       <div class="input-group">
         <div class="input-label">City</div>
         ${cityField}
       </div>
       <div class="input-group">
         <div class="input-label">Pincode</div>
-        <input id="ec-pincode" class="input-field" value="${c.pincode || ''}" placeholder="6-digit pincode" inputmode="numeric" maxlength="6">
+        <input id="ec-pincode" class="input-field" value="${c.pincode || ''}" placeholder="6-digit pincode" inputmode="numeric" maxlength="6"
+               onblur="ProfileScreen.lookupPincode()">
+      </div>
+      <div class="input-group">
+        <div class="input-label">Area / Locality</div>
+        <input id="ec-area" class="input-field" value="${c.area || ''}" placeholder="e.g. Andheri West, Madeenaguda">
       </div>
       <div class="input-group">
         <div class="input-label">Address</div>
@@ -99,6 +119,176 @@ const ProfileScreen = {
         Save Changes
       </button>
     `;
+
+    // If we already have coords on file, draw the map (with draggable pin)
+    // immediately so the owner sees their existing location.
+    if (hasGeo) {
+      // Save into a working buffer so dragging persists across re-renders.
+      this._geoLat = Number(c.lat);
+      this._geoLng = Number(c.lng);
+      setTimeout(() => this._renderMap(this._geoLat, this._geoLng), 80);
+    } else {
+      this._geoLat = null;
+      this._geoLng = null;
+    }
+  },
+
+  // ── EDIT-CENTER: location helpers (mirror of Onboarding._getGeo etc.) ──
+
+  _geoMap:    null,
+  _geoMarker: null,
+  _geoLat:    null,
+  _geoLng:    null,
+
+  async _getPosition() {
+    if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Geolocation) {
+      const { Geolocation } = window.Capacitor.Plugins;
+      let perm = await Geolocation.checkPermissions();
+      if (perm.location !== 'granted') {
+        perm = await Geolocation.requestPermissions();
+        if (perm.location !== 'granted') throw new Error('Location permission denied');
+      }
+      return Geolocation.getCurrentPosition({ enableHighAccuracy: true, timeout: 10000 });
+    }
+    if (!navigator.geolocation) throw new Error('Geolocation not supported on this device');
+    return new Promise((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(resolve, reject,
+        { enableHighAccuracy: true, timeout: 10000 });
+    });
+  },
+
+  async detectGeo() {
+    const btn    = document.getElementById('ec-geo-btn');
+    const status = document.getElementById('ec-geo-status');
+    const orig   = btn?.textContent;
+    if (btn)    btn.textContent = '⏳ Detecting…';
+    if (status) status.textContent = 'Detecting your location…';
+
+    let pos;
+    try { pos = await this._getPosition(); }
+    catch (err) {
+      if (btn) btn.textContent = orig || '📡 Use my current location';
+      const denied = /denied|permission/i.test(err.message || '');
+      if (status) {
+        status.innerHTML = denied
+          ? '⚠️ Location blocked — enable it in <b>Settings → Apps → Pitbay Center → Permissions</b>'
+          : `⚠️ ${err.message || 'Could not get location'}`;
+      }
+      return;
+    }
+
+    const lat = pos.coords.latitude;
+    const lng = pos.coords.longitude;
+    this._geoLat = lat;
+    this._geoLng = lng;
+
+    if (status) status.textContent = 'Looking up address…';
+    await this._fillFromCoords(lat, lng);
+    this._renderMap(lat, lng);
+
+    if (btn)    btn.textContent    = '✅ Location captured';
+    if (status) status.textContent = `📍 ${lat.toFixed(4)}, ${lng.toFixed(4)} · drag pin to fine-tune`;
+  },
+
+  async _fillFromCoords(lat, lng) {
+    try {
+      const r = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`
+      );
+      const j = await r.json();
+      const a = j.address || {};
+
+      const city = a.city || a.town || a.village || a.municipality || a.county || a.state_district || '';
+      const pin  = a.postcode || '';
+      const areaParts = [
+        a.neighbourhood, a.suburb, a.city_district, a.hamlet, a.locality, a.quarter,
+      ].map(x => (x || '').trim()).filter(Boolean);
+      const seen = new Set();
+      const area = areaParts.filter(p => {
+        const k = p.toLowerCase();
+        if (seen.has(k)) return false; seen.add(k); return true;
+      }).join(', ');
+
+      // Fill empty fields. Don't overwrite anything the owner has already
+      // edited or what they had on file.
+      const cityInp = document.getElementById('ec-city');
+      const areaInp = document.getElementById('ec-area');
+      const pinInp  = document.getElementById('ec-pincode');
+      const addInp  = document.getElementById('ec-address');
+      // City is a <select> — only set if the detected city is in the options.
+      if (cityInp && cityInp.tagName === 'SELECT' && city) {
+        const opt = Array.from(cityInp.options).find(o => o.value.toLowerCase() === city.toLowerCase());
+        if (opt) cityInp.value = opt.value;
+      } else if (cityInp && !cityInp.value.trim()) {
+        cityInp.value = city;
+      }
+      if (areaInp && !areaInp.value.trim()) areaInp.value = area || city;
+      if (pinInp  && !pinInp.value.trim())  pinInp.value  = pin;
+      if (addInp  && !addInp.value.trim()) {
+        const street = [a.house_number, a.road].filter(Boolean).join(', ');
+        if (street) addInp.value = street;
+      }
+    } catch (e) { console.warn('reverse-geocode failed:', e.message); }
+  },
+
+  async lookupPincode() {
+    const pin = document.getElementById('ec-pincode')?.value.trim();
+    if (!/^\d{6}$/.test(pin)) return;
+    try {
+      const r = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&postalcode=${pin}&country=India&limit=1&addressdetails=1`
+      );
+      const j = await r.json();
+      if (!j.length) return;
+      const hit = j[0];
+      const a = hit.address || {};
+      const cityInp = document.getElementById('ec-city');
+      const areaInp = document.getElementById('ec-area');
+      if (cityInp && cityInp.tagName === 'SELECT' && a.city) {
+        const opt = Array.from(cityInp.options).find(o => o.value.toLowerCase() === a.city.toLowerCase());
+        if (opt) cityInp.value = opt.value;
+      } else if (cityInp && !cityInp.value.trim()) {
+        cityInp.value = a.city || a.town || a.state_district || '';
+      }
+      if (areaInp && !areaInp.value.trim()) {
+        areaInp.value = a.suburb || a.neighbourhood || hit.display_name.split(',')[0].trim();
+      }
+      const lat = parseFloat(hit.lat), lng = parseFloat(hit.lon);
+      if (!isNaN(lat) && !isNaN(lng) && this._geoLat == null) {
+        this._geoLat = lat;
+        this._geoLng = lng;
+        this._renderMap(lat, lng);
+        const status = document.getElementById('ec-geo-status');
+        if (status) status.textContent = `📍 ${lat.toFixed(4)}, ${lng.toFixed(4)} · drag pin to fine-tune`;
+      }
+    } catch { /* silent */ }
+  },
+
+  _renderMap(lat, lng) {
+    const container = document.getElementById('ec-geo-map');
+    if (!container) return;
+    container.style.display = 'block';
+    if (typeof L === 'undefined') return;
+    if (this._geoMap) { this._geoMap.remove(); this._geoMap = null; }
+
+    this._geoMap = L.map('ec-geo-map', { zoomControl: true, attributionControl: false })
+      .setView([lat, lng], 16);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(this._geoMap);
+
+    this._geoMarker = L.marker([lat, lng], { draggable: true }).addTo(this._geoMap);
+    this._geoMarker.on('dragend', async () => {
+      const p = this._geoMarker.getLatLng();
+      this._geoLat = p.lat;
+      this._geoLng = p.lng;
+      const status = document.getElementById('ec-geo-status');
+      if (status) status.textContent = `📍 ${p.lat.toFixed(4)}, ${p.lng.toFixed(4)} · pin updated`;
+      await this._fillFromCoords(p.lat, p.lng);
+    });
+    this._geoMap.on('click', e => {
+      this._geoMarker.setLatLng(e.latlng);
+      this._geoMarker.fire('dragend');
+    });
+    setTimeout(() => this._geoMap && this._geoMap.invalidateSize(), 80);
   },
 
   renderBankDetails() {
@@ -239,11 +429,14 @@ const ProfileScreen = {
       owner_name: document.getElementById('ec-owner')?.value?.trim(),
       email:      document.getElementById('ec-email')?.value?.trim(),
       address:    document.getElementById('ec-address')?.value?.trim(),
+      area:       document.getElementById('ec-area')?.value?.trim() || null,
       gstin:      document.getElementById('ec-gstin')?.value?.trim(),
       open_time:  document.getElementById('ec-open')?.value,
       close_time: document.getElementById('ec-close')?.value,
       wash_types: washTypes,
       pincode:    pincode || null,
+      lat:        this._geoLat,
+      lng:        this._geoLng,
     };
     const selectedCity = document.getElementById('ec-city')?.value;
     if (selectedCity) body.city = selectedCity;

@@ -493,6 +493,10 @@
 
 </div><!-- end .phone -->
 
+<!-- Capacitor (auto-injected on native build by `cap sync`) -->
+<script src="capacitor.js"></script>
+<script src="cordova.js"></script>
+
 <!-- Leaflet JS -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
@@ -513,6 +517,48 @@
 <script src="js/reviews.js"></script>
 
 <script>
+  // ── Capacitor / native shell setup ───────────────────────────────
+  // When the app is running as a packaged Android APK the WebView loads
+  // from https://localhost, so relative `/api/...` calls would hit
+  // localhost instead of our deployed backend. Override fetch to prepend
+  // the deployed center-app URL when we're on the native shell.
+  window.API_URL = 'https://userappclaudecode-production-7ece.up.railway.app';
+  (function() {
+    const isNative = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+    if (!isNative) return; // Web build talks to its own origin via relative URLs.
+    const orig = window.fetch;
+    window.fetch = function(resource, options) {
+      if (typeof resource === 'string' && resource.startsWith('/api/')) {
+        resource = (window.API_URL || '') + resource;
+      }
+      return orig(resource, options);
+    };
+  })();
+
+  if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) {
+    const { StatusBar, SplashScreen, App } = window.Capacitor.Plugins;
+    if (StatusBar) {
+      StatusBar.setOverlaysWebView({ overlay: false });
+      StatusBar.setBackgroundColor({ color: '#0f172a' });
+      StatusBar.setStyle({ style: 'DARK' });
+    }
+    if (SplashScreen) setTimeout(() => SplashScreen.hide(), 500);
+
+    // Android hardware back button + gesture-nav swipe. The OS consumes
+    // both before they reach the WebView so we have to listen here.
+    if (App) {
+      App.addListener('backButton', () => {
+        if (typeof Router !== 'undefined' && Router.back) {
+          // If we're already on the root screen, exit the app instead
+          // of looping inside the same screen forever.
+          const rootScreens = ['dashboard', 'login', 'onboard'];
+          if (rootScreens.includes(Router.current)) { App.exitApp(); return; }
+          Router.back();
+        }
+      });
+    }
+  }
+
   // Boot
   Router.init();
 
