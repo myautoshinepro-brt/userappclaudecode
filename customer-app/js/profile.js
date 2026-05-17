@@ -450,7 +450,7 @@ const ProfileScreen = {
 
     // Block saving if city is not serviceable
     if (typeof SERVICEABLE_CITIES !== 'undefined' && !SERVICEABLE_CITIES.includes(city)) {
-       UI.toast('❌ No service in this city yet'); return;
+       UI.toast(`❌ No service in ${city} yet`); return;
     }
 
     const LABELS = { home2: { label: 'Home', icon: '🏠' }, work: { label: 'Office', icon: '🏢' }, other: { label: 'Other', icon: '📍' } };

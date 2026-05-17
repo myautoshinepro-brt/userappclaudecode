@@ -5,7 +5,47 @@
 // ============================================================
 
 const MapView = (() => {
-  const MUMBAI = [19.076, 72.877];
+  // City centroid fallbacks for when we only have a city name (no lat/lng on
+  // the saved address). Keys are normalized lowercased city names — keep in
+  // sync with the alias logic in location.js.
+  const CITY_CENTROIDS = {
+    'mumbai':           [19.0760, 72.8777],
+    'delhi':            [28.6139, 77.2090],
+    'bangalore':        [12.9716, 77.5946],
+    'bengaluru':        [12.9716, 77.5946],
+    'pune':             [18.5204, 73.8567],
+    'hyderabad':        [17.3850, 78.4867],
+    'secunderabad':     [17.4399, 78.4983],
+    'chennai':          [13.0827, 80.2707],
+    'kolkata':          [22.5726, 88.3639],
+    'gurgaon':          [28.4595, 77.0266],
+    'gurugram':         [28.4595, 77.0266],
+    'noida':            [28.5355, 77.3910],
+    'ahmedabad':        [23.0225, 72.5714],
+    'rajahmundry':      [17.0005, 81.8040],
+    'rajamahendravaram':[17.0005, 81.8040],
+  };
+  const INDIA_FALLBACK = [22.3511, 78.6677]; // centroid of India
+
+  // Resolve the best starting map view: explicit lat/lng > city centroid >
+  // saved primary address > India fallback.
+  function _resolveInitialCenter() {
+    const a = (typeof SAVED_ADDRESSES !== 'undefined')
+      ? (SAVED_ADDRESSES.find(x => x.isDefault) || SAVED_ADDRESSES[0])
+      : null;
+    if (a && a.lat != null && a.lng != null) {
+      return { center: [a.lat, a.lng], zoom: 13 };
+    }
+    const city = (AppState?.user?.city || '').trim().toLowerCase();
+    if (city && CITY_CENTROIDS[city]) {
+      return { center: CITY_CENTROIDS[city], zoom: 11 };
+    }
+    if (a && a.city) {
+      const ck = a.city.trim().toLowerCase();
+      if (CITY_CENTROIDS[ck]) return { center: CITY_CENTROIDS[ck], zoom: 11 };
+    }
+    return { center: INDIA_FALLBACK, zoom: 5 };
+  }
 
   let _map         = null;
   let _userMarker  = null;
@@ -34,9 +74,10 @@ const MapView = (() => {
   }
 
   function _create(el) {
+    const start = _resolveInitialCenter();
     _map = L.map(el, {
-      center: MUMBAI,
-      zoom:   12,
+      center: start.center,
+      zoom:   start.zoom,
       zoomControl: false,
       attributionControl: false,
     });
@@ -101,13 +142,34 @@ const MapView = (() => {
   function _autoFit() {
     const pts = _markers.map(m => m.getLatLng());
     if (_userMarker) pts.push(_userMarker.getLatLng());
-    if (!pts.length) return;
+    if (!pts.length) {
+      // No centers in this city — at least move the view to the user's
+      // city/address instead of leaving it on Mumbai.
+      const start = _resolveInitialCenter();
+      _map.setView(start.center, start.zoom);
+      return;
+    }
     if (pts.length === 1) {
       _map.setView(pts[0], 14);
       return;
     }
     const bounds = L.latLngBounds(pts);
     _map.fitBounds(bounds, { padding: [30, 30], maxZoom: 14 });
+  }
+
+  // Public: explicitly recenter the map (used when the user picks a saved
+  // address or detects GPS in a city with no centers yet).
+  function centerOn(lat, lng, zoom) {
+    if (!_map || lat == null || lng == null) return;
+    _map.setView([lat, lng], zoom != null ? zoom : 13);
+  }
+
+  // Public: when the user's city changes but we don't have address coords,
+  // jump to the city centroid so the empty-centers screen still feels right.
+  function centerOnCity(cityName) {
+    if (!_map) return;
+    const k = String(cityName || '').trim().toLowerCase();
+    if (k && CITY_CENTROIDS[k]) _map.setView(CITY_CENTROIDS[k], 11);
   }
 
   // ── GPS ──────────────────────────────────────────────────
@@ -213,5 +275,5 @@ const MapView = (() => {
     return !!_userMarker;
   }
 
-  return { init, locateUser, refreshMarkers, hasUserLocation };
+  return { init, locateUser, refreshMarkers, hasUserLocation, centerOn, centerOnCity };
 })();

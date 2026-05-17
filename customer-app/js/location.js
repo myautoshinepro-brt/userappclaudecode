@@ -372,18 +372,42 @@ const LocationModal = {
     if (mapLabel) mapLabel.textContent = area.split(',')[0] + ', India';
     UI.showAT(label + ' selected');
 
-    // Auto-detect city from the area string and re-filter centers
-    const detectedCity = this._detectCityFromText(area);
+    // Re-center the map on the address (or its city) so the "blue dot"
+    // stops being Mumbai by default.
+    if (typeof MapView !== 'undefined') {
+      if (lat != null && lng != null) MapView.centerOn(lat, lng);
+    }
+
+    // Always update the city to whatever was detected — serviceable or not.
+    // Previously this only updated when the city was in SERVICEABLE_CITIES,
+    // which left the home showing "We don't service <stale-old-city>" even
+    // after the user had clearly moved to a new area.
+    const detectedCity = this._detectCityFromArea(area);
     if (detectedCity && detectedCity !== AppState.user.city) {
       AppState.user.city = detectedCity;
       this._applyCityFilter(detectedCity);
+      if (typeof MapView !== 'undefined' && (lat == null || lng == null)) {
+        MapView.centerOnCity(detectedCity);
+      }
     }
   },
 
-  // Match area text against SERVICEABLE_CITIES (case-insensitive substring)
-  _detectCityFromText(text) {
-    if (!text || typeof SERVICEABLE_CITIES === 'undefined') return null;
+  // Pull the city out of the area string. Prefer a SERVICEABLE_CITIES match
+  // (so "MG Road, Bangalore" maps to canonical "Bangalore"), but fall back
+  // to the last comma-separated segment so non-serviceable cities still
+  // surface in the UI rather than silently staying as the previous value.
+  _detectCityFromArea(text) {
+    if (!text) return null;
     const lower = text.toLowerCase();
-    return SERVICEABLE_CITIES.find(c => lower.includes(c.toLowerCase())) || null;
+    if (typeof SERVICEABLE_CITIES !== 'undefined') {
+      const hit = SERVICEABLE_CITIES.find(c => lower.includes(c.toLowerCase()));
+      if (hit) return hit;
+    }
+    const parts = String(text).split(',').map(s => s.trim()).filter(Boolean);
+    return parts.length ? parts[parts.length - 1] : null;
   },
+
+  // Kept for backward-compat with any external caller; new code uses
+  // _detectCityFromArea, which doesn't silently drop unknown cities.
+  _detectCityFromText(text) { return this._detectCityFromArea(text); },
 };

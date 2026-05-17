@@ -196,16 +196,38 @@ const UserData = (() => {
     if (typeof ProfileScreen !== 'undefined' && ProfileScreen.updateMenuCounts) ProfileScreen.updateMenuCounts();
     if (typeof BookingScreen !== 'undefined' && BookingScreen.renderBookings)   BookingScreen.renderBookings();
 
-    const defAddr = (typeof SAVED_ADDRESSES !== 'undefined')
-      ? (SAVED_ADDRESSES.find(a => a.isDefault) || SAVED_ADDRESSES[0])
+    // Pick the user's primary saved address: explicit default first, then
+    // the most-recently-added address (db returns ASC, so the last entry is
+    // newest — feels right when a user just added an address and reloads).
+    const defAddr = (typeof SAVED_ADDRESSES !== 'undefined' && SAVED_ADDRESSES.length)
+      ? (SAVED_ADDRESSES.find(a => a.isDefault) || SAVED_ADDRESSES[SAVED_ADDRESSES.length - 1])
       : null;
 
     if (defAddr) {
-      AppState.user.city = defAddr.city || '';
+      // Derive a city even when the column is empty (older addresses, or
+      // ones saved before the city field was added). Try lat/lng reverse
+      // geocode first, then the last comma-separated chunk of the address.
+      let city = (defAddr.city || '').trim();
+      if (!city && defAddr.lat != null && defAddr.lng != null && typeof LocationModal !== 'undefined') {
+        try {
+          const g = await LocationModal._reverseGeocode(defAddr.lat, defAddr.lng);
+          city = g.city || '';
+        } catch { /* keep empty */ }
+      }
+      if (!city) {
+        const parts = (defAddr.address || '').split(',').map(s => s.trim()).filter(Boolean);
+        if (parts.length) city = parts[parts.length - 1];
+      }
+
+      AppState.user.city = city;
       if (typeof LocationModal !== 'undefined') {
-        LocationModal._setLocation(defAddr.label, defAddr.city || defAddr.label, defAddr.lat, defAddr.lng);
+        LocationModal._setLocation(defAddr.label, city || defAddr.label, defAddr.lat, defAddr.lng);
         LocationModal._selectedId = defAddr.id;
-        await LocationModal._applyCityFilter(defAddr.city || '');
+        await LocationModal._applyCityFilter(city || '');
+      }
+      if (typeof MapView !== 'undefined') {
+        if (defAddr.lat != null && defAddr.lng != null) MapView.centerOn(defAddr.lat, defAddr.lng);
+        else if (city) MapView.centerOnCity(city);
       }
     } else {
       AppState.user.city = '';
