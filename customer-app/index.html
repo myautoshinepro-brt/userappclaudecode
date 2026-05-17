@@ -1235,7 +1235,7 @@
   // Fix mobile status bar: stop it overlaying the WebView so the OS
   // pushes content down by exactly the right amount — applies to Android + iOS.
   if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) {
-    const { StatusBar, SplashScreen } = window.Capacitor.Plugins;
+    const { StatusBar, SplashScreen, App } = window.Capacitor.Plugins;
     if (StatusBar) {
       StatusBar.setOverlaysWebView({ overlay: false });
       StatusBar.setBackgroundColor({ color: '#1a73e8' });
@@ -1243,6 +1243,39 @@
     }
     if (SplashScreen) {
       setTimeout(() => SplashScreen.hide(), 500);
+    }
+
+    // Android hardware back button + gesture-nav swipe-back. The OS consumes
+    // these before they reach the WebView, so we have to listen here.
+    if (App) {
+      App.addListener('backButton', () => {
+        // 1. If any overlay/bottom-sheet is open, close it first.
+        const locOverlay = document.getElementById('location-modal');
+        if (locOverlay && locOverlay.classList.contains('open')) {
+          if (typeof LocationModal !== 'undefined') LocationModal.close();
+          return;
+        }
+        const promoOverlay = document.getElementById('promo-overlay');
+        if (promoOverlay && promoOverlay.classList.contains('show')) {
+          if (typeof SummaryScreen !== 'undefined') SummaryScreen.closePromoSheet();
+          return;
+        }
+        const vehOverlay = document.getElementById('veh-overlay');
+        if (vehOverlay && vehOverlay.classList.contains('show')) {
+          if (typeof VehiclePicker !== 'undefined') VehiclePicker.close();
+          return;
+        }
+
+        // 2. On the home screen with no history → exit the app (matches
+        //    every other Android app's behavior).
+        if (Router.current === 'home' && Router.history.length === 0) {
+          App.exitApp();
+          return;
+        }
+
+        // 3. Otherwise go back one step in our in-app history.
+        Router.back();
+      });
     }
   }
 
