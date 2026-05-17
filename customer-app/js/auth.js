@@ -259,6 +259,14 @@ const LoginScreen = (() => {
     try {
       const res = await Auth.verifyOtp(_identifier, otp);
       UI.toast(`Welcome back, ${res.user.full_name.split(' ')[0]}!`);
+      // Hydrate saved vehicles/addresses/bookings + apply default address
+      // BEFORE landing on home — otherwise the home header shows "Tap to
+      // select location" and centers are unfiltered until the user manually
+      // adds an address.
+      if (typeof UserData !== 'undefined' && UserData.initSession) {
+        try { await UserData.initSession(); }
+        catch (e) { console.warn('initSession after login failed:', e.message); }
+      }
       Router.go('home', false);
     } catch (err) {
       _showError('login-otp-error', err.message);

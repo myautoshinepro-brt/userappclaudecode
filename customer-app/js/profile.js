@@ -221,86 +221,104 @@ const ProfileScreen = {
     });
   },
 
+  // Capacitor when on device, browser geolocation when testing in a desktop
+  // browser. Keeps add-address usable in both environments.
+  async _getCurrentPosition() {
+    if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Geolocation) {
+      const { Geolocation } = window.Capacitor.Plugins;
+      const perm = await Geolocation.checkPermissions();
+      if (perm.location !== 'granted') {
+        const req = await Geolocation.requestPermissions();
+        if (req.location !== 'granted') throw new Error('Location permission denied');
+      }
+      return Geolocation.getCurrentPosition({ enableHighAccuracy: true, timeout: 10000 });
+    }
+    return new Promise((resolve, reject) => {
+      if (!navigator.geolocation) return reject(new Error('Geolocation not supported'));
+      navigator.geolocation.getCurrentPosition(resolve, reject, {
+        enableHighAccuracy: true,
+        timeout: 10000,
+      });
+    });
+  },
+
   async detectAddressGPS() {
     const btn = document.getElementById('addr-gps-btn');
     if (btn) btn.textContent = '📡 Detecting…';
 
-    if (!window.Capacitor) {
-      if (btn) btn.textContent = '📍 Detect GPS';
-      UI.toast('⚠️ GPS only available on mobile');
-      return;
-    }
-
+    let pos;
     try {
-      const { Geolocation } = Capacitor.Plugins;
-
-      const permission = await Geolocation.checkPermissions();
-      if (permission.location !== 'granted') {
-        await Geolocation.requestPermissions();
-      }
-
-      const pos = await Geolocation.getCurrentPosition({
-        timeout: 10000,
-        enableHighAccuracy: true
-      });
-
-      const { latitude: lat, longitude: lng } = pos.coords;
-
-      // Store coords in hidden inputs
-      const latInp = document.getElementById('addr-lat');
-      const lngInp = document.getElementById('addr-lng');
-      if (latInp) latInp.value = lat;
-      if (lngInp) lngInp.value = lng;
-
-      // Reverse geocode to fill area
-      try {
-        const r = await fetch(
-          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`,
-          { headers: { 'User-Agent': 'PitbayApp/1.0' } }
-        );
-        const j = await r.json();
-        const a = j.address || {};
-
-        const city = a.city || a.town || a.village || '';
-        const area = a.suburb || a.neighbourhood || a.city_district || '';
-        const pin  = a.postcode || '';
-        const road = a.road || '';
-        const houseNumber = a.house_number || '';
-
-        const areaInp = document.getElementById('addr-area');
-        if (areaInp) areaInp.value = area || city;
-
-        const flatInp = document.getElementById('addr-flat');
-        if (flatInp) flatInp.value = [houseNumber, road].filter(Boolean).join(', ');
-
-        const pinInp = document.getElementById('addr-pincode');
-        if (pinInp) pinInp.value = pin;
-
-        const cityInp = document.getElementById('addr-city');
-        if (cityInp) {
-          // If city not in list, add it temporarily to show serviceability message
-          if (city && !Array.from(cityInp.options).some(opt => opt.value === city)) {
-            const opt = document.createElement('option');
-            opt.value = city;
-            opt.textContent = city;
-            cityInp.appendChild(opt);
-          }
-          cityInp.value = city;
-          this.checkCityServiceability();
-        }
-
-        if (btn) btn.textContent = '✅ ' + (area || city);
-        UI.toast('📍 Location detected!');
-      } catch (err) {
-        console.warn('Geocode error:', err);
-        if (btn) btn.textContent = '📍 Detect GPS';
-        UI.toast('⚠️ Could not fetch details');
-      }
-
+      pos = await this._getCurrentPosition();
     } catch (err) {
       console.error('GPS Error:', err);
       if (btn) btn.textContent = '📍 Detect GPS';
-      UI.toast('⚠️ GPS permission denied or error');
+      UI.toast('⚠️ ' + (err.message || 'Could not get location'));
+      return;
+    }
+
+    const { latitude: lat, longitude: lng } = pos.coords;
+
+    // Store coords in hidden inputs
+    const latInp = document.getElementById('addr-lat');
+    const lngInp = document.getElementById('addr-lng');
+    if (latInp) latInp.value = lat;
+    if (lngInp) lngInp.value = lng;
+
+    // Reverse geocode to fill area/city/pin/road
+    try {
+      const r = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`
+      );
+      const j = await r.json();
+      const a = j.address || {};
+
+      const city = a.city || a.town || a.village || a.municipality || a.county || a.state_district || '';
+      const pin  = a.postcode || '';
+      const road = a.road || '';
+      const houseNumber = a.house_number || '';
+
+      // Combine colony + suburb when both exist so addresses like
+      // "Mithri Nagar, Madeenaguda" come through complete. Dedupe, keep order.
+      const areaParts = [
+        a.neighbourhood, a.suburb, a.city_district, a.hamlet, a.locality, a.quarter,
+      ].map(x => (x || '').trim()).filter(Boolean);
+      const areaSeen = new Set();
+      const area = areaParts.filter(p => {
+        const k = p.toLowerCase();
+        if (areaSeen.has(k)) return false;
+        areaSeen.add(k);
+        return true;
+      }).join(', ');
+
+      const areaInp = document.getElementById('addr-area');
+      if (areaInp) areaInp.value = area || city;
+
+      const flatInp = document.getElementById('addr-flat');
+      if (flatInp) flatInp.value = [houseNumber, road].filter(Boolean).join(', ');
+
+      const pinInp = document.getElementById('addr-pincode');
+      if (pinInp) pinInp.value = pin;
+
+      const cityInp = document.getElementById('addr-city');
+      if (cityInp) {
+        // If city isn't in the dropdown, add it so the value sticks and the
+        // serviceability hint can render.
+        if (city && !Array.from(cityInp.options).some(opt => opt.value === city)) {
+          const opt = document.createElement('option');
+          opt.value = city;
+          opt.textContent = city;
+          cityInp.appendChild(opt);
+        }
+        cityInp.value = city;
+        this.checkCityServiceability();
+      }
+
+      if (btn) btn.textContent = '✅ ' + (area || city || 'Location set');
+      UI.toast('📍 Location detected!');
+    } catch (err) {
+      console.warn('Geocode error:', err);
+      if (btn) btn.textContent = '📍 Detect GPS';
+      UI.toast('⚠️ Got coordinates but could not fetch address details');
     }
   },
 
@@ -309,19 +327,36 @@ const ProfileScreen = {
     if (!/^\d{6}$/.test(pin)) return;
     try {
       const r = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&postalcode=${pin}&country=India&limit=1`,
-        { headers: { 'User-Agent': 'PitbayApp/1.0' } }
+        `https://nominatim.openstreetmap.org/search?format=json&postalcode=${pin}&country=India&limit=1&addressdetails=1`
       );
       const j = await r.json();
       if (!j.length) return;
+      const hit = j[0];
+      const a = hit.address || {};
+
       const areaInp = document.getElementById('addr-area');
       if (areaInp && !areaInp.value.trim()) {
-        areaInp.value = j[0].display_name.split(',')[0].trim();
+        areaInp.value = a.suburb || a.neighbourhood || a.city_district
+                     || hit.display_name.split(',')[0].trim();
       }
       const latInp = document.getElementById('addr-lat');
       const lngInp = document.getElementById('addr-lng');
-      if (latInp) latInp.value = j[0].lat;
-      if (lngInp) lngInp.value = j[0].lon;
+      if (latInp) latInp.value = hit.lat;
+      if (lngInp) lngInp.value = hit.lon;
+
+      // Auto-set the city dropdown if we got one and the field is empty.
+      const city = a.city || a.town || a.state_district || '';
+      const cityInp = document.getElementById('addr-city');
+      if (cityInp && !cityInp.value && city) {
+        if (!Array.from(cityInp.options).some(opt => opt.value === city)) {
+          const opt = document.createElement('option');
+          opt.value = city;
+          opt.textContent = city;
+          cityInp.appendChild(opt);
+        }
+        cityInp.value = city;
+        this.checkCityServiceability();
+      }
     } catch { /* silent */ }
   },
 

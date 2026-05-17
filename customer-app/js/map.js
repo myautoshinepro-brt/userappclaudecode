@@ -1,153 +1,217 @@
-// Pitbay Customer App — map.js
-// Google Maps integration for "Find centers near me"
+// ============================================================
+// Pitbay — map.js
+// Leaflet + OpenStreetMap map on the home screen.
+// No API key, no billing. Center pins + user pin + "Near me".
+// ============================================================
 
 const MapView = (() => {
+  const MUMBAI = [19.076, 72.877];
+
   let _map         = null;
   let _userMarker  = null;
-  let _initialized = false;
+  let _userCircle  = null;
   let _markers     = [];
-
-  const MUMBAI     = { lat: 19.076, lng: 72.877 };
-
-  async function init() {
+  let _initialized = false;
+  // Public: called by Router._onEnter('home') on every home entry.
+  // We do NOT auto-request GPS here — the permission prompt is triggered
+  // explicitly when the user taps "📍 Near me" or the Nearest filter chip,
+  // so it always has context.
+  function init() {
     const el = document.getElementById('center-map');
     if (!el) return;
 
-    if (_initialized) {
-      // Re-trigger idle event to ensure map renders correctly if it was hidden
-      if (_map) google.maps.event.trigger(_map, 'resize');
+    if (typeof L === 'undefined') {
+      // Leaflet not loaded yet — try again shortly.
+      setTimeout(init, 300);
       return;
     }
 
-    // Check if Google Maps is loaded
-    if (typeof google === 'undefined' || !google.maps) {
-      console.warn('Google Maps not loaded yet. Retrying...');
-      setTimeout(init, 500);
-      return;
-    }
+    if (!_initialized) _create(el);
+    refreshMarkers();
+    // Invalidate size — fixes the half-rendered map when the home screen was
+    // initially hidden (Leaflet doesn't know its container resized).
+    setTimeout(() => _map && _map.invalidateSize(), 0);
+  }
 
-    _map = new google.maps.Map(el, {
+  function _create(el) {
+    _map = L.map(el, {
       center: MUMBAI,
-      zoom: 12,
-      disableDefaultUI: true,
-      zoomControl: true,
-      zoomControlOptions: {
-        position: google.maps.ControlPosition.LEFT_BOTTOM
-      },
-      styles: [
-        { "featureType": "poi", "stylers": [{ "visibility": "off" }] }
-      ]
+      zoom:   12,
+      zoomControl: false,
+      attributionControl: false,
     });
 
-    // Place markers for every center in CENTERS
-    if (typeof CENTERS !== 'undefined') {
-      _renderCenterMarkers();
-      const badge = document.getElementById('map-center-count');
-      if (badge) badge.textContent = `${CENTERS.length} centers`;
-    }
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '© OpenStreetMap',
+    }).addTo(_map);
+
+    L.control.zoom({ position: 'bottomleft' }).addTo(_map);
+    L.control.attribution({ position: 'bottomright', prefix: false }).addTo(_map);
 
     _initialized = true;
   }
 
-  function _renderCenterMarkers() {
-    // Clear old markers
-    _markers.forEach(m => m.setMap(null));
-    _markers = [];
+  // ── MARKERS ──────────────────────────────────────────────
 
-    CENTERS.forEach((c, i) => {
-      const marker = new google.maps.Marker({
-        position: { lat: c.lat, lng: c.lng },
-        map: _map,
-        title: c.name,
-        label: {
-          text: c.name,
-          color: 'white',
-          fontSize: '10px',
-          fontWeight: '700'
-        },
-        icon: {
-          path: google.maps.SymbolPath.CIRCLE,
-          fillColor: '#1a73e8',
-          fillOpacity: 1,
-          strokeWeight: 2,
-          strokeColor: '#fff',
-          scale: 12,
-          labelOrigin: new google.maps.Point(0, 2)
-        }
-      });
-
-      marker.addListener('click', () => {
-        if (typeof HomeScreen !== 'undefined') HomeScreen.openCenter(c.id);
-      });
-
-      _markers.push(marker);
+  function _centerIcon() {
+    return L.divIcon({
+      className: 'sw-center-pin',
+      html: '<div class="sw-pin-dot"></div>',
+      iconSize:   [22, 22],
+      iconAnchor: [11, 11],
     });
   }
 
-  async function locateUser() {
-    if (!window.Capacitor) {
-      UI.toast('Native GPS only available on mobile');
+  function _userIcon() {
+    return L.divIcon({
+      className: 'sw-user-pin',
+      html: '<div class="sw-user-dot"></div>',
+      iconSize:   [18, 18],
+      iconAnchor: [9, 9],
+    });
+  }
+
+  // Re-paint center markers when CENTERS changes (e.g. after city filter).
+  function refreshMarkers() {
+    if (!_map) return;
+
+    _markers.forEach(m => m.remove());
+    _markers = [];
+
+    const list = (typeof CENTERS !== 'undefined') ? CENTERS : [];
+    list.forEach(c => {
+      if (c.lat == null || c.lng == null) return;
+      const m = L.marker([c.lat, c.lng], { icon: _centerIcon(), title: c.name });
+      m.on('click', () => {
+        if (typeof HomeScreen !== 'undefined') HomeScreen.openCenter(c.id);
+      });
+      m.addTo(_map);
+      _markers.push(m);
+    });
+
+    const badge = document.getElementById('map-center-count');
+    if (badge) badge.textContent = `${list.length} center${list.length === 1 ? '' : 's'}`;
+
+    // Fit the map to whatever we have. Prefer "user + nearby centers" when GPS
+    // is on, otherwise just the centers, otherwise leave it on Mumbai.
+    _autoFit();
+  }
+
+  function _autoFit() {
+    const pts = _markers.map(m => m.getLatLng());
+    if (_userMarker) pts.push(_userMarker.getLatLng());
+    if (!pts.length) return;
+    if (pts.length === 1) {
+      _map.setView(pts[0], 14);
       return;
     }
+    const bounds = L.latLngBounds(pts);
+    _map.fitBounds(bounds, { padding: [30, 30], maxZoom: 14 });
+  }
 
-    UI.toast('📍 Detecting location…');
+  // ── GPS ──────────────────────────────────────────────────
 
+  // Tap on the "📍 Near me" button on the map overlay.
+  async function locateUser() {
+    const ok = await _getAndApplyGps({ toast: true });
+    if (ok && typeof UI !== 'undefined') UI.toast('📍 Showing centers near you');
+  }
+
+  // Returns true on success, false on failure (permission denied, no GPS, etc.)
+  async function _getAndApplyGps({ toast }) {
     try {
-      const { Geolocation } = Capacitor.Plugins;
-
-      // Request permission first
-      const permission = await Geolocation.checkPermissions();
-      if (permission.location !== 'granted') {
-        const request = await Geolocation.requestPermissions();
-        if (request.location !== 'granted') {
-          throw new Error('Location permission denied');
-        }
-      }
-
-      const pos = await Geolocation.getCurrentPosition({
-        enableHighAccuracy: true,
-        timeout: 10000
-      });
-
-      const lat = pos.coords.latitude;
-      const lng = pos.coords.longitude;
-
-      if (_map) {
-        const latLng = new google.maps.LatLng(lat, lng);
-        _map.setCenter(latLng);
-        _map.setZoom(14);
-
-        if (_userMarker) _userMarker.setMap(null);
-
-        _userMarker = new google.maps.Marker({
-          position: latLng,
-          map: _map,
-          icon: {
-            path: google.maps.SymbolPath.CIRCLE,
-            fillColor: '#1a73e8',
-            fillOpacity: 1,
-            strokeWeight: 4,
-            strokeColor: '#fff',
-            scale: 8
-          },
-          title: 'You are here'
-        });
-      }
-
-      UI.toast('Location found! Showing nearby centers.');
-
-      // Update app location state if needed
-      if (typeof LocationModal !== 'undefined' && LocationModal._reverseGeocode) {
-        const area = await LocationModal._reverseGeocode(lat, lng);
-        LocationModal._setLocation(area, area, lat, lng);
-        LocationModal._updateCenterDistances(lat, lng);
-      }
-
+      const pos = await _getPosition();
+      const { latitude: lat, longitude: lng, accuracy } = pos.coords;
+      _placeUserMarker(lat, lng, accuracy);
+      _recomputeCenterDistances(lat, lng);
+      _autoFit();
+      return true;
     } catch (err) {
-      console.error('GPS Error:', err);
-      UI.toast('Could not get location: ' + err.message);
+      console.warn('GPS error:', err && err.message ? err.message : err);
+      if (toast && typeof UI !== 'undefined') {
+        UI.toast('⚠️ Could not get your location');
+      }
+      return false;
     }
   }
 
-  return { init, locateUser };
+  function _getPosition() {
+    if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Geolocation) {
+      const { Geolocation } = window.Capacitor.Plugins;
+      return (async () => {
+        const perm = await Geolocation.checkPermissions();
+        if (perm.location !== 'granted') {
+          const req = await Geolocation.requestPermissions();
+          if (req.location !== 'granted') throw new Error('Location permission denied');
+        }
+        return Geolocation.getCurrentPosition({ enableHighAccuracy: true, timeout: 10000 });
+      })();
+    }
+    // Browser fallback (works on https / localhost desktop testing)
+    return new Promise((resolve, reject) => {
+      if (!navigator.geolocation) return reject(new Error('Geolocation not supported'));
+      navigator.geolocation.getCurrentPosition(resolve, reject, {
+        enableHighAccuracy: true,
+        timeout: 10000,
+      });
+    });
+  }
+
+  function _placeUserMarker(lat, lng, accuracyMeters) {
+    if (!_map) return;
+    if (_userMarker) _userMarker.remove();
+    if (_userCircle) _userCircle.remove();
+
+    _userMarker = L.marker([lat, lng], { icon: _userIcon(), title: 'You are here' }).addTo(_map);
+
+    if (accuracyMeters && accuracyMeters < 1000) {
+      _userCircle = L.circle([lat, lng], {
+        radius: accuracyMeters,
+        color:  '#1a73e8',
+        weight: 1,
+        fillColor: '#1a73e8',
+        fillOpacity: 0.08,
+      }).addTo(_map);
+    }
+  }
+
+  // Distance from user (lat,lng) to every center, then re-render the list so
+  // the "Nearest" filter and the meta line are correct.
+  function _recomputeCenterDistances(userLat, userLng) {
+    if (typeof CENTERS === 'undefined') return;
+
+    AppState.location._lat = userLat;
+    AppState.location._lng = userLng;
+
+    CENTERS = CENTERS.map(c => ({
+      ...c,
+      distance: (c.lat != null && c.lng != null)
+        ? parseFloat(_haversine(userLat, userLng, c.lat, c.lng).toFixed(1))
+        : c.distance,
+    }));
+
+    if (typeof HomeScreen !== 'undefined') {
+      const activeChip = document.querySelector('.filter-chip.active');
+      const filter = activeChip?.dataset.filter || 'all';
+      if (filter === 'all') HomeScreen.renderCenterCards(CENTERS);
+      else                   HomeScreen.applyFilter(activeChip, filter);
+    }
+  }
+
+  function _haversine(lat1, lng1, lat2, lng2) {
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLng = (lng2 - lng1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) ** 2
+            + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180)
+            * Math.sin(dLng / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  }
+
+  function hasUserLocation() {
+    return !!_userMarker;
+  }
+
+  return { init, locateUser, refreshMarkers, hasUserLocation };
 })();

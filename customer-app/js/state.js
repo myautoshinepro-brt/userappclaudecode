@@ -35,6 +35,11 @@ const AppState = {
     centerDiscount: 0, // center's own offer — NOT settled by Pitbay
   },
 
+  // Coupon the user copied from the home promo banner — auto-applied on the
+  // summary screen if it's still valid for the resulting booking. Cleared
+  // after a successful apply or when the user manually removes a promo.
+  pendingPromoCode: null,
+
   // Confirmed booking (after payment)
   confirmedBooking: {
     id: null,
@@ -54,7 +59,7 @@ const AppState = {
     name: 'Rahul Kumar',
     phone: '+91 98765 43210',
     email: 'rahul.kumar@gmail.com',
-    city: 'Mumbai',
+    city: '',
     initials: 'RK',
     language: 'English',
   },
@@ -178,27 +183,30 @@ const AppState = {
 
   // ── VEHICLE ──
 
+  // Vehicle IDs round-trip as integers from the API but get stringified by
+  // onclick HTML interpolation in the picker. Comparing both sides as strings
+  // is the simple, no-surprise fix.
+  _vehById(id) {
+    if (id == null || id === 'null' || id === 'undefined' || id === '') return null;
+    const key = String(id);
+    return SAVED_VEHICLES.find(v => String(v.id) === key) || null;
+  },
+
   getSelectedVehicle() {
-    if (this.booking.vehicleId) {
-      return SAVED_VEHICLES.find(v => v.id === this.booking.vehicleId) || null;
-    }
+    const picked = this._vehById(this.booking.vehicleId);
+    if (picked) return picked;
     return SAVED_VEHICLES.find(v => v.isPrimary) || SAVED_VEHICLES[0] || null;
   },
 
   setVehicle(vehicleId) {
-    // Reject sentinel strings from inline HTML interpolation.
-    if (vehicleId == null || vehicleId === 'null' || vehicleId === 'undefined' || vehicleId === '') return;
-    const v = SAVED_VEHICLES.find(v => v.id === vehicleId);
+    const v = this._vehById(vehicleId);
     if (!v) return;
-    this.booking.vehicleId = vehicleId;
+    this.booking.vehicleId = v.id;            // store the canonical (int) id
     this.booking.vehicle   = `${v.plate} · ${v.model}`;
   },
 
   initVehicle() {
-    // Treat sentinel strings as "no vehicle picked" so the primary fallback kicks in.
-    const vid = this.booking.vehicleId;
-    const hasReal = vid != null && vid !== 'null' && vid !== 'undefined' && vid !== '';
-    if (!hasReal || !SAVED_VEHICLES.find(v => v.id === vid)) {
+    if (!this._vehById(this.booking.vehicleId)) {
       this.booking.vehicleId = null;
       const primary = SAVED_VEHICLES.find(v => v.isPrimary) || SAVED_VEHICLES[0];
       if (primary) this.setVehicle(primary.id);
@@ -224,7 +232,7 @@ const AppState = {
       name: '',
       phone: '',
       email: '',
-      city: 'Mumbai',
+      city: '',
       initials: '??',
       language: 'English',
     };

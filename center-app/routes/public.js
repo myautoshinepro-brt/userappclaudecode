@@ -51,9 +51,10 @@ router.get('/centers', (req, res) => {
   // Hide centers the super admin has flipped off; order is already DESC by display_order from the DB.
   let visible = db.getAllCenters().filter(c => c.visible !== 0);
   if (cityFilter) {
-    const matched = visible.filter(c => (c.city || '').trim().toLowerCase() === cityFilter);
-    // Only narrow to the city if we actually have centers there; otherwise return all (safe fallback).
-    if (matched.length) visible = matched;
+    // Strict city match — if there are no centers in this city, the customer
+    // app should show "We don't service <city> yet" rather than fall through
+    // to centers in a different city, which is confusing.
+    visible = visible.filter(c => (c.city || '').trim().toLowerCase() === cityFilter);
   }
   res.json({ success: true, data: visible.map(shapeForCustomer) });
 });

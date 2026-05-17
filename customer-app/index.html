@@ -16,8 +16,9 @@
   <link rel="apple-touch-icon" href="/icon.svg">
   <meta name="description" content="Book your car wash in seconds. Choose a center, pick a slot, done.">
 
-  <!-- Google Maps JS API -->
-  <script src="https://maps.googleapis.com/maps/api/js?key=YOUR_GOOGLE_MAPS_API_KEY&libraries=places"></script>
+  <!-- Leaflet CSS (JS is loaded near the bottom alongside the app scripts) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
 
   <link rel="stylesheet" href="css/base.css">
   <link rel="stylesheet" href="css/components.css">
@@ -50,6 +51,46 @@
 
     /* Fix address modal overlaying issue */
     .loc-overlay { z-index: 9999 !important; }
+
+    /* "Pick an address" prompt shown on home when no city is selected */
+    .loc-prompt {
+      margin: 8px 16px 0;
+      padding: 22px 18px 20px;
+      background: linear-gradient(180deg,#eff6ff 0%, #ffffff 70%);
+      border: 1px solid #dbeafe;
+      border-radius: 16px;
+      text-align: center;
+      box-shadow: 0 1px 3px rgba(30,64,175,.06);
+    }
+    .loc-prompt-emoji { font-size: 32px; line-height: 1; margin-bottom: 6px; }
+    .loc-prompt-title { font-size: 15px; font-weight: 700; color: #1e293b; margin-bottom: 4px; }
+    .loc-prompt-sub   { font-size: 12px; color: #64748b; line-height: 1.4; margin-bottom: 14px; }
+    .loc-prompt-actions { display: flex; flex-direction: column; gap: 8px; }
+    .loc-prompt-btn {
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      width: 100%; padding: 11px 14px;
+      font-size: 13px; font-weight: 600;
+      background: #fff; color: #1e293b;
+      border: 1px solid #e2e8f0; border-radius: 12px;
+      cursor: pointer; transition: background .15s, border-color .15s, transform .05s;
+    }
+    .loc-prompt-btn:active { transform: scale(0.985); }
+    .loc-prompt-btn:hover { background: #f8fafc; }
+    .loc-prompt-btn.primary { background: #1a73e8; color: #fff; border-color: #1a73e8; }
+    .loc-prompt-btn.primary:hover { background: #1666d4; }
+
+    /* Leaflet pin glyphs — keep them tiny + tappable */
+    .sw-center-pin, .sw-user-pin { background: transparent !important; border: none !important; }
+    .sw-pin-dot {
+      width: 18px; height: 18px; border-radius: 50%;
+      background: #1a73e8; border: 2px solid #fff;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.25);
+    }
+    .sw-user-dot {
+      width: 14px; height: 14px; border-radius: 50%;
+      background: #22c55e; border: 3px solid #fff;
+      box-shadow: 0 0 0 4px rgba(34,197,94,0.20);
+    }
   </style>
 </head>
 <body>
@@ -197,11 +238,11 @@
       <!-- Scrollable content -->
       <div class="scroll-area">
         <!-- Promo banner -->
-        <div class="promo-banner" onclick="Router.go('summary')">
+        <div class="promo-banner" onclick="HomeScreen.tapPromoBanner('SPARKFIRST10')">
           <span style="font-size:18px">🎁</span>
           <div>
             <div style="font-size:11px;font-weight:700;color:#5d4037">SPARKFIRST10 — 10% off first wash!</div>
-            <div style="font-size:10px;color:#8d6e63;margin-top:1px">Tap to apply at checkout</div>
+            <div style="font-size:10px;color:#8d6e63;margin-top:1px">Tap to copy code — applies at checkout</div>
           </div>
         </div>
 
@@ -1234,28 +1275,7 @@
     const user = await Auth.checkSession();
     if (user) {
       AppState.setAuthUser(user);
-      await UserData.loadAll();
-      ProfileScreen.updateMenuCounts();
-      BookingScreen.renderBookings();
-
-      // Apply user's default saved address to the home header + city filter
-      const defAddr = SAVED_ADDRESSES.find(a => a.isDefault) || SAVED_ADDRESSES[0];
-      if (defAddr) {
-        AppState.user.city = defAddr.city || '';
-        LocationModal._setLocation(defAddr.label, defAddr.city || defAddr.label, defAddr.lat, defAddr.lng);
-        LocationModal._selectedId = defAddr.id;
-        // Fetch city-specific centers from API (await so home renders with correct data)
-        await LocationModal._applyCityFilter(defAddr.city || '');
-      } else {
-        // No saved address — all centers already loaded at boot; just reset UI
-        AppState.user.city = '';
-        if (typeof HomeScreen !== 'undefined') HomeScreen.renderCenterCards(CENTERS);
-        const locLabel = document.getElementById('location-label');
-        if (locLabel) locLabel.textContent = 'Tap to select location';
-        const locDot = document.getElementById('location-dot');
-        if (locDot) locDot.style.background = '#f59e0b'; // amber = location not set
-      }
-
+      await UserData.initSession();
       Router.go('home', false);
     } else {
       Router.go('login', false);

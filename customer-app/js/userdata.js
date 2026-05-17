@@ -163,6 +163,35 @@ const UserData = (() => {
     await Promise.all([loadVehicles(), loadAddresses(), loadBookings(), loadPromos()]);
   }
 
+  // Shared post-login bootstrap: pulls user data, then applies the default
+  // saved address to the home header + city filter. Called from both the
+  // app boot path (existing session) and the fresh-login flow.
+  async function initSession() {
+    await loadAll();
+    if (typeof ProfileScreen !== 'undefined' && ProfileScreen.updateMenuCounts) ProfileScreen.updateMenuCounts();
+    if (typeof BookingScreen !== 'undefined' && BookingScreen.renderBookings)   BookingScreen.renderBookings();
+
+    const defAddr = (typeof SAVED_ADDRESSES !== 'undefined')
+      ? (SAVED_ADDRESSES.find(a => a.isDefault) || SAVED_ADDRESSES[0])
+      : null;
+
+    if (defAddr) {
+      AppState.user.city = defAddr.city || '';
+      if (typeof LocationModal !== 'undefined') {
+        LocationModal._setLocation(defAddr.label, defAddr.city || defAddr.label, defAddr.lat, defAddr.lng);
+        LocationModal._selectedId = defAddr.id;
+        await LocationModal._applyCityFilter(defAddr.city || '');
+      }
+    } else {
+      AppState.user.city = '';
+      if (typeof HomeScreen !== 'undefined') HomeScreen.renderCenterCards(CENTERS);
+      const locLabel = document.getElementById('location-label');
+      if (locLabel) locLabel.textContent = 'Tap to select location';
+      const locDot = document.getElementById('location-dot');
+      if (locDot) locDot.style.background = '#f59e0b';
+    }
+  }
+
   // Fetch packages for a specific center; cached per-center on CENTER_PACKAGES.
   // Returns true if real packages were loaded, false if we fell back to defaults.
   async function loadCenterPackages(centerId) {
@@ -198,6 +227,6 @@ const UserData = (() => {
     }
   }
 
-  return { loadAll, loadVehicles, loadAddresses, loadBookings, loadPromos, loadCenterPackages };
+  return { loadAll, initSession, loadVehicles, loadAddresses, loadBookings, loadPromos, loadCenterPackages };
 
 })();

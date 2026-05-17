@@ -30,12 +30,38 @@ const HomeScreen = {
     const noResults = document.getElementById('no-results');
     if (!container) return;
 
+    const city = (AppState.user?.city || '').trim();
+
+    // No city/address picked yet — invite the user to choose one instead of
+    // showing a confusing "no centers in <empty>" message.
+    if (!city) {
+      container.innerHTML = '';
+      noResults.innerHTML = this._noLocationPromptHTML();
+      noResults.style.display = 'block';
+      document.getElementById('results-title').textContent = 'Where do you need a wash?';
+      document.getElementById('results-count').textContent = '';
+      return;
+    }
+
     container.innerHTML = centers.map(c => this._centerCardHTML(c)).join('');
 
     if (centers.length === 0) {
-      const city = AppState.user?.city || '';
       if (CENTERS.length === 0) {
-        noResults.innerHTML = `🌆 No centers in <b>${city || 'your area'}</b> yet<br><span style="font-size:11px">We're expanding! Please check back soon.</span>`;
+        // City has zero centers — give the user a way out instead of a dead end.
+        noResults.innerHTML = `
+          <div class="loc-prompt" style="margin:8px 0 0">
+            <div class="loc-prompt-emoji">🌆</div>
+            <div class="loc-prompt-title">We don't service <b>${city}</b> yet</div>
+            <div class="loc-prompt-sub">Try a different area, or detect your location to find the nearest serviceable city.</div>
+            <div class="loc-prompt-actions">
+              <button class="loc-prompt-btn primary" onclick="HomeScreen._promptDetectGPS()">
+                <span>📡</span><span>Use my current location</span>
+              </button>
+              <button class="loc-prompt-btn" onclick="LocationModal.open()">
+                <span>🏙️</span><span>Choose a different city</span>
+              </button>
+            </div>
+          </div>`;
       } else {
         noResults.innerHTML = `😕 No centers match this filter<br><span style="font-size:11px">Try a different filter or search term.</span>`;
       }
@@ -46,6 +72,83 @@ const HomeScreen = {
 
     document.getElementById('results-count').textContent = `${centers.length} found`;
     document.getElementById('results-title').textContent = 'Nearby centers';
+  },
+
+  _noLocationPromptHTML() {
+    return `
+      <div class="loc-prompt">
+        <div class="loc-prompt-emoji">📍</div>
+        <div class="loc-prompt-title">Tell us where you are</div>
+        <div class="loc-prompt-sub">Pick an address so we can show wash centers near you.</div>
+        <div class="loc-prompt-actions">
+          <button class="loc-prompt-btn primary" onclick="HomeScreen._promptDetectGPS()">
+            <span>📡</span><span>Use my current location</span>
+          </button>
+          <button class="loc-prompt-btn" onclick="HomeScreen._promptOpenSearch()">
+            <span>🔎</span><span>Enter area or pincode</span>
+          </button>
+          <button class="loc-prompt-btn" onclick="LocationModal.open()">
+            <span>🏠</span><span>Choose a saved address</span>
+          </button>
+        </div>
+      </div>`;
+  },
+
+  _promptDetectGPS() {
+    LocationModal.open();
+    setTimeout(() => LocationModal.detectGPS(), 320);
+  },
+
+  _promptOpenSearch() {
+    LocationModal.open();
+    setTimeout(() => LocationModal.focusSearch(), 360);
+  },
+
+  // ── PROMO BANNER ──
+  // Tap on the home promo banner: copy the code to the OS clipboard, stash
+  // it so the summary screen auto-applies it, and nudge the user to the
+  // next step (pick a city if none, otherwise pick a center).
+  async tapPromoBanner(code) {
+    AppState.pendingPromoCode = code;
+    await this._copyToClipboard(code);
+
+    const city = (AppState.user?.city || '').trim();
+    if (!city) {
+      UI.toast(`📋 ${code} copied — pick your area first`);
+      this._promptOpenSearch();
+      return;
+    }
+    UI.toast(`📋 ${code} copied — pick a center to apply`);
+    // Scroll to the center list so the user knows where to tap next.
+    const target = document.getElementById('results-title');
+    if (target && target.scrollIntoView) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  },
+
+  async _copyToClipboard(text) {
+    // Capacitor Clipboard plugin works in the WebView; fall back to the
+    // Web Clipboard API (Android Chrome) and finally to a textarea+execCommand.
+    try {
+      if (window.Capacitor?.Plugins?.Clipboard) {
+        await window.Capacitor.Plugins.Clipboard.write({ string: text });
+        return;
+      }
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+        return;
+      }
+    } catch (e) {
+      console.warn('Clipboard API failed, falling back:', e);
+    }
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+    } catch { /* nothing more we can do */ }
   },
 
   _centerCardHTML(c) {
@@ -237,6 +340,22 @@ const HomeScreen = {
     chip?.classList.add('active');
     this.clearSearch();
 
+    // No city yet → keep the address-prompt UI; ignore the filter tap.
+    const city = (AppState.user?.city || '').trim();
+    if (!city) {
+      this.renderCenterCards([]);
+      return;
+    }
+
+    // "Nearest" is meaningless without GPS — ask for it the first time the
+    // user taps the chip, then re-run the filter once distances are fresh.
+    if (filter === 'nearest' && typeof MapView !== 'undefined' && !MapView.hasUserLocation()) {
+      MapView.locateUser().then(() => {
+        // The GPS path re-runs the active filter via _recomputeCenterDistances,
+        // so we don't need to do anything else here.
+      });
+    }
+
     let filtered = [...CENTERS];
     const titles = {
       all: 'Nearby centers', nearest: 'Nearest first',
@@ -252,13 +371,8 @@ const HomeScreen = {
       case 'steam':    filtered = filtered.filter(c => c.hasSteam); break;
     }
 
-    // Re-order DOM
-    const container = document.getElementById('center-cards');
-    container.innerHTML = '';
-    filtered.forEach(c => { container.innerHTML += this._centerCardHTML(c); });
-
+    this.renderCenterCards(filtered);
     document.getElementById('results-title').textContent = titles[filter] || 'Centers';
     document.getElementById('results-count').textContent = `${filtered.length} found`;
-    document.getElementById('no-results').style.display = filtered.length === 0 ? 'block' : 'none';
   },
 };

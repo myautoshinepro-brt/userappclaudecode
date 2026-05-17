@@ -11,14 +11,23 @@ const LocationModal = {
   async _reverseGeocode(lat, lng) {
     try {
       const r = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`,
-        { headers: { 'User-Agent': 'PitbayApp/1.0' } }
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`
       );
       const j = await r.json();
       const a = j.address || {};
-      const suburb = a.suburb || a.neighbourhood || a.city_district || a.village || '';
-      const city   = a.city   || a.town || a.state_district || '';
-      return { area: suburb || city || 'Current location', city };
+      const city = a.city || a.town || a.village || a.municipality || a.county || a.state_district || '';
+
+      // Prefer colony + suburb combo so labels like "Mithri Nagar, Madeenaguda"
+      // come through rather than just one of them.
+      const parts = [a.neighbourhood, a.suburb, a.city_district, a.hamlet, a.locality, a.quarter]
+        .map(x => (x || '').trim()).filter(Boolean);
+      const seen = new Set();
+      const area = parts.filter(p => {
+        const k = p.toLowerCase();
+        if (seen.has(k)) return false; seen.add(k); return true;
+      }).join(', ');
+
+      return { area: area || city || 'Current location', city };
     } catch { return { area: 'Current location', city: '' }; }
   },
 
@@ -298,12 +307,15 @@ const LocationModal = {
       if (!cityParam) {
         CENTERS = [...ALL_CENTERS];
       } else {
-        const cityLc  = cityParam.toLowerCase();
-        const matched = ALL_CENTERS.filter(c => (c.city || '').trim().toLowerCase() === cityLc);
-        CENTERS = matched.length ? matched : [...ALL_CENTERS];
+        const cityLc = cityParam.toLowerCase();
+        // Strict match — don't fall back to all centers from other cities;
+        // the home screen will show "No centers in <city> yet" instead.
+        CENTERS = ALL_CENTERS.filter(c => (c.city || '').trim().toLowerCase() === cityLc);
       }
     }
     if (typeof HomeScreen !== 'undefined') HomeScreen.renderCenterCards(CENTERS);
+    // Keep the map pins in sync with the (newly filtered) center list.
+    if (typeof MapView !== 'undefined' && MapView.refreshMarkers) MapView.refreshMarkers();
   },
 
   _deselect() {

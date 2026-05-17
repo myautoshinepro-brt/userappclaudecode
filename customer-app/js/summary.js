@@ -14,6 +14,18 @@ const SummaryScreen = {
     // Ensure a vehicle is selected (init if needed)
     AppState.initVehicle();
 
+    // Auto-apply a coupon the user copied from the home promo banner, but
+    // only once and only if it's still valid for this booking. Manual
+    // selection takes precedence.
+    if (AppState.pendingPromoCode && !b.promoCode) {
+      const pending = PROMO_CODES.find(p => p.code === AppState.pendingPromoCode);
+      if (pending && pending.applicable && (pending.minOrder || 0) <= (pkg.price || 0)) {
+        AppState.setPromo(pending.code);
+        UI.toast(`🎁 ${pending.code} applied — you save ₹${AppState.booking.promoDiscount}`);
+      }
+      AppState.pendingPromoCode = null;
+    }
+
     const washLabel = WASH_TYPES.find(t => t.key === b.washType)?.label || b.washType;
     const t = AppState.calcTotal();
 

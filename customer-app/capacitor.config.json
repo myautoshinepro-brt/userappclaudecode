@@ -15,7 +15,8 @@
     },
     "StatusBar": {
       "style": "DARK",
-      "backgroundColor": "#1e40af"
+      "backgroundColor": "#1e40af",
+      "overlaysWebView": false
     }
   },
   "android": {
