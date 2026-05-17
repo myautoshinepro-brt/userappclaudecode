@@ -66,7 +66,7 @@ const BookingScreen = {
       return `
         <div class="booking-item" style="border-left:3px solid var(--blue)">
           <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
-            <div style="font-size:13px;font-weight:800;color:var(--text-primary);flex:1;margin-right:8px">${b.centerName}</div>
+            <div onclick="CenterInfoModal.open('${b.centerId}')" class="ci-link" style="font-size:13px;font-weight:800;color:var(--text-primary);flex:1;margin-right:8px">${b.centerName}</div>
             <div class="badge badge-upcoming">${statusLabel}</div>
           </div>
           <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
@@ -84,6 +84,7 @@ const BookingScreen = {
           <div style="font-size:10px;color:var(--text-tertiary);margin-bottom:8px">${b.ref} · Pay at center</div>
           <div class="action-btn-row">
             <div class="action-btn primary" onclick="AppState.confirmedBooking.id='${b.ref}';AppState.confirmedBooking.centerId='${b.centerId}';Router.go('manage')">📍 Track</div>
+            <div class="action-btn primary" onclick="BookingScreen.navigateToCenter('${b.centerId}','${(b.centerName||'').replace(/'/g,"\\'")}')">🗺️ Navigate</div>
             <div class="action-btn primary" onclick="AppState.confirmedBooking.id='${b.ref}';BookingScreen.openModify();Router.go('manage')">✏️ Modify</div>
             <div class="action-btn primary" onclick="ChatScreen.openForBooking('${b.ref}')">💬 Chat</div>
             <div class="action-btn danger" onclick="AppState.confirmedBooking={id:'${b.ref}'};BookingScreen.cancelBooking()">✕ Cancel</div>
@@ -101,19 +102,30 @@ const BookingScreen = {
     }
     el.innerHTML = PAST_BOOKINGS.map(b => {
       const isCompleted = b.status === 'completed';
+      // We stringify the booking so the inline onclick can hand the whole
+      // row (including any existing comment) to ReviewModal without doing
+      // another lookup. Escape quotes so the attribute parses.
+      const bJson = encodeURIComponent(JSON.stringify({
+        ref: b.ref, centerName: b.centerName, packageName: b.packageName,
+        date: b.date, rating: b.rating || 0, reviewComment: b.reviewComment || '',
+      }));
+      const commentBlock = b.reviewComment
+        ? `<div style="font-size:11px;color:var(--text-secondary);margin:0 0 6px;line-height:1.4;font-style:italic">"${b.reviewComment.replace(/"/g, '&quot;')}"</div>`
+        : '';
       const ratingHtml = isCompleted
         ? b.rating
-          ? `<div style="display:flex;align-items:center;gap:3px;margin-bottom:6px">
+          ? `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
                <span style="font-size:14px;color:#f9a825">${'★'.repeat(b.rating)}<span style="color:#d1d5db">${'★'.repeat(5-b.rating)}</span></span>
-             </div>`
-          : `<div style="display:flex;gap:4px;margin-bottom:6px" id="stars-${b.ref}">
-               ${[1,2,3,4,5].map(n=>`<span onclick="BookingScreen.rateBooking(${n},'${b.ref}')" style="font-size:20px;color:#d1d5db;cursor:pointer">★</span>`).join('')}
+               <span onclick="BookingScreen._openReview('${bJson}')" style="font-size:10px;color:var(--blue);font-weight:600;cursor:pointer">✏️ Edit review</span>
+             </div>${commentBlock}`
+          : `<div onclick="BookingScreen._openReview('${bJson}')" style="padding:8px 10px;background:#eff6ff;border:1px dashed var(--blue);border-radius:8px;text-align:center;font-size:11px;font-weight:700;color:var(--blue);cursor:pointer;margin-bottom:6px">
+               ★ Rate & write a review
              </div>`
         : '';
       return `
         <div class="booking-item" style="border-left:3px solid ${isCompleted ? '#2e7d32' : '#c62828'}">
           <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
-            <div style="font-size:13px;font-weight:800;color:var(--text-primary);flex:1;margin-right:8px">${b.centerName}</div>
+            <div onclick="CenterInfoModal.open('${b.centerId}')" class="ci-link" style="font-size:13px;font-weight:800;color:var(--text-primary);flex:1;margin-right:8px">${b.centerName}</div>
             <div class="badge ${isCompleted ? 'badge-completed' : 'badge-cancelled'}">${isCompleted ? '✅ Completed' : '❌ Cancelled'}</div>
           </div>
           <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
@@ -135,6 +147,7 @@ const BookingScreen = {
                  onclick="BookingScreen.repeatBooking('${b.centerId}','${b.washType}','${b.packageName||''}','${b.vehiclePlate||''}')">
               🔁 Repeat this wash
             </div>
+            <div class="action-btn primary" onclick="BookingScreen.navigateToCenter('${b.centerId}','${(b.centerName||'').replace(/'/g,"\\'")}')">🗺️ Navigate</div>
             <div class="action-btn primary" onclick="ChatScreen.openForBooking('${b.ref}')">💬 Chat</div>
           </div>` : ''}
         </div>`;
@@ -221,15 +234,21 @@ const BookingScreen = {
     window.location.href = 'tel:' + String(phone).replace(/\D/g, '');
   },
 
-  navigateToCenter() {
-    const c = this._activeCenter();
-    if (!c) { UI.toast('⚠️ Center info not loaded'); return; }
-    // Prefer lat/lng if we have them; otherwise search by name + area.
+  // Caller can either pass a centerId/centerName explicitly (booking list
+  // cards) or rely on _activeCenter() (manage screen flow).
+  navigateToCenter(centerId, centerName) {
+    let c = null;
+    if (centerId) c = CENTERS.find(x => x.id === centerId);
+    if (!c) c = this._activeCenter();
+    // Last resort — at least open maps with the name so the user gets somewhere.
+    const name = (c && c.name) || centerName || '';
+    if (!c && !name) { UI.toast('⚠️ Center info not loaded'); return; }
+
     let url;
-    if (c.lat && c.lng) {
+    if (c && c.lat && c.lng) {
       url = `https://www.google.com/maps/dir/?api=1&destination=${c.lat},${c.lng}&travelmode=driving`;
     } else {
-      const q = encodeURIComponent([c.name, c.area, 'Mumbai'].filter(Boolean).join(' '));
+      const q = encodeURIComponent([name, c && c.area, c && c.city].filter(Boolean).join(' '));
       url = `https://www.google.com/maps/dir/?api=1&destination=${q}&travelmode=driving`;
     }
     window.open(url, '_blank');
@@ -341,7 +360,17 @@ const BookingScreen = {
     }
   },
 
-  // ── STAR RATING ──
+  // ── REVIEW MODAL TRIGGER ──
+  // Decode the booking JSON we encoded into the onclick (avoids HTML-quote
+  // escaping nightmares for usernames/center names with apostrophes).
+  _openReview(encodedJson) {
+    try {
+      const booking = JSON.parse(decodeURIComponent(encodedJson));
+      if (typeof ReviewModal !== 'undefined') ReviewModal.open(booking);
+    } catch (e) { console.error('_openReview:', e); }
+  },
+
+  // ── STAR RATING (legacy single-tap path — kept for backward-compat) ──
 
   // Animates the inline star widget (if present) and persists the rating via API.
   // Called as rateBooking(stars, bookingRef). bookingRef may be omitted only when

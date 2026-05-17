@@ -201,7 +201,7 @@ const HomeScreen = {
            data-steam="${c.hasSteam ? '1' : '0'}"
            onclick="HomeScreen.openCenter('${c.id}')">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px">
-          <div class="center-name">${c.name}</div>
+          <div class="center-name ci-link" onclick="event.stopPropagation();CenterInfoModal.open('${c.id}')">${c.name} <span style="font-size:9px;color:var(--text-tertiary);font-weight:600">ⓘ</span></div>
           ${statusBadge}
         </div>
         <div class="center-meta">

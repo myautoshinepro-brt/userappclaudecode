@@ -646,14 +646,21 @@ const ProfileScreen = {
       const empty  = '<span style="color:var(--text-tertiary)">' + '★'.repeat(5 - b.rating) + '</span>';
       const wash   = WASH_TYPES.find(t => t.key === b.washType)?.name || b.washType;
       const cmt    = b.reviewComment ? `<div style="font-size:11px;color:var(--text-secondary);margin-top:6px;line-height:1.5">"${b.reviewComment.replace(/"/g, '&quot;')}"</div>` : '';
+      const bJson = encodeURIComponent(JSON.stringify({
+        ref: b.ref, centerName: b.centerName, packageName: b.packageName,
+        date: b.date, rating: b.rating, reviewComment: b.reviewComment || '',
+      }));
       return `
         <div class="review-card">
           <div style="display:flex;justify-content:space-between;align-items:flex-start">
-            <div style="font-size:12px;font-weight:700;color:var(--text-primary)">${b.centerName}</div>
+            <div style="font-size:12px;font-weight:700;color:var(--text-primary);cursor:pointer" onclick="CenterInfoModal.open('${(b.centerId||'').replace(/'/g,"\\'")}')">${b.centerName}</div>
             <div class="review-stars">${full}${empty}</div>
           </div>
           <div style="font-size:10px;color:var(--text-secondary);margin-top:1px">${b.date} · ${wash}${b.packageName ? ' · ' + b.packageName : ''}</div>
           ${cmt}
+          <div style="text-align:right;margin-top:6px">
+            <span onclick="BookingScreen._openReview('${bJson}')" style="font-size:10px;color:var(--blue);font-weight:600;cursor:pointer">✏️ Edit review</span>
+          </div>
         </div>`;
     }).join('');
   },

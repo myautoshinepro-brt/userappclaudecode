@@ -42,7 +42,7 @@
     /* Full screen on actual mobile */
     @media (max-width: 480px) {
       .phone { width:100vw; height:100vh; border-radius:0; border:none; position: relative; display: flex; flex-direction: column; overflow: hidden; background: #fff; }
-      [data-screen] { position:absolute; inset:0; display:flex; flex-direction:column; background:#fff; visibility:hidden; pointer-events:none; height: 100%; width: 100%; opacity: 0; transition: opacity 0.2s; }
+      [data-screen] { position:absolute; inset:0; display:flex; flex-direction:column; background:#fff; visibility:hidden; pointer-events:none; height: 100%; width: 100%; }
       [data-screen].screen-active { visibility:visible; pointer-events:all; z-index:1; opacity: 1; }
       .status-bar { display: none; } /* Use native status bar */
     }
@@ -78,6 +78,78 @@
     .loc-prompt-btn:hover { background: #f8fafc; }
     .loc-prompt-btn.primary { background: #1a73e8; color: #fff; border-color: #1a73e8; }
     .loc-prompt-btn.primary:hover { background: #1666d4; }
+
+    /* Bottom-sheet modal shared shell (review + center-info) */
+    .rev-overlay, .ci-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.45);
+      z-index: 10000; display: none; align-items: flex-end; justify-content: center;
+    }
+    .rev-overlay.open, .ci-overlay.open { display: flex; }
+    .rev-sheet, .ci-sheet {
+      width: 100%; max-width: 480px;
+      background: #fff; border-radius: 18px 18px 0 0;
+      padding: 6px 18px 22px;
+      transform: translateY(100%);
+      transition: transform .28s cubic-bezier(.32,.72,0,1);
+      max-height: 90vh; overflow-y: auto;
+    }
+    .rev-overlay.open .rev-sheet, .ci-overlay.open .ci-sheet { transform: translateY(0); }
+    .rev-handle-bar, .ci-handle-bar { display:flex; justify-content:center; padding:6px 0 8px }
+    .rev-handle, .ci-handle { width:42px; height:4px; border-radius:3px; background:#d1d5db }
+
+    /* Review modal specifics */
+    .rev-header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:4px }
+    .rev-title { font-size:15px; font-weight:700; color:#1e293b }
+    .rev-sub { font-size:11px; color:#64748b; margin-top:2px }
+    .rev-close-btn { background:transparent;border:none;font-size:18px;color:#64748b;cursor:pointer;padding:0 4px }
+    .rev-center-line { font-size:11px; color:#475569; padding:6px 10px; background:#f8fafc; border-radius:8px; margin:8px 0 14px }
+    .rev-stars { display:flex; justify-content:center; gap:10px; padding:8px 0 }
+    .rev-stars span { font-size:36px; line-height:1; color:#d1d5db; cursor:pointer; transition: color .15s, transform .1s }
+    .rev-stars span:active { transform: scale(0.9) }
+    .rev-stars span.on { color:#f9a825 }
+    .rev-stars-label { text-align:center; font-size:11px; color:#64748b; margin-bottom:14px; min-height:14px }
+    .rev-comment-label { font-size:11px; font-weight:600; color:#475569; display:block; margin-bottom:4px }
+    .rev-comment-input {
+      width:100%; min-height:90px; max-height:200px; padding:10px 12px;
+      border:1.5px solid #e2e8f0; border-radius:10px; font-size:13px; font-family:inherit; resize:vertical;
+      box-sizing:border-box; outline:none;
+    }
+    .rev-comment-input:focus { border-color:#1a73e8 }
+    .rev-comment-count { text-align:right; font-size:10px; color:#94a3b8; margin-top:3px }
+    .rev-submit-btn {
+      width:100%; padding:12px; margin-top:12px;
+      background:#1a73e8; color:#fff; border:none; border-radius:12px;
+      font-size:13px; font-weight:700; cursor:pointer;
+    }
+    .rev-submit-btn:disabled { background:#94a3b8; cursor:not-allowed }
+
+    /* Center info modal specifics */
+    .ci-body { padding-top: 4px }
+    .ci-head { display:flex; justify-content:space-between; align-items:flex-start; gap:8px; margin-bottom:6px }
+    .ci-name { font-size:16px; font-weight:700; color:#1e293b; flex:1 }
+    .ci-close-btn { background:transparent;border:none;font-size:18px;color:#64748b;cursor:pointer;padding:0 4px }
+    .ci-meta { display:flex; flex-wrap:wrap; align-items:center; gap:6px; font-size:11px; color:#64748b; margin-bottom:12px }
+    .ci-meta .ci-rating { color:#f9a825; font-weight:700 }
+    .ci-meta .ci-status { font-weight:700 }
+    .ci-meta .ci-dot { color:#cbd5e1 }
+    .ci-address-row { display:flex; gap:8px; padding:10px 12px; background:#f8fafc; border-radius:10px; margin-bottom:10px }
+    .ci-area { font-size:12px; font-weight:600; color:#1e293b }
+    .ci-city { font-size:11px; color:#64748b; margin-top:1px }
+    .ci-tags { display:flex; flex-wrap:wrap; gap:5px; margin-bottom:10px }
+    .ci-tags .ci-tag {
+      padding:3px 9px; font-size:10px; font-weight:600; color:#1a73e8;
+      background:#eff6ff; border:1px solid #dbeafe; border-radius:11px;
+    }
+    .ci-price-row { font-size:12px; color:#475569; margin-bottom:14px }
+    .ci-price-row b { color:#1e293b; font-weight:700 }
+    .ci-actions { display:flex; gap:8px }
+    .ci-btn { flex:1; padding:11px; border-radius:11px; font-size:12px; font-weight:700; cursor:pointer; border:1.5px solid transparent }
+    .ci-btn-primary { background:#1a73e8; color:#fff; border-color:#1a73e8 }
+    .ci-btn-outline { background:#fff; color:#1a73e8; border-color:#1a73e8 }
+
+    /* Make center names look tappable wherever they appear */
+    .ci-link { color:inherit; cursor:pointer; text-decoration:none }
+    .ci-link:active { opacity:.7 }
 
     /* Leaflet pin glyphs — keep them tiny + tappable */
     .sw-center-pin, .sw-user-pin { background: transparent !important; border: none !important; }
@@ -398,7 +470,7 @@
         <div style="padding:11px 13px 0">
           <div class="section-head">Booking details</div>
           <div class="summary-card">
-            <div class="summary-row"><span class="summary-label">Center</span><span class="summary-value" id="sum-center-name">—</span></div>
+            <div class="summary-row"><span class="summary-label">Center</span><span class="summary-value ci-link" id="sum-center-name" onclick="CenterInfoModal.open(AppState.booking.centerId)">—</span></div>
             <div class="summary-row"><span class="summary-label">Package</span><span class="summary-value" id="sum-pkg-name">—</span></div>
             <div class="summary-row"><span class="summary-label">Wash type</span><span class="summary-value" id="sum-wash-type">—</span></div>
             <div class="summary-row"><span class="summary-label">Date & time</span><span class="summary-value" id="sum-slot">—</span></div>
@@ -482,7 +554,7 @@
           <div style="font-size:11px;color:var(--text-secondary);margin-bottom:12px;text-align:center">WhatsApp sent to +91 98765 43210</div>
           <div class="confirm-card">
             <div class="confirm-row"><span class="confirm-label">Booking ID</span><span class="confirm-value" id="conf-booking-id">#SW20490</span></div>
-            <div class="confirm-row"><span class="confirm-label">Center</span><span class="confirm-value" id="conf-center-name">Shine Auto Wash</span></div>
+            <div class="confirm-row"><span class="confirm-label">Center</span><span class="confirm-value ci-link" id="conf-center-name" onclick="CenterInfoModal.open(AppState.confirmedBooking?.centerId)">Shine Auto Wash</span></div>
             <div class="confirm-row"><span class="confirm-label">Package</span><span class="confirm-value" id="conf-pkg-name">—</span></div>
             <div class="confirm-row"><span class="confirm-label">Vehicle</span><span class="confirm-value" id="conf-vehicle">—</span></div>
             <div class="confirm-row"><span class="confirm-label">Date & time</span><span class="confirm-value" id="conf-slot">—</span></div>
@@ -553,7 +625,7 @@
             <div class="manage-map-nav-bar">🗺️ Navigate to wash center</div>
           </div>
           <div class="manage-info-card">
-            <div><div style="font-size:11px;font-weight:700;color:var(--text-primary)" id="manage-center-name">—</div><div style="font-size:10px;color:var(--text-secondary)" id="manage-center-area">—</div></div>
+            <div onclick="CenterInfoModal.open(AppState.confirmedBooking?.centerId)" class="ci-link"><div style="font-size:11px;font-weight:700;color:var(--text-primary)" id="manage-center-name">—</div><div style="font-size:10px;color:var(--text-secondary)" id="manage-center-area">—</div></div>
             <div style="display:flex;gap:5px">
               <button class="btn btn-sm btn-outline" onclick="BookingScreen.callCenter()">📞 Call</button>
               <button class="btn btn-sm btn-primary" onclick="BookingScreen.navigateToCenter()">Navigate</button>
@@ -1184,6 +1256,72 @@
     </div>
 
   </div><!-- end screens container -->
+
+  <!-- ════════════════════════════════════════════
+       RATING + COMMENT MODAL (used from bookings list & reviews)
+  ════════════════════════════════════════════ -->
+  <div class="rev-overlay" id="review-modal" onclick="ReviewModal.handleOverlayClick(event)">
+    <div class="rev-sheet" id="review-sheet">
+      <div class="rev-handle-bar"><div class="rev-handle"></div></div>
+      <div class="rev-header">
+        <div>
+          <div class="rev-title" id="review-modal-title">Rate your wash</div>
+          <div class="rev-sub" id="review-modal-sub">How was your experience?</div>
+        </div>
+        <button class="rev-close-btn" onclick="ReviewModal.close()">✕</button>
+      </div>
+      <div class="rev-center-line" id="review-center-line"></div>
+      <div class="rev-stars" id="review-stars">
+        <span data-val="1" onclick="ReviewModal.pickStar(1)">☆</span>
+        <span data-val="2" onclick="ReviewModal.pickStar(2)">☆</span>
+        <span data-val="3" onclick="ReviewModal.pickStar(3)">☆</span>
+        <span data-val="4" onclick="ReviewModal.pickStar(4)">☆</span>
+        <span data-val="5" onclick="ReviewModal.pickStar(5)">☆</span>
+      </div>
+      <div class="rev-stars-label" id="review-stars-label">Tap a star to rate</div>
+      <label class="rev-comment-label">Your comments (optional)</label>
+      <textarea id="review-comment-input" class="rev-comment-input" maxlength="500"
+                placeholder="Share what worked or what didn't…"></textarea>
+      <div class="rev-comment-count"><span id="review-char-count">0</span> / 500</div>
+      <button class="rev-submit-btn" id="review-submit-btn" onclick="ReviewModal.submit()">Submit review</button>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════
+       CENTER INFO MODAL (tap any center name)
+  ════════════════════════════════════════════ -->
+  <div class="ci-overlay" id="center-info-modal" onclick="CenterInfoModal.handleOverlayClick(event)">
+    <div class="ci-sheet" id="center-info-sheet">
+      <div class="ci-handle-bar"><div class="ci-handle"></div></div>
+      <div class="ci-body">
+        <div class="ci-head">
+          <div class="ci-name" id="ci-name">—</div>
+          <button class="ci-close-btn" onclick="CenterInfoModal.close()">✕</button>
+        </div>
+        <div class="ci-meta">
+          <span class="ci-rating" id="ci-rating"></span>
+          <span class="ci-dot">·</span>
+          <span class="ci-status" id="ci-status"></span>
+          <span class="ci-dot">·</span>
+          <span class="ci-dist" id="ci-dist"></span>
+        </div>
+        <div class="ci-address-row">
+          <span style="font-size:14px">📍</span>
+          <div>
+            <div class="ci-area" id="ci-area">—</div>
+            <div class="ci-city" id="ci-city"></div>
+          </div>
+        </div>
+        <div class="ci-tags" id="ci-tags"></div>
+        <div class="ci-price-row" id="ci-price-row"></div>
+        <div class="ci-actions">
+          <button class="ci-btn ci-btn-outline" onclick="CenterInfoModal.openBooking()">📋 Book a wash</button>
+          <button class="ci-btn ci-btn-primary" onclick="CenterInfoModal.navigate()">🗺️ Navigate</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
 </div><!-- end phone -->
 
 <!-- Toast -->
@@ -1212,6 +1350,7 @@
 <script src="js/help.js"></script>
 <script src="js/profile.js"></script>
 <script src="js/map.js"></script>
+<script src="js/modals.js"></script>
 <script src="js/pull-refresh.js"></script>
 
 <script>
@@ -1266,6 +1405,16 @@
           if (typeof VehiclePicker !== 'undefined') VehiclePicker.close();
           return;
         }
+        const revOverlay = document.getElementById('review-modal');
+        if (revOverlay && revOverlay.classList.contains('open')) {
+          if (typeof ReviewModal !== 'undefined') ReviewModal.close();
+          return;
+        }
+        const ciOverlay = document.getElementById('center-info-modal');
+        if (ciOverlay && ciOverlay.classList.contains('open')) {
+          if (typeof CenterInfoModal !== 'undefined') CenterInfoModal.close();
+          return;
+        }
 
         // 2. On the home screen with no history → exit the app (matches
         //    every other Android app's behavior).
@@ -1314,8 +1463,10 @@
 
   // Boot — check session before showing any screen
   document.addEventListener('DOMContentLoaded', async () => {
+    console.log('[boot] DOMContentLoaded fired');
     try {
       Router.init();
+      console.log('[boot] Router initialized');
 
       // Load real centers from center-app
       try {
