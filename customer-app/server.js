@@ -5,6 +5,20 @@ const path    = require('path');
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
+const HOST = process.env.HOST || '0.0.0.0';
+
+// Surface key startup info in logs so Railway deploy failures are diagnosable
+// (no secrets — just whether they were set).
+console.log('[boot] node', process.version, 'PORT=' + PORT, 'HOST=' + HOST);
+console.log('[boot] env: DB_PATH=' + (process.env.DB_PATH ? '(set)' : '(default)')
+          + ' JWT_SECRET=' + (process.env.JWT_SECRET ? '(set)' : '(default DEV)')
+          + ' CENTER_APP_URL=' + (process.env.CENTER_APP_URL || '(default localhost:3001)')
+          + ' RESEND_API_KEY=' + (process.env.RESEND_API_KEY ? '(set)' : '(unset)'));
+
+// Don't let unhandled errors kill the process silently — Railway then reports
+// "deploy failed" with zero detail. Logging surfaces them in the runtime log.
+process.on('uncaughtException',  err => console.error('[fatal] uncaughtException:',  err));
+process.on('unhandledRejection', err => console.error('[fatal] unhandledRejection:', err));
 
 // Allow Capacitor origin + same-origin + any explicit CORS_ORIGIN override
 const allowedOrigins = [
@@ -38,6 +52,12 @@ app.use((req, res, next) => {
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
   next();
 });
+
+// Health check — first thing so Railway's deploy phase always gets a fast
+// 200 even if a downstream route or the DB init is slow. Without this Railway
+// times out the healthcheck and marks the deploy as failed.
+app.get('/health', (_req, res) => res.status(200).json({ ok: true, ts: Date.now() }));
+app.get('/healthz', (_req, res) => res.status(200).send('ok'));
 
 // Auth routes
 const authRoutes = require('./routes/auth');
@@ -160,7 +180,8 @@ app.get(/^(?!\/api).*$/, (_req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-app.listen(PORT, () => {
-  console.log(`\n🚿 Pitbay server running at http://localhost:${PORT}`);
-  console.log('   OTPs will be printed here in development mode.\n');
+// Explicit 0.0.0.0 bind — Node's default ('::') works in most containers but
+// Railway occasionally requires the explicit IPv4 host. Cheap insurance.
+app.listen(PORT, HOST, () => {
+  console.log(`🚿 Pitbay customer-app listening on http://${HOST}:${PORT}`);
 });

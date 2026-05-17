@@ -2,10 +2,36 @@ const Database = require('better-sqlite3');
 const path     = require('path');
 const fs       = require('fs');
 
-// In production (Railway) set DB_PATH=/data/sparkwash.sqlite pointing to a persistent volume
-const DB_PATH = process.env.DB_PATH || path.join(__dirname, 'sparkwash.sqlite');
-fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
-const db      = new Database(DB_PATH);
+// In production (Railway) set DB_PATH=/data/sparkwash.sqlite pointing to a
+// persistent volume. We try that first, but if the volume isn't mounted or
+// is read-only we fall back to a writable directory so the process doesn't
+// crash on boot — Railway then deploys successfully and a clear log line
+// tells us to fix the volume.
+function _openDb() {
+  const preferred = process.env.DB_PATH || path.join(__dirname, 'sparkwash.sqlite');
+  const tries = [preferred, '/tmp/sparkwash.sqlite', path.join(__dirname, 'sparkwash.sqlite')];
+  const seen = new Set();
+  for (const target of tries) {
+    if (seen.has(target)) continue;
+    seen.add(target);
+    try {
+      fs.mkdirSync(path.dirname(target), { recursive: true });
+      const handle = new Database(target);
+      if (target !== preferred) {
+        console.warn(`[db] preferred path ${preferred} not writable — using fallback ${target}.`);
+        console.warn(`[db] DATA WILL NOT PERSIST across deploys. Fix the Railway volume mount at /data.`);
+      } else {
+        console.log(`[db] opened ${target}`);
+      }
+      return handle;
+    } catch (e) {
+      console.warn(`[db] cannot open ${target}:`, e.message);
+    }
+  }
+  throw new Error('Could not open SQLite at any candidate path');
+}
+
+const db = _openDb();
 
 // Enable WAL mode for better concurrent read performance
 db.pragma('journal_mode = WAL');

@@ -3,7 +3,14 @@ builder = "nixpacks"
 
 [deploy]
 startCommand = "node server.js"
-restartPolicyType = "on_failure"
+# Healthcheck — Railway pings this URL after the container starts. If the
+# server hasn't responded with 2xx within healthcheckTimeout seconds, the
+# deploy is marked failed. Without an explicit path Railway pings "/" which
+# our catch-all serves as the SPA shell — that works but is heavier than a
+# dedicated endpoint and was timing out under load.
+healthcheckPath    = "/health"
+healthcheckTimeout = 60
+restartPolicyType  = "on_failure"
 restartPolicyMaxRetries = 3
 
 [[mounts]]
