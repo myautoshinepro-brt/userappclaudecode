@@ -428,7 +428,17 @@
 .sheet-close { font-size: 19px; color: var(--text-tertiary); cursor: pointer; line-height: 1; background: none; border: none; }
 
 /* ── CONFIRM SCREEN ── */
-.confirm-body { display: flex; flex-direction: column; align-items: center; padding: 13px; }
+/* Vertically center the booking-confirmed card so the screen doesn't look
+   top-heavy with empty space at the bottom on tall phones. min-height:100%
+   gives us the scroll-area's full height; on small screens overflow still
+   scrolls correctly. */
+.confirm-body {
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  padding: 13px;
+  min-height: 100%;
+  box-sizing: border-box;
+}
 .confirm-icon {
   width: 56px; height: 56px;
   background: #e8f5e9; border-radius: 50%;
