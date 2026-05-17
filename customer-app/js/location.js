@@ -285,7 +285,9 @@ const LocationModal = {
   },
 
   // ── CITY FILTER ───────────────────────────────────────────
-  // Fetches centers from the API filtered by city, with client-side fallback.
+  // Fetches centers from the API filtered by city. Always re-filters the
+  // response client-side too, so a stale/un-deployed backend that ignores
+  // ?city= can't leak centers from other cities into the home screen.
 
   async _applyCityFilter(city) {
     const cityParam = (city || '').trim();
@@ -297,25 +299,48 @@ const LocationModal = {
       const r = await fetch(url);
       const j = await r.json();
       if (j && j.success && Array.isArray(j.data)) {
-        CENTERS = j.data;
-        // When no city filter, refresh ALL_CENTERS too (keeps fallback in sync)
-        if (!cityParam) window.ALL_CENTERS = [...j.data];
+        if (cityParam) {
+          CENTERS = j.data.filter(c => this._cityMatches(c.city, cityParam));
+        } else {
+          CENTERS = j.data;
+          window.ALL_CENTERS = [...j.data];
+        }
       }
     } catch (e) {
       console.warn('_applyCityFilter API call failed, using client-side filter:', e.message);
       if (typeof ALL_CENTERS === 'undefined') return;
-      if (!cityParam) {
-        CENTERS = [...ALL_CENTERS];
-      } else {
-        const cityLc = cityParam.toLowerCase();
-        // Strict match — don't fall back to all centers from other cities;
-        // the home screen will show "No centers in <city> yet" instead.
-        CENTERS = ALL_CENTERS.filter(c => (c.city || '').trim().toLowerCase() === cityLc);
-      }
+      CENTERS = cityParam
+        ? ALL_CENTERS.filter(c => this._cityMatches(c.city, cityParam))
+        : [...ALL_CENTERS];
     }
     if (typeof HomeScreen !== 'undefined') HomeScreen.renderCenterCards(CENTERS);
     // Keep the map pins in sync with the (newly filtered) center list.
     if (typeof MapView !== 'undefined' && MapView.refreshMarkers) MapView.refreshMarkers();
+  },
+
+  // Common Indian city naming variations — group equivalent names so a saved
+  // address tagged "New Delhi" still matches centers tagged "Delhi" in the DB.
+  _CITY_ALIASES: [
+    ['delhi', 'new delhi'],
+    ['bangalore', 'bengaluru'],
+    ['mumbai', 'bombay'],
+    ['kolkata', 'calcutta'],
+    ['chennai', 'madras'],
+    ['pune', 'poona'],
+    ['hyderabad', 'secunderabad'],
+    ['gurgaon', 'gurugram'],
+    ['mysore', 'mysuru'],
+  ],
+  _cityCanonical(name) {
+    const norm = String(name || '').trim().toLowerCase();
+    if (!norm) return '';
+    for (const group of this._CITY_ALIASES) {
+      if (group.includes(norm)) return group[0];
+    }
+    return norm;
+  },
+  _cityMatches(a, b) {
+    return this._cityCanonical(a) === this._cityCanonical(b);
   },
 
   _deselect() {
