@@ -607,7 +607,9 @@
 .filter-chip.active { background: var(--blue); border-color: var(--blue); color: #fff; }
 
 /* ── SEARCH BOX ── */
-.search-wrap { padding: 0 13px; margin-top: -11px; position: relative; z-index: 20; flex-shrink: 0; }
+/* z-index must beat Leaflet's panes (tile=200, overlay=400, marker=600, popup=700)
+   so the dropdown overlays the map instead of disappearing behind it. */
+.search-wrap { padding: 0 13px; margin-top: -11px; position: relative; z-index: 800; flex-shrink: 0; }
 .search-box  {
   background: var(--bg-primary);
   border: .5px solid var(--border-light);
