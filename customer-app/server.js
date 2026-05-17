@@ -70,6 +70,26 @@ app.use('/api/profile', require('./routes/profile'));
 // ── Centers / packages / bookings — proxied to center-app ─────────────
 // Set CENTER_APP_URL on the customer-app Railway service to the center-app's URL.
 const CENTER_APP_URL = (process.env.CENTER_APP_URL || 'http://localhost:3001').replace(/\/$/, '');
+console.log('[boot] proxying upstream calls to CENTER_APP_URL =', CENTER_APP_URL);
+
+// Diagnostic endpoint — returns what the server thinks its upstream is +
+// whether it can actually reach it. Lets us debug 502s without trawling logs.
+app.get('/api/_diag', async (_req, res) => {
+  const target = `${CENTER_APP_URL}/api/public/centers`;
+  let reach = { ok: false, error: null, status: null, ms: null };
+  const t0 = Date.now();
+  try {
+    const r = await fetch(target);
+    reach = { ok: r.ok, status: r.status, error: null, ms: Date.now() - t0 };
+  } catch (e) {
+    reach = { ok: false, status: null, error: e.message, ms: Date.now() - t0 };
+  }
+  res.json({
+    CENTER_APP_URL,
+    upstream_test: { target, ...reach },
+    node: process.version,
+  });
+});
 
 async function relayJson(res, url, init = {}) {
   try {
@@ -77,8 +97,13 @@ async function relayJson(res, url, init = {}) {
     const body = await r.json().catch(() => ({}));
     res.status(r.status).json(body);
   } catch (e) {
-    console.error('Proxy error →', url, e.message);
-    res.status(502).json({ success: false, error: 'Upstream center-app unavailable' });
+    console.error('[proxy] error →', url, '·', e.message);
+    res.status(502).json({
+      success: false,
+      error: 'Upstream center-app unavailable',
+      upstream: url,
+      reason: e.message,
+    });
   }
 }
 
