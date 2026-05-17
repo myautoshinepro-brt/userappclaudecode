@@ -4,18 +4,73 @@ const router  = express.Router();
 
 const DEFAULT_RATING  = 4.5;
 const DEFAULT_PRICE   = 149;
-const MUMBAI_CENTROID = { lat: 19.076, lng: 72.877 };
 
-// Stable per-id offset around Mumbai (~5km box) for centers without real coords.
-// Used so map markers don't collapse to a single point.
-function fallbackLatLng(id) {
+// City centroids for India. Used when a center has no lat/lng on file, or
+// when its stored coords are wildly far from its declared city (legacy
+// rows had a Mumbai-only fallback baked in, so a "Hyderabad" center
+// could end up plotted in Andheri). Keys are lowercased; keep this
+// list aligned with customer-app/js/map.js CITY_CENTROIDS.
+const CITY_CENTROIDS = {
+  'mumbai':            { lat: 19.0760, lng: 72.8777 },
+  'delhi':             { lat: 28.6139, lng: 77.2090 },
+  'new delhi':         { lat: 28.6139, lng: 77.2090 },
+  'bangalore':         { lat: 12.9716, lng: 77.5946 },
+  'bengaluru':         { lat: 12.9716, lng: 77.5946 },
+  'pune':              { lat: 18.5204, lng: 73.8567 },
+  'hyderabad':         { lat: 17.3850, lng: 78.4867 },
+  'secunderabad':      { lat: 17.4399, lng: 78.4983 },
+  'chennai':           { lat: 13.0827, lng: 80.2707 },
+  'kolkata':           { lat: 22.5726, lng: 88.3639 },
+  'gurgaon':           { lat: 28.4595, lng: 77.0266 },
+  'gurugram':          { lat: 28.4595, lng: 77.0266 },
+  'noida':             { lat: 28.5355, lng: 77.3910 },
+  'ahmedabad':         { lat: 23.0225, lng: 72.5714 },
+  'rajahmundry':       { lat: 17.0005, lng: 81.8040 },
+  'rajamahendravaram': { lat: 17.0005, lng: 81.8040 },
+};
+const INDIA_CENTROID = { lat: 22.3511, lng: 78.6677 };
+
+function centroidForCity(city) {
+  const k = String(city || '').trim().toLowerCase();
+  return CITY_CENTROIDS[k] || INDIA_CENTROID;
+}
+
+// Great-circle distance in km (Haversine). Used to detect when a center's
+// stored coords are in a completely different city than its label.
+function _haversineKm(lat1, lng1, lat2, lng2) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) ** 2
+          + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180)
+          * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+// Deterministic ~5km jitter around a centroid so multiple coordless centers
+// in the same city don't stack on the exact same point.
+function _jitterAround(centroid, id) {
   const seed = id * 9301 + 49297;
   const a = (seed % 233280) / 233280;
   const b = ((seed * 13) % 233280) / 233280;
   return {
-    lat: MUMBAI_CENTROID.lat + (a - 0.5) * 0.10,
-    lng: MUMBAI_CENTROID.lng + (b - 0.5) * 0.10,
+    lat: centroid.lat + (a - 0.5) * 0.05,  // ~5km lat
+    lng: centroid.lng + (b - 0.5) * 0.05,
   };
+}
+
+// Returns the best lat/lng to plot a center at:
+//  1. its real stored coords, IF they're within ~150km of its city centroid;
+//  2. otherwise (no coords, or wildly wrong coords), a deterministic jitter
+//     around the city centroid so the marker lands in the right metro area.
+function resolveCenterLatLng(c) {
+  const centroid = centroidForCity(c.city);
+  if (c.lat != null && c.lng != null) {
+    const distKm = _haversineKm(c.lat, c.lng, centroid.lat, centroid.lng);
+    if (distKm <= 150) return { lat: c.lat, lng: c.lng };
+    // Coords don't match the declared city — fall through to centroid jitter.
+  }
+  return _jitterAround(centroid, c.id);
 }
 
 function shapeForCustomer(c) {
@@ -24,8 +79,7 @@ function shapeForCustomer(c) {
   const price = db.getMinPackagePrice(c.id);
   const area  = String(c.address || c.city || '').split(',').pop().trim() || c.city || '';
 
-  const hasGeo = c.lat != null && c.lng != null;
-  const geo    = hasGeo ? { lat: c.lat, lng: c.lng } : fallbackLatLng(c.id);
+  const geo = resolveCenterLatLng(c);
 
   return {
     id:        'c' + c.id,

@@ -113,6 +113,26 @@ const MapView = (() => {
     });
   }
 
+  // Defense-in-depth: if the backend ever ships back a center whose coords
+  // are wildly off its declared city (e.g. legacy bad data, race during a
+  // backfill), don't draw a misleading pin in a different metro area.
+  // Backend already snaps these in shapeForCustomer; this is a belt to the
+  // backend's suspenders.
+  function _isMarkerPlausible(c, expectedCity) {
+    if (c.lat == null || c.lng == null) return false;
+    if (!expectedCity) return true;
+    const k = String(expectedCity).trim().toLowerCase();
+    const centroid = CITY_CENTROIDS[k];
+    if (!centroid) return true;  // unknown city — trust whatever we got
+    const dLat = (c.lat - centroid[0]) * Math.PI / 180;
+    const dLng = (c.lng - centroid[1]) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) ** 2
+            + Math.cos(c.lat * Math.PI / 180) * Math.cos(centroid[0] * Math.PI / 180)
+            * Math.sin(dLng / 2) ** 2;
+    const km = 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return km <= 150;
+  }
+
   // Re-paint center markers when CENTERS changes (e.g. after city filter).
   function refreshMarkers() {
     if (!_map) return;
@@ -121,8 +141,11 @@ const MapView = (() => {
     _markers = [];
 
     const list = (typeof CENTERS !== 'undefined') ? CENTERS : [];
+    const expectedCity = (AppState && AppState.user && AppState.user.city) || '';
+
+    let dropped = 0;
     list.forEach(c => {
-      if (c.lat == null || c.lng == null) return;
+      if (!_isMarkerPlausible(c, expectedCity)) { dropped++; return; }
       const m = L.marker([c.lat, c.lng], { icon: _centerIcon(), title: c.name });
       m.on('click', () => {
         if (typeof HomeScreen !== 'undefined') HomeScreen.openCenter(c.id);
@@ -131,11 +154,14 @@ const MapView = (() => {
       _markers.push(m);
     });
 
+    if (dropped) {
+      console.warn('[map] dropped', dropped, 'center pin(s) with coords > 150km from',
+                   JSON.stringify(expectedCity), '(probable backend data drift)');
+    }
+
     const badge = document.getElementById('map-center-count');
     if (badge) badge.textContent = `${list.length} center${list.length === 1 ? '' : 's'}`;
 
-    // Fit the map to whatever we have. Prefer "user + nearby centers" when GPS
-    // is on, otherwise just the centers, otherwise leave it on Mumbai.
     _autoFit();
   }
 
