@@ -150,10 +150,23 @@
                     0 4px 16px rgba(15,23,42,0.08);
         border: 1px solid rgba(15,23,42,0.06);
       }
-      /* The login/onboard screens use min-height:100% to fill the phone —
-         on desktop the phone is auto-height, so override to size-to-content. */
-      body.on-public-screen [data-screen] { position: relative; }
+      /* Login/onboard cascade fix on desktop centered-card layout.
+         .scroll-area + .login-card both use `flex: 1` which collapses to
+         0px when the parent (.phone) is auto-height — the form was there
+         in the DOM but invisible. Override to size-to-content. */
+      body.on-public-screen .phone {
+        overflow: auto;            /* let the card scroll if content is tall */
+      }
+      body.on-public-screen [data-screen] {
+        position: relative;        /* was absolute fill */
+        height: auto;
+      }
+      body.on-public-screen [data-screen] .scroll-area {
+        flex: none;
+        overflow: visible;         /* don't make inner card height:0 */
+      }
       body.on-public-screen .login-screen { min-height: auto; }
+      body.on-public-screen .login-card   { flex: none; }
     }
 </head>
 <body>
