@@ -506,10 +506,12 @@ const ProfileScreen = {
           try { targetCity = (await LocationModal._reverseGeocode(target.lat, target.lng)).city || ''; }
           catch { /* keep empty */ }
         }
-        AppState.user.city = targetCity;
-        LocationModal._setLocation(target.label, targetCity || target.label, target.lat, target.lng);
         LocationModal._selectedId = target.id;
-        await LocationModal._applyCityFilter(targetCity || '');
+        // Single call: _setLocation accepts explicit city, sets AppState,
+        // and returns the filter promise. Was previously _setLocation
+        // (which text-detected wrong) + _applyCityFilter (correct) = 2
+        // calls to /api/centers per save.
+        await LocationModal._setLocation(target.label, targetCity || target.label, target.lat, target.lng, targetCity || '');
         if (typeof MapView !== 'undefined') {
           if (target.lat != null && target.lng != null) MapView.centerOn(target.lat, target.lng);
           else if (targetCity) MapView.centerOnCity(targetCity);

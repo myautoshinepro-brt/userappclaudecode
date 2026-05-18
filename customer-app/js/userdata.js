@@ -222,11 +222,15 @@ const UserData = (() => {
       console.log('[initSession] picked default address', JSON.stringify(defAddr.label),
                   '→ city:', JSON.stringify(city), '(source:', citySource || 'derived', ')');
 
-      AppState.user.city = city;
       if (typeof LocationModal !== 'undefined') {
-        LocationModal._setLocation(defAddr.label, city || defAddr.label, defAddr.lat, defAddr.lng);
+        // Pass `city` explicitly so _setLocation doesn't text-detect a
+        // wrong segment (e.g. defaulting to defAddr.label="Home" when no
+        // city was given). It also sets AppState.user.city + returns the
+        // filter promise — one call, awaited.
         LocationModal._selectedId = defAddr.id;
-        await LocationModal._applyCityFilter(city || '');
+        await LocationModal._setLocation(defAddr.label, city || defAddr.label, defAddr.lat, defAddr.lng, city || '');
+      } else {
+        AppState.user.city = city;
       }
       if (typeof MapView !== 'undefined') {
         if (defAddr.lat != null && defAddr.lng != null) MapView.centerOn(defAddr.lat, defAddr.lng);

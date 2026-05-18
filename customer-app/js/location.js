@@ -155,16 +155,16 @@ const LocationModal = {
       this._selectedId = null;
       this._deselect();
 
-      // _setLocation kicks off _applyCityFilter as fire-and-forget — for the
-      // GPS path we need to actually wait for centers to load before closing
-      // the modal so the home doesn't briefly show stale results.
+      // Pass `city` explicitly so _setLocation skips text-detection and we
+      // get a single /api/centers call (was 2 before: wrong area-as-city
+      // then right city). _setLocation returns its filter promise so we
+      // can await it for the "Fetching centers…" status.
       const fullArea = city ? area + ', ' + city : area;
-      this._setLocation(area, fullArea, lat, lng);
+      if (city && subTxt) subTxt.textContent = `Fetching centers in ${city}…`;
+      await this._setLocation(area, fullArea, lat, lng, city);
       this._updateCenterDistances(lat, lng);
 
       if (city) {
-        if (subTxt) subTxt.textContent = `Fetching centers in ${city}…`;
-        await this._applyCityFilter(city);
         const count = (typeof CENTERS !== 'undefined') ? CENTERS.length : 0;
         console.log('[GPS] centers loaded for', city, '→', count);
         if (subTxt) {
@@ -299,9 +299,11 @@ const LocationModal = {
     this.clearSearch();
     this._selectedId = null;
     this._deselect();
-    // Build a location string that _setLocation can extract city from too.
+    // Pass the explicit city as the 5th arg so _setLocation skips its
+    // text-detection (which would pick the last comma segment and fire a
+    // wasted /api/centers?city=<area-name> call before the right one).
     const locationStr = city ? `${area}, ${city}` : area;
-    this._setLocation(area.split(',')[0], locationStr, lat || null, lng || null);
+    this._setLocation(area.split(',')[0], locationStr, lat || null, lng || null, city || '');
     if (lat && lng) this._updateCenterDistances(lat, lng);
     if (city) UI.toast(`📮 Showing centers in ${city}`);
     setTimeout(() => this.close(), 280);
@@ -323,15 +325,14 @@ const LocationModal = {
     const card = document.getElementById('lac-' + id);
     if (card) card.classList.add('selected');
     this._selectedId = id;
-    this._setLocation(label, area, lat, lng);
-    if (lat && lng) this._updateCenterDistances(lat, lng);
 
-    // Apply the address's city to filter the home screen centers
+    // Pass the canonical city directly to _setLocation so it doesn't
+    // text-detect a wrong segment (e.g. "Madeenaguda") and fire a wasted
+    // /api/centers?city=Madeenaguda call before the correct one runs.
     const addr = typeof SAVED_ADDRESSES !== 'undefined' ? SAVED_ADDRESSES.find(a => a.id === id) : null;
-    if (addr && addr.city) {
-      AppState.user.city = addr.city;
-      this._applyCityFilter(addr.city);
-    }
+    const city = addr && addr.city ? addr.city : '';
+    this._setLocation(label, area, lat, lng, city);
+    if (lat && lng) this._updateCenterDistances(lat, lng);
 
     UI.toast(emoji + ' ' + label + ' selected');
     setTimeout(() => this.close(), 380);
@@ -426,7 +427,11 @@ const LocationModal = {
 
   // ── INTERNAL: apply location to AppState + header ─────────
 
-  _setLocation(label, area, lat, lng) {
+  // `explicitCity` (optional) is the canonical city for this location. When
+  // provided we trust it and skip text-based detection — saves a redundant
+  // /api/centers call against the wrong "city" (e.g. an area name) for
+  // callers that already know which city the address belongs to.
+  _setLocation(label, area, lat, lng, explicitCity) {
     AppState.setLocation(label, area);
     AppState.location._lat = lat || null;
     AppState.location._lng = lng || null;
@@ -443,18 +448,26 @@ const LocationModal = {
       if (lat != null && lng != null) MapView.centerOn(lat, lng);
     }
 
-    // Always update the city to whatever was detected — serviceable or not.
-    // Previously this only updated when the city was in SERVICEABLE_CITIES,
-    // which left the home showing "We don't service <stale-old-city>" even
-    // after the user had clearly moved to a new area.
-    const detectedCity = this._detectCityFromArea(area);
-    if (detectedCity && detectedCity !== AppState.user.city) {
-      AppState.user.city = detectedCity;
-      this._applyCityFilter(detectedCity);
+    // Resolve the city we'll filter on:
+    //  - caller passed a string (even '')  →  trust it. '' = "I know there's
+    //    no city, don't filter or guess." Non-empty = the canonical city.
+    //  - caller didn't pass anything       →  fall back to text-detect from
+    //    the area string (legacy behavior).
+    const city = (typeof explicitCity === 'string')
+      ? explicitCity.trim()
+      : (this._detectCityFromArea(area) || '');
+
+    if (city && city !== AppState.user.city) {
+      AppState.user.city = city;
       if (typeof MapView !== 'undefined' && (lat == null || lng == null)) {
-        MapView.centerOnCity(detectedCity);
+        MapView.centerOnCity(city);
       }
+      // Return the filter promise so callers that need to wait for the
+      // /api/centers response (e.g. GPS flow showing "Fetching…" status)
+      // can await us instead of double-firing the call.
+      return this._applyCityFilter(city);
     }
+    return Promise.resolve();
   },
 
   // Pull the city out of the area string. Prefer a SERVICEABLE_CITIES match
