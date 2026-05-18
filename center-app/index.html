@@ -127,8 +127,34 @@
       /* Constrain content inside scrollable screens for readability */
       [data-screen] .scroll-area > * { max-width:1200px; }
       [data-screen] .scroll-area { padding-left:8px; padding-right:8px; }
+
+      /* ── Public screens (login + onboard) — centered card on desktop ── */
+      /* Without a sidebar, the .phone would otherwise stretch full-width,
+         making the login form look lost in a sea of white space. */
+      body.on-public-screen {
+        background: linear-gradient(135deg, #e0f2fe 0%, #f0f9ff 35%, #ffffff 65%, #eef2ff 100%);
+        height: 100vh;
+        overflow: auto;
+      }
+      body.on-public-screen .app-shell {
+        align-items: center; justify-content: center;
+        min-height: 100vh; height: auto;
+        padding: 32px 16px;
+      }
+      body.on-public-screen .phone {
+        flex: 0 0 auto;
+        width: 460px; max-width: 460px;
+        height: auto; max-height: calc(100vh - 64px);
+        border-radius: 20px; overflow: hidden;
+        box-shadow: 0 24px 80px rgba(15,23,42,0.18),
+                    0 4px 16px rgba(15,23,42,0.08);
+        border: 1px solid rgba(15,23,42,0.06);
+      }
+      /* The login/onboard screens use min-height:100% to fill the phone —
+         on desktop the phone is auto-height, so override to size-to-content. */
+      body.on-public-screen [data-screen] { position: relative; }
+      body.on-public-screen .login-screen { min-height: auto; }
     }
-  </style>
 </head>
 <body>
 

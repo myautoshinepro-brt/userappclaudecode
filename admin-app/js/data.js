@@ -21,8 +21,11 @@ let CENTERS     = [];
 let SETTLEMENTS = [];
 
 // Center onboarding applications — submitted via center app, reviewed by SA
-// Center-app backend URL — update this when deploying to production
-const CENTER_APP_URL = localStorage.getItem('sw_center_app_url') || 'https://userappclaudecode-production-7ece.up.railway.app';
+// Center-app backend URL. Admin app uses this to fetch applications,
+// approve/reject them, view all centers, settlements, chats, etc.
+// Override at runtime via localStorage('sw_center_app_url') if you ever
+// spin up a staging center-app on a different URL.
+const CENTER_APP_URL = localStorage.getItem('sw_center_app_url') || 'https://pitbay-center.fly.dev';
 const ADMIN_API_KEY   = localStorage.getItem('sw_admin_api_key')  || 'sparkwash-admin-2026';
 
 let APPLICATIONS  = []; // loaded from real API by ApplicationsScreen

@@ -43,6 +43,39 @@ const Auth = {
   },
 
   renderLogin() {
+    // Demo logins for quick testing. Grouped by city — each tap fills the
+    // mobile input. In production, hide this whole block by setting
+    // window.HIDE_DEMO_LOGINS = true before the page loads.
+    const demoChip = (mobile, name) =>
+      `<button onclick="Auth._fillDemo('${mobile}')" style="background:#fff;border:1px solid #cbd5e1;border-radius:18px;padding:5px 11px;font-size:11px;color:#1e293b;font-weight:600;cursor:pointer;transition:border-color .12s,background .12s" onmouseover="this.style.borderColor='#1a73e8';this.style.background='#eff6ff'" onmouseout="this.style.borderColor='#cbd5e1';this.style.background='#fff'">${name}</button>`;
+    const demoCity = (city, chips) =>
+      `<div style="margin-bottom:8px"><div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:6px">${city}</div><div style="display:flex;flex-wrap:wrap;gap:5px">${chips}</div></div>`;
+    const demoBlock = window.HIDE_DEMO_LOGINS ? '' : `
+      <div style="margin-top:18px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:12px 13px">
+        <div style="font-size:12px;color:#1e293b;font-weight:700;margin-bottom:10px">🧪 Demo centers · tap to autofill</div>
+        ${demoCity('Mumbai', [
+          ['9876543210', 'Shine Auto Wash'],
+          ['9876543211', 'Pitbay Bandra'],
+          ['9876543212', 'QuickWash Thane'],
+        ].map(([m, n]) => demoChip(m, n)).join(''))}
+        ${demoCity('Hyderabad', [
+          ['9999100001', 'Cyber Sparkle'],
+          ['9999100002', 'Gachi GlowWash'],
+          ['9999100003', 'Hitec Auto Spa'],
+          ['9999100004', 'Kondapur CarCare'],
+          ['9999100005', 'Banjara Detailing'],
+          ['9999100006', 'Jubilee Pro Wash'],
+          ['9999100007', 'Begumpet Bubble'],
+          ['9999100008', 'Secunderabad Shine'],
+          ['9999100009', 'KPHB Quick Wash'],
+          ['9999100010', 'Madeenaguda WashPoint'],
+        ].map(([m, n]) => demoChip(m, n)).join(''))}
+        ${demoCity('Delhi', [
+          ['9999200001', 'CP Pro Carwash'],
+          ['9999200002', 'Dwarka WashHub'],
+        ].map(([m, n]) => demoChip(m, n)).join(''))}
+      </div>`;
+
     document.getElementById('login-form-area').innerHTML = `
       <p class="login-sub">Enter your registered mobile number to receive an OTP</p>
       <div class="input-group">
@@ -58,14 +91,7 @@ const Auth = {
       <button class="btn btn-primary btn-full" id="send-otp-btn" onclick="Auth.sendOtp()">
         Send OTP
       </button>
-      <div style="margin-top:16px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:10px 12px">
-        <div style="font-size:11px;color:#166534;font-weight:600;margin-bottom:8px">🧪 Demo centers (tap to fill)</div>
-        <div style="display:flex;flex-wrap:wrap;gap:6px">
-          <button onclick="Auth._fillDemo('9876543210')" style="background:#fff;border:1px solid #86efac;border-radius:20px;padding:4px 10px;font-size:11px;color:#166534;font-weight:600;cursor:pointer">Shine Auto Wash</button>
-          <button onclick="Auth._fillDemo('9876543211')" style="background:#fff;border:1px solid #86efac;border-radius:20px;padding:4px 10px;font-size:11px;color:#166534;font-weight:600;cursor:pointer">Pitbay Bandra</button>
-          <button onclick="Auth._fillDemo('9876543212')" style="background:#fff;border:1px solid #86efac;border-radius:20px;padding:4px 10px;font-size:11px;color:#166534;font-weight:600;cursor:pointer">QuickWash Thane</button>
-        </div>
-      </div>
+      ${demoBlock}
     `;
     setTimeout(() => document.getElementById('login-mobile')?.focus(), 100);
   },

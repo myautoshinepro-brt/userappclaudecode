@@ -101,7 +101,11 @@ const Router = {
     if (!sidebar) return;
     // Auto-hide sidebar on public screens (login/onboard) since user has no
     // center to manage yet. We also hide it at all <1024px viewports via CSS.
-    sidebar.style.display = this.PUBLIC_SCREENS.has(screenId) ? 'none' : '';
+    const isPublic = this.PUBLIC_SCREENS.has(screenId);
+    sidebar.style.display = isPublic ? 'none' : '';
+    // Toggle a body class so CSS can center the login/onboard card on desktop
+    // (it would otherwise stretch full-width with the sidebar gone).
+    document.body.classList.toggle('on-public-screen', isPublic);
 
     const groupMap = {
       'booking-detail':   'bookings',
