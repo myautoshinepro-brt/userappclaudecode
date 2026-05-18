@@ -37,10 +37,14 @@ const Auth = (() => {
     };
     if (token) headers['Authorization'] = `Bearer ${token}`;
 
-    // In Capacitor, we must use absolute URLs.
-    // window.API_URL is defined in index.html
-    const baseUrl = window.API_URL || '';
-    const fullUrl = baseUrl + BASE + path;
+    // Use a RELATIVE URL — fetch resolves to same-origin on the web (works
+    // whichever host the page is served from: Railway, Fly, custom domain)
+    // and the monkey-patch in index.html rewrites it to window.API_URL when
+    // running inside Capacitor (where the WebView loads from https://localhost
+    // and same-origin would go nowhere). Was previously hardcoded to prepend
+    // window.API_URL, which made every web visit do a cross-origin call to
+    // the configured (and possibly stale) Railway URL.
+    const fullUrl = BASE + path;
     console.log(`API Call: ${method} ${fullUrl}`, body);
 
     const res  = await fetch(fullUrl, {

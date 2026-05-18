@@ -1351,7 +1351,8 @@
   // when running inside Capacitor. On the web we MUST use relative URLs so
   // visitors hit whichever Railway service is serving them (no hardcoded
   // URL = no breakage when the service URL changes).
-  window.API_URL = 'https://userappclaudecode-production-0545.up.railway.app';
+  // Backend URL for the Capacitor build only (web uses relative URLs).
+  window.API_URL = 'https://pitbay-customer.fly.dev';
   (function() {
     const isNative = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
     if (!isNative) return; // Web build: leave /api/* alone — same-origin works.
