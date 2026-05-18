@@ -1,0 +1,31 @@
+node_modules
+npm-debug.log
+*.log
+
+# Native mobile builds — not needed in the server image
+android
+ios
+.capacitor
+www
+
+# Local dev databases — Fly mounts a persistent volume at /data
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+db/*.sqlite
+db/*.sqlite-shm
+db/*.sqlite-wal
+
+# Local env + secrets
+.env
+.env.*
+
+# IDE / tooling
+.vscode
+.idea
+.git
+.gitignore
+.claude
+
+# Markdown / docs aren't needed at runtime
+*.md

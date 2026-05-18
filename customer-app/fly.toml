@@ -1,0 +1,50 @@
+# Fly.io config for customer-app
+# Deploy with: cd customer-app && flyctl deploy
+# Mumbai region (`bom`) for lowest latency to Indian users.
+
+app            = 'pitbay-customer'   # CHANGE THIS to a unique name if "pitbay-customer" is taken
+primary_region = 'bom'
+
+[build]
+  # We use a Dockerfile (in this dir) instead of a buildpack because
+  # better-sqlite3 needs native build tools (gcc, python, make) at install
+  # time. The Dockerfile installs them explicitly.
+
+[env]
+  PORT      = '3000'
+  HOST      = '0.0.0.0'
+  NODE_ENV  = 'production'
+  DB_PATH   = '/data/sparkwash.sqlite'
+  DEV_MODE  = 'true'
+  CORS_ORIGIN = '*'
+  # CENTER_APP_URL and JWT_SECRET are set as secrets via `flyctl secrets set`
+  # so they don't end up in source control.
+
+[http_service]
+  internal_port       = 3000
+  force_https         = true
+  # Free tier: stop the machine after idle to conserve free hours.
+  # First request after idle takes ~2s extra (cold start). Set
+  # min_machines_running = 1 if you want always-on (uses more credit).
+  auto_stop_machines  = 'stop'
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ['app']
+
+  [[http_service.checks]]
+    grace_period  = '15s'
+    interval      = '30s'
+    timeout       = '5s'
+    method        = 'GET'
+    path          = '/health'
+
+# Persistent volume for the SQLite DB. Must be created once via:
+#   flyctl volumes create customer_app_data --size 1 --region bom
+# (1 GB free in the Fly free tier.)
+[mounts]
+  source      = 'customer_app_data'
+  destination = '/data'
+
+[[vm]]
+  size   = 'shared-cpu-1x'   # 1 shared vCPU
+  memory = '256mb'           # plenty for Express + SQLite
