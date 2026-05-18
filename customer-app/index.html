@@ -31,12 +31,95 @@
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     }
 
+    /* Marketing pane is hidden by default — only shown on large desktops below */
+    .mk-pane { display: none; }
+
     /* Phone shell styling - only for desktop */
     @media (min-width: 481px) {
       body { display:flex; flex-direction:column; align-items:center; padding:8px; gap:10px; min-height:100vh; background:#e5e7eb; }
       .phone { width:375px; height:812px; background:#fff; border-radius:40px; overflow:hidden; display:flex; flex-direction:column; box-shadow:0 8px 40px rgba(0,0,0,.2); border:1.5px solid #d1d5db; position:relative; }
       /* Screen visibility on desktop */
       [data-screen] { position:absolute; inset:0; display:flex; flex-direction:column; background:#fff; visibility:hidden; pointer-events:none; }
+    }
+
+    /* Wide desktops (>= 1024px) — show marketing pane next to the phone shell */
+    @media (min-width: 1024px) {
+      body {
+        flex-direction: row;
+        justify-content: center;
+        gap: 48px;
+        padding: 32px 24px;
+        background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 50%, #ffffff 100%);
+      }
+      .mk-pane {
+        display: flex; flex-direction: column;
+        max-width: 480px;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        color: #0f172a;
+      }
+      .mk-logo {
+        display: flex; align-items: center; gap: 10px;
+        font-size: 22px; font-weight: 800;
+        color: #1e40af; margin-bottom: 32px;
+      }
+      .mk-logo-mark {
+        width: 36px; height: 36px; border-radius: 9px;
+        background: linear-gradient(135deg, #1a73e8, #1e40af);
+        display: flex; align-items: center; justify-content: center;
+        font-size: 18px;
+      }
+      .mk-headline {
+        font-size: 42px; font-weight: 800;
+        line-height: 1.1; letter-spacing: -0.02em;
+        margin: 0 0 16px;
+        color: #0f172a;
+      }
+      .mk-hl-blue { color: #1a73e8; }
+      .mk-sub {
+        font-size: 16px; line-height: 1.55;
+        color: #475569; margin: 0 0 28px;
+      }
+      .mk-features { list-style: none; padding: 0; margin: 0 0 32px; display: grid; gap: 12px; }
+      .mk-features li {
+        display: flex; align-items: flex-start; gap: 10px;
+        font-size: 14px; color: #334155; line-height: 1.5;
+      }
+      .mk-features .mk-tick {
+        flex-shrink: 0;
+        width: 22px; height: 22px; border-radius: 50%;
+        background: #dcfce7; color: #16a34a;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 12px; font-weight: 800;
+      }
+      .mk-cta-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 24px; }
+      .mk-store {
+        display: inline-flex; align-items: center; gap: 8px;
+        padding: 10px 16px; background: #0f172a; color: #fff;
+        border-radius: 10px; font-size: 13px; font-weight: 600;
+        text-decoration: none; transition: transform .12s;
+      }
+      .mk-store:hover { transform: translateY(-1px); }
+      .mk-store-emoji { font-size: 18px; }
+      .mk-store-small { font-size: 10px; opacity: .8; line-height: 1; display:block; }
+      .mk-store-big   { font-size: 14px; line-height: 1.15; font-weight: 700; display:block; }
+      .mk-arrow-hint {
+        display: flex; align-items: center; gap: 8px;
+        font-size: 13px; color: #1a73e8; font-weight: 600;
+      }
+      .mk-arrow-hint::before { content: '→'; font-size: 18px; }
+
+      /* Add a bigger drop shadow so the phone reads as a "preview" */
+      .phone {
+        box-shadow: 0 24px 80px rgba(15, 23, 42, 0.18),
+                    0 4px 16px rgba(15, 23, 42, 0.08);
+      }
+    }
+
+    /* Extra-large screens — give a bit more breathing room */
+    @media (min-width: 1440px) {
+      body { gap: 80px; }
+      .mk-pane { max-width: 540px; }
+      .mk-headline { font-size: 48px; }
     }
 
     /* Full screen on actual mobile */
@@ -171,6 +254,53 @@
   </style>
 </head>
 <body>
+
+<!-- Marketing pane — only visible on >=1024px desktops (CSS-controlled).
+     On mobile/tablet this element is display:none and the phone shell
+     takes the whole screen as before. -->
+<aside class="mk-pane">
+  <div class="mk-logo">
+    <div class="mk-logo-mark">🚿</div>
+    <span>Pitbay</span>
+  </div>
+
+  <h1 class="mk-headline">
+    Book your car wash<br>
+    in <span class="mk-hl-blue">30 seconds.</span>
+  </h1>
+
+  <p class="mk-sub">
+    Find verified wash centers near you, pick a slot, and pay at the
+    center. No advance payment, no surprises — washes done by trusted,
+    rated centers in your area.
+  </p>
+
+  <ul class="mk-features">
+    <li><span class="mk-tick">✓</span> Real-time slot availability across 15+ wash centers in Mumbai, Hyderabad, and Delhi</li>
+    <li><span class="mk-tick">✓</span> Live tracking — see when your wash starts and finishes</li>
+    <li><span class="mk-tick">✓</span> Rate &amp; review every wash · choose centers customers love</li>
+    <li><span class="mk-tick">✓</span> Doorstep wash available · the wash comes to you</li>
+  </ul>
+
+  <div class="mk-cta-row">
+    <a class="mk-store" href="#" onclick="event.preventDefault();alert('Android APK download coming soon — for now, use the web app on the right →')">
+      <span class="mk-store-emoji">🤖</span>
+      <span>
+        <span class="mk-store-small">Get it on</span>
+        <span class="mk-store-big">Google Play</span>
+      </span>
+    </a>
+    <a class="mk-store" href="#" onclick="event.preventDefault();alert('iOS app coming soon — for now, use the web app on the right →')" style="background:#1f2937">
+      <span class="mk-store-emoji">🍎</span>
+      <span>
+        <span class="mk-store-small">Download on</span>
+        <span class="mk-store-big">the App Store</span>
+      </span>
+    </a>
+  </div>
+
+  <div class="mk-arrow-hint">Or try the web app right here</div>
+</aside>
 
 <div class="phone">
   <!-- Status bar (hidden on mobile) -->
