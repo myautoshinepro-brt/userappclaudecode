@@ -545,11 +545,46 @@ const _demoAppInsert = db.prepare(`
 ].forEach(a => _demoAppInsert.run(...a));
 
 // ── SEED additional demo centers (idempotent) ─────────────────
-const _demoCenterInsert = db.prepare('INSERT OR IGNORE INTO centers (name, owner_name, mobile, email, address, city, wash_types) VALUES (?,?,?,?,?,?,?)');
-[
-  ['Pitbay Bandra', 'Kiran Nair',  '9876543211', 'bandra@pitbay.in', 'Unit 12, Hill Road, Bandra West',   'Mumbai', 'water,dry,steam'],
-  ['QuickWash Thane',  'Deepak Rao',  '9876543212', 'thane@pitbay.in',  'Plot 3, Pokhran Road, Thane West',  'Mumbai', 'water,dry,steam,d2d'],
-].forEach(c => _demoCenterInsert.run(...c));
+// Each center's `mobile` is also its owner-login identifier — center owners
+// log in to the center-app by entering this mobile + the OTP that comes back.
+// (DEV_MODE=true in production returns the OTP in the API response, so you
+// can test the owner flow end-to-end without real SMS.)
+const _demoCenterInsert = db.prepare(
+  'INSERT OR IGNORE INTO centers ' +
+  '(name, owner_name, mobile, email, address, area, pincode, city, wash_types, lat, lng) ' +
+  'VALUES (?,?,?,?,?,?,?,?,?,?,?)'
+);
+
+const _demoCenters = [
+  // Mumbai (legacy seed)
+  ['Pitbay Bandra',          'Kiran Nair',     '9876543211', 'bandra@pitbay.in',       'Unit 12, Hill Road, Bandra West',          'Bandra West',     '400050', 'Mumbai',    'water,dry,steam',     19.0596, 72.8295],
+  ['QuickWash Thane',        'Deepak Rao',     '9876543212', 'thane@pitbay.in',        'Plot 3, Pokhran Road, Thane West',         'Thane West',      '400606', 'Mumbai',    'water,dry,steam,d2d', 19.2183, 72.9781],
+  // Hyderabad — 10 centers across major neighborhoods
+  ['Cyber Sparkle Madhapur', 'Vamsi Krishna',  '9999100001', 'madhapur@pitbay.in',     'Plot 12, Ayyappa Society, Madhapur',       'Madhapur',        '500081', 'Hyderabad', 'water,dry,steam,d2d', 17.4485, 78.3908],
+  ['Gachi GlowWash',         'Sandeep Reddy',  '9999100002', 'gachibowli@pitbay.in',   'Shop 5, DLF Cyber City, Gachibowli',       'Gachibowli',      '500032', 'Hyderabad', 'water,dry,steam',     17.4399, 78.3489],
+  ['Hitec Auto Spa',         'Pranav Rao',     '9999100003', 'hitec@pitbay.in',        'Tower B, Cyber Towers, Hitec City',        'Hitec City',      '500081', 'Hyderabad', 'water,dry,steam,d2d', 17.4435, 78.3772],
+  ['Kondapur CarCare',       'Anitha Suresh',  '9999100004', 'kondapur@pitbay.in',     'Door 18, Botanical Garden Road, Kondapur', 'Kondapur',        '500084', 'Hyderabad', 'water,dry',           17.4615, 78.3637],
+  ['Banjara Detailing',      'Ravi Teja',      '9999100005', 'banjara@pitbay.in',      'Road 12, Banjara Hills',                   'Banjara Hills',   '500034', 'Hyderabad', 'water,dry,steam',     17.4156, 78.4347],
+  ['Jubilee Pro Wash',       'Manjula Devi',   '9999100006', 'jubilee@pitbay.in',      'Road 36, Jubilee Hills',                   'Jubilee Hills',   '500033', 'Hyderabad', 'water,dry,steam,d2d', 17.4326, 78.4071],
+  ['Begumpet Bubble Wash',   'Kiran Kumar',    '9999100007', 'begumpet@pitbay.in',     'Shop 9, SP Road, Begumpet',                'Begumpet',        '500016', 'Hyderabad', 'water,dry',           17.4438, 78.4632],
+  ['Secunderabad Shine',     'Rajesh Patnaik', '9999100008', 'secunderabad@pitbay.in', 'Plot 4, Parade Grounds, Secunderabad',     'Secunderabad',    '500003', 'Hyderabad', 'water,dry,steam',     17.4399, 78.4983],
+  ['KPHB Quick Wash',        'Lakshmi Prasad', '9999100009', 'kphb@pitbay.in',         'Phase 3, KPHB Colony, Kukatpally',         'Kukatpally',      '500072', 'Hyderabad', 'water,dry,d2d',       17.4849, 78.4076],
+  ['Madeenaguda WashPoint',  'Surekha Devi',   '9999100010', 'madeenaguda@pitbay.in',  'Plot 7, Mythri Nagar, Madeenaguda',        'Madeenaguda',     '500049', 'Hyderabad', 'water,dry,steam',     17.4929, 78.3556],
+  // Delhi — 2 centers
+  ['CP Pro Carwash',         'Rohit Sharma',   '9999200001', 'cp@pitbay.in',           'Block N, Connaught Place',                 'Connaught Place', '110001', 'Delhi',     'water,dry,steam,d2d', 28.6315, 77.2167],
+  ['Dwarka WashHub',         'Anjali Gupta',   '9999200002', 'dwarka@pitbay.in',       'Sector 12, Dwarka',                        'Dwarka',          '110078', 'Delhi',     'water,dry,steam',     28.5921, 77.0460],
+];
+
+for (const row of _demoCenters) {
+  const result = _demoCenterInsert.run(...row);
+  // result.changes === 1 means a brand-new row was inserted; seed its default
+  // packages so customers can book immediately. INSERT OR IGNORE returns
+  // changes:0 when the mobile already exists, and we don't want to re-seed.
+  if (result.changes === 1) {
+    try { _seedDefaultPackages(result.lastInsertRowid); }
+    catch (e) { console.warn('seed packages for', row[0], '→', e.message); }
+  }
+}
 
 // ── PREPARED STATEMENTS ──────────────────────────────────────
 
