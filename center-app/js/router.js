@@ -38,6 +38,7 @@ const Router = {
 
     this._updateNav(screenId);
     this._updatePills(screenId);
+    this._updateSidebar(screenId);
     this._onEnter(screenId);
   },
 
@@ -91,5 +92,33 @@ const Router = {
       pill.style.color        = on ? '#fff'          : '';
       pill.style.borderColor  = on ? 'var(--navy)'  : '';
     });
+  },
+
+  // Desktop sidebar highlight. Maps sub-screens to their canonical sidebar
+  // group (same idea as _updateNav's navMap).
+  _updateSidebar(screenId) {
+    const sidebar = document.getElementById('app-sidebar');
+    if (!sidebar) return;
+    // Auto-hide sidebar on public screens (login/onboard) since user has no
+    // center to manage yet. We also hide it at all <1024px viewports via CSS.
+    sidebar.style.display = this.PUBLIC_SCREENS.has(screenId) ? 'none' : '';
+
+    const groupMap = {
+      'booking-detail':   'bookings',
+      'bank-details':     'profile',
+      'edit-package':     'manage-packages',
+    };
+    const active = groupMap[screenId] || screenId;
+    sidebar.querySelectorAll('.as-link[data-sb-screen]').forEach(link => {
+      link.classList.toggle('active', link.dataset.sbScreen === active);
+    });
+
+    // Refresh the center-name card while we're here.
+    if (typeof AppState !== 'undefined' && AppState.center) {
+      const nameEl = document.getElementById('sb-center-name');
+      const subEl  = document.getElementById('sb-center-sub');
+      if (nameEl) nameEl.textContent = AppState.center.name || 'Your center';
+      if (subEl)  subEl.textContent  = [AppState.center.area, AppState.center.city].filter(Boolean).join(' · ') || 'Center';
+    }
   },
 };

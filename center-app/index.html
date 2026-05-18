@@ -22,32 +22,163 @@
   <link rel="stylesheet" href="css/components.css">
   <link rel="stylesheet" href="css/screens.css">
   <style>
-    body { display:flex; flex-direction:column; align-items:center; padding:8px; gap:10px; min-height:100vh; background:#e5e7eb; }
+    /* ────────── Base ────────── */
+    body { display:flex; flex-direction:column; align-items:center; padding:8px; gap:10px; min-height:100vh; background:#e5e7eb; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+
+    /* Dev-only nav pills above the phone (hidden in mobile + desktop layouts) */
+    .dev-nav-pills { display:none; }
+    @media (min-width:481px) and (max-width:1023px) {
+      /* Show only in mid-width "phone-shell on desktop" preview mode */
+      .dev-nav-pills { display:flex; gap:5px; flex-wrap:wrap; justify-content:center; max-width:375px; }
+    }
+
+    /* ────────── Phone-frame layout (mobile + tablet preview) ────────── */
+    .app-shell { display:contents; }            /* default: no wrapper effect */
+    .app-sidebar { display:none; }              /* hidden by default */
     .phone { width:375px; height:812px; background:#fff; border-radius:40px; overflow:hidden; display:flex; flex-direction:column; box-shadow:0 8px 40px rgba(0,0,0,.2); border:1.5px solid #d1d5db; position:relative; }
-    @media (max-width:480px) { body { padding:0; } .phone { width:100vw; height:100dvh; border-radius:0; border:none; } }
+    @media (max-width:480px) {
+      body { padding:0; }
+      .phone { width:100vw; height:100dvh; border-radius:0; border:none; }
+    }
     [data-screen] { position:absolute; inset:0; display:flex; flex-direction:column; background:#fff; visibility:hidden; pointer-events:none; }
     [data-screen].screen-active { visibility:visible; pointer-events:all; z-index:1; }
+
+    /* ────────── Desktop layout: sidebar + full-bleed content (≥1024px) ────────── */
+    @media (min-width: 1024px) {
+      body {
+        display:block; padding:0; gap:0;
+        background:#f6f8fb;
+        height:100vh; overflow:hidden;
+      }
+      .app-shell {
+        display:flex !important; flex-direction:row;
+        height:100vh; width:100vw;
+      }
+      .app-sidebar {
+        display:flex !important; flex-direction:column;
+        width:240px; flex-shrink:0;
+        background:#0f172a; color:#e2e8f0;
+        height:100vh; overflow-y:auto;
+        padding:24px 0;
+        font-size:14px;
+      }
+      .as-brand {
+        display:flex; align-items:center; gap:10px;
+        padding:0 22px 24px;
+        font-size:18px; font-weight:800;
+        color:#fff;
+        border-bottom:1px solid rgba(255,255,255,0.08);
+        margin-bottom:16px;
+      }
+      .as-brand-mark {
+        width:34px; height:34px; border-radius:9px;
+        background:linear-gradient(135deg,#1a73e8,#1e40af);
+        display:flex; align-items:center; justify-content:center;
+        font-size:16px;
+      }
+      .as-center-card {
+        margin:0 14px 18px; padding:12px 14px;
+        background:rgba(255,255,255,0.04); border-radius:10px;
+      }
+      .as-center-name {
+        font-size:13px; font-weight:700; color:#fff;
+        white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+      }
+      .as-center-sub {
+        font-size:11px; color:#94a3b8; margin-top:2px;
+        white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+      }
+      .as-section-label {
+        font-size:10px; font-weight:700; color:#64748b;
+        text-transform:uppercase; letter-spacing:0.06em;
+        padding:14px 22px 6px;
+      }
+      .as-link {
+        display:flex; align-items:center; gap:12px;
+        padding:10px 22px;
+        color:#cbd5e1; cursor:pointer;
+        border-left:3px solid transparent;
+        transition: background .15s, color .15s, border-color .15s;
+      }
+      .as-link:hover { background:rgba(255,255,255,0.04); color:#fff; }
+      .as-link.active {
+        background:rgba(26,115,232,0.18);
+        color:#fff;
+        border-left-color:#1a73e8;
+      }
+      .as-link-ico { font-size:16px; width:20px; text-align:center; }
+      .as-spacer { flex:1; }
+      .as-footer {
+        padding:12px 22px; border-top:1px solid rgba(255,255,255,0.08);
+        font-size:11px; color:#64748b;
+      }
+
+      /* Phone shell becomes a full-bleed content area on desktop */
+      .phone {
+        width:auto; height:100vh;
+        border:none; border-radius:0;
+        box-shadow:none;
+        flex:1; min-width:0;
+        background:#f6f8fb;
+      }
+      /* Hide the in-app bottom nav — sidebar replaces it */
+      .phone .bottom-nav { display:none !important; }
+
+      /* Constrain content inside scrollable screens for readability */
+      [data-screen] .scroll-area > * { max-width:1200px; }
+      [data-screen] .scroll-area { padding-left:8px; padding-right:8px; }
+    }
   </style>
 </head>
 <body>
 
-<!-- Dev nav pills -->
-<div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:center;max-width:375px">
-  <div class="nav-pill" data-screen="login"          onclick="Router.go('login')"          style="font-size:10px;padding:4px 10px;border-radius:18px;border:.5px solid #d1d5db;cursor:pointer">🔑 Login</div>
-  <div class="nav-pill" data-screen="onboard"        onclick="Router.go('onboard')"        style="font-size:10px;padding:4px 10px;border-radius:18px;border:.5px solid #d1d5db;cursor:pointer">🏪 Apply</div>
-  <div class="nav-pill" data-screen="dashboard"      onclick="Router.go('dashboard')"      style="font-size:10px;padding:4px 10px;border-radius:18px;border:.5px solid #d1d5db;cursor:pointer">📊 Dashboard</div>
-  <div class="nav-pill" data-screen="bookings"       onclick="Router.go('bookings')"       style="font-size:10px;padding:4px 10px;border-radius:18px;border:.5px solid #d1d5db;cursor:pointer">📋 Bookings</div>
-  <div class="nav-pill" data-screen="booking-detail" onclick="Router.go('booking-detail')" style="font-size:10px;padding:4px 10px;border-radius:18px;border:.5px solid #d1d5db;cursor:pointer">🔍 Detail</div>
-  <div class="nav-pill" data-screen="queue"          onclick="Router.go('queue')"          style="font-size:10px;padding:4px 10px;border-radius:18px;border:.5px solid #d1d5db;cursor:pointer">🚗 Queue</div>
-  <div class="nav-pill" data-screen="slots"          onclick="Router.go('slots')"          style="font-size:10px;padding:4px 10px;border-radius:18px;border:.5px solid #d1d5db;cursor:pointer">🕐 Slots</div>
-  <div class="nav-pill" data-screen="profile"        onclick="Router.go('profile')"        style="font-size:10px;padding:4px 10px;border-radius:18px;border:.5px solid #d1d5db;cursor:pointer">⚙️ Profile</div>
-  <div class="nav-pill" data-screen="edit-center"    onclick="Router.go('edit-center')"    style="font-size:10px;padding:4px 10px;border-radius:18px;border:.5px solid #d1d5db;cursor:pointer">✏️ Edit</div>
-  <div class="nav-pill" data-screen="manage-packages" onclick="Router.go('manage-packages')" style="font-size:10px;padding:4px 10px;border-radius:18px;border:.5px solid #d1d5db;cursor:pointer">📦 Packages</div>
-  <div class="nav-pill" data-screen="revenue-report"  onclick="Router.go('revenue-report')"  style="font-size:10px;padding:4px 10px;border-radius:18px;border:.5px solid #d1d5db;cursor:pointer">📊 Revenue</div>
-  <div class="nav-pill" data-screen="reviews"         onclick="Router.go('reviews')"         style="font-size:10px;padding:4px 10px;border-radius:18px;border:.5px solid #d1d5db;cursor:pointer">⭐ Reviews</div>
+<!-- Dev nav pills — hidden in production layouts via CSS .dev-nav-pills -->
+<div class="dev-nav-pills">
+  <div class="nav-pill" data-screen="login"           onclick="Router.go('login')"           style="font-size:10px;padding:4px 10px;border-radius:18px;border:.5px solid #d1d5db;cursor:pointer">🔑 Login</div>
+  <div class="nav-pill" data-screen="onboard"         onclick="Router.go('onboard')"         style="font-size:10px;padding:4px 10px;border-radius:18px;border:.5px solid #d1d5db;cursor:pointer">🏪 Apply</div>
+  <div class="nav-pill" data-screen="dashboard"       onclick="Router.go('dashboard')"       style="font-size:10px;padding:4px 10px;border-radius:18px;border:.5px solid #d1d5db;cursor:pointer">📊 Dashboard</div>
+  <div class="nav-pill" data-screen="bookings"        onclick="Router.go('bookings')"        style="font-size:10px;padding:4px 10px;border-radius:18px;border:.5px solid #d1d5db;cursor:pointer">📋 Bookings</div>
+  <div class="nav-pill" data-screen="queue"           onclick="Router.go('queue')"           style="font-size:10px;padding:4px 10px;border-radius:18px;border:.5px solid #d1d5db;cursor:pointer">🚗 Queue</div>
+  <div class="nav-pill" data-screen="slots"           onclick="Router.go('slots')"           style="font-size:10px;padding:4px 10px;border-radius:18px;border:.5px solid #d1d5db;cursor:pointer">🕐 Slots</div>
+  <div class="nav-pill" data-screen="profile"         onclick="Router.go('profile')"         style="font-size:10px;padding:4px 10px;border-radius:18px;border:.5px solid #d1d5db;cursor:pointer">⚙️ Profile</div>
 </div>
 
-<div class="phone">
+<div class="app-shell">
+  <!-- ════════════════════════════════════════════
+       DESKTOP SIDEBAR (≥1024px) — replaces the in-app bottom-nav.
+       Hidden on mobile/tablet via CSS.
+  ════════════════════════════════════════════ -->
+  <aside class="app-sidebar" id="app-sidebar">
+    <div class="as-brand">
+      <div class="as-brand-mark">🚿</div>
+      <span>Pitbay Center</span>
+    </div>
+    <div class="as-center-card">
+      <div class="as-center-name" id="sb-center-name">—</div>
+      <div class="as-center-sub" id="sb-center-sub">Not signed in</div>
+    </div>
+
+    <div class="as-section-label">Operations</div>
+    <div class="as-link" data-sb-screen="dashboard" onclick="Router.go('dashboard')"><span class="as-link-ico">📊</span>Dashboard</div>
+    <div class="as-link" data-sb-screen="bookings"  onclick="Router.go('bookings')"><span class="as-link-ico">📋</span>Bookings</div>
+    <div class="as-link" data-sb-screen="queue"     onclick="Router.go('queue')"><span class="as-link-ico">🚗</span>Live Queue</div>
+    <div class="as-link" data-sb-screen="slots"     onclick="Router.go('slots')"><span class="as-link-ico">🕐</span>Slots</div>
+
+    <div class="as-section-label">Manage</div>
+    <div class="as-link" data-sb-screen="manage-packages" onclick="Router.go('manage-packages')"><span class="as-link-ico">📦</span>Packages</div>
+    <div class="as-link" data-sb-screen="reviews"         onclick="Router.go('reviews')"><span class="as-link-ico">⭐</span>Reviews</div>
+    <div class="as-link" data-sb-screen="revenue-report"  onclick="Router.go('revenue-report')"><span class="as-link-ico">💰</span>Revenue</div>
+
+    <div class="as-section-label">Account</div>
+    <div class="as-link" data-sb-screen="edit-center" onclick="Router.go('edit-center')"><span class="as-link-ico">✏️</span>Center Info</div>
+    <div class="as-link" data-sb-screen="profile"     onclick="Router.go('profile')"><span class="as-link-ico">⚙️</span>Settings</div>
+
+    <div class="as-spacer"></div>
+    <div class="as-link" onclick="Auth.logout()"><span class="as-link-ico">🚪</span>Sign out</div>
+    <div class="as-footer">Pitbay Center · v1.0</div>
+  </aside>
+
+  <div class="phone">
   <!-- Screens container -->
   <div style="flex:1;position:relative;overflow:hidden">
 
@@ -487,6 +618,7 @@
   </nav>
 
 </div><!-- end .phone -->
+</div><!-- end .app-shell -->
 
 <!-- Capacitor (auto-injected on native build by `cap sync`) -->
 <script src="capacitor.js"></script>
