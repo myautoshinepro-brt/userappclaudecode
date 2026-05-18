@@ -518,16 +518,22 @@ const ProfileScreen = {
         }
       }
 
-      // Where to go next:
-      //  - mid-booking → back to summary so the booking flow keeps going
-      //  - first address (just created) → home so user sees centers near them
-      //  - subsequent add → addresses list so user can manage them
-      const cameFromSummary = Router.history.includes('summary');
-      const isFirstAddress  = !isEditing && SAVED_ADDRESSES.length === 1;
+      // Where to go next — based on where the user came from:
+      //  - mid-booking (summary in history)  →  back to summary so the booking flow continues
+      //  - opened add-address from HOME      →  back to home with the new/edited address active
+      //  - opened add-address from ADDRESSES →  back to addresses list (managing addresses)
+      //  - otherwise (first-time user, no history yet) → home
+      //
+      // The screen *immediately before* add-address tells us the user's intent.
+      // history[length-1] is the most-recently-pushed entry, which is the
+      // screen they were on when they tapped "Add new address".
+      const cameFromSummary   = Router.history.includes('summary');
+      const previousScreen    = Router.history[Router.history.length - 1] || '';
+      const cameFromAddresses = previousScreen === 'addresses';
       setTimeout(() => {
-        if (cameFromSummary)     Router.back();
-        else if (isFirstAddress) Router.go('home', false);
-        else                     Router.go('addresses');
+        if (cameFromSummary)        Router.back();
+        else if (cameFromAddresses) Router.go('addresses');
+        else                        Router.go('home', false);
       }, 800);
     } catch (e) {
       UI.toast('❌ ' + e.message);
